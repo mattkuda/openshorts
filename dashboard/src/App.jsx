@@ -334,13 +334,29 @@ function App() {
       let body;
       const headers = { 'X-Gemini-Key': apiKey };
 
+      const generationMode = data.generationMode || 'viral';
+      const targetDuration = data.targetDuration || 30;
+      const reframeMode = data.reframeMode || 'auto';
+      const facecamCorner = data.facecamCorner || 'tr';
+
       if (data.type === 'url') {
         headers['Content-Type'] = 'application/json';
-        body = JSON.stringify({ url: data.payload, acknowledged: !!data.acknowledged });
+        body = JSON.stringify({
+          url: data.payload,
+          acknowledged: !!data.acknowledged,
+          mode: generationMode,
+          target_duration: targetDuration,
+          reframe_mode: reframeMode,
+          facecam_corner: facecamCorner,
+        });
       } else {
         const formData = new FormData();
         formData.append('file', data.payload);
         formData.append('acknowledged', data.acknowledged ? 'true' : 'false');
+        formData.append('mode', generationMode);
+        formData.append('target_duration', String(targetDuration));
+        formData.append('reframe_mode', reframeMode);
+        formData.append('facecam_corner', facecamCorner);
         body = formData;
       }
 

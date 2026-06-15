@@ -67,6 +67,49 @@ OUTPUT — RETURN ONLY VALID JSON (no markdown, no comments). Order clips by pre
 }}
 """
 
+SUMMARY_PROMPT_TEMPLATE = """
+You are a senior short-form video editor. Read the ENTIRE transcript and word-level timestamps and choose 4–8 short segments that, when concatenated in chronological order, form a ~{target_duration}-second SUMMARY reel of the video covering its major beats.
+
+⚠️ FFMPEG TIME CONTRACT — STRICT REQUIREMENTS:
+- Return timestamps in ABSOLUTE SECONDS from the start of the source video.
+- Only NUMBERS with decimal point, up to 3 decimals (e.g. 0, 1.250, 17.350).
+- Ensure 0 ≤ start < end ≤ VIDEO_DURATION_SECONDS.
+- Each segment between 3 and 10 seconds long.
+- Sum of all segment durations must be between {min_total} and {max_total} seconds.
+- ORDER segments chronologically by start time, ascending.
+- Use silence/breath moments for natural cuts; never cut in the middle of a word.
+- STRICTLY FORBIDDEN to use time formats other than absolute seconds.
+
+GOALS:
+- The concatenated reel must read as a coherent ~{target_duration}-second summary, not a random montage.
+- Cover the MAJOR beats: opening hook → key points → conclusion / takeaway.
+- Prefer punchy, self-contained sentences over half-thoughts.
+- Skip filler, throat-clearing ("um", "so basically"), sponsor breaks, generic intros/outros.
+
+VIDEO_DURATION_SECONDS: {video_duration}
+
+TRANSCRIPT_TEXT (raw):
+{transcript_text}
+
+WORDS_JSON (array of {{w, s, e}} where s/e are seconds):
+{words_json}
+
+OUTPUT — RETURN ONLY VALID JSON (no markdown, no comments):
+{{
+  "segments": [
+    {{
+      "start": <number in seconds>,
+      "end": <number in seconds>,
+      "reason": "<one short phrase: why this segment is in the summary>"
+    }}
+  ],
+  "video_title_for_youtube_short": "<title for the summary reel, 100 chars max>",
+  "video_description_for_tiktok": "<TikTok description oriented to get views>",
+  "video_description_for_instagram": "<Instagram description oriented to get views>",
+  "viral_hook_text": "<SHORT punchy text overlay (max 10 words). MUST BE IN THE SAME LANGUAGE AS THE TRANSCRIPT.>"
+}}
+"""
+
 # Load the YOLO model once (Keep for backup or scene analysis if needed)
 model = YOLO('yolov8n.pt')
 
@@ -334,6 +377,81 @@ def detect_person_yolo(frame):
                 
     return best_box
 
+def _letterbox_fit(src, target_w, target_h):
+    """Scale src to fit target_w x target_h, letterbox-padding with black."""
+    src_h, src_w = src.shape[:2]
+    if src_w <= 0 or src_h <= 0:
+        return np.zeros((target_h, target_w, 3), dtype=np.uint8)
+
+    src_aspect = src_w / src_h
+    tgt_aspect = target_w / target_h
+
+    if src_aspect > tgt_aspect:
+        new_w = target_w
+        new_h = max(2, int(target_w / src_aspect))
+    else:
+        new_h = target_h
+        new_w = max(2, int(target_h * src_aspect))
+
+    if new_w % 2: new_w -= 1
+    if new_h % 2: new_h -= 1
+    new_w = max(2, new_w)
+    new_h = max(2, new_h)
+
+    resized = cv2.resize(src, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    canvas = np.zeros((target_h, target_w, 3), dtype=resized.dtype)
+    pad_x = (target_w - new_w) // 2
+    pad_y = (target_h - new_h) // 2
+    canvas[pad_y:pad_y + new_h, pad_x:pad_x + new_w] = resized
+    return canvas
+
+
+def create_streamer_frame(frame, output_width, output_height,
+                          facecam_corner='tr',
+                          facecam_w_ratio=0.25, facecam_h_ratio=0.30):
+    """
+    Two-tile vertical layout for streamer / face-cam-overlay content.
+
+    Top half  : cropped face-cam region from a configurable source corner, scaled up.
+    Bottom half: the full source frame, letterbox-fit (full game/screen visible).
+
+    facecam_corner: 'tl' | 'tr' (default) | 'bl' | 'br'
+    facecam_w_ratio/h_ratio: face-cam window size as fraction of source dimensions.
+    """
+    src_h, src_w = frame.shape[:2]
+    fc_w = max(2, int(src_w * facecam_w_ratio))
+    fc_h = max(2, int(src_h * facecam_h_ratio))
+
+    if facecam_corner == 'tl':
+        fc_x, fc_y = 0, 0
+    elif facecam_corner == 'bl':
+        fc_x, fc_y = 0, src_h - fc_h
+    elif facecam_corner == 'br':
+        fc_x, fc_y = src_w - fc_w, src_h - fc_h
+    else:  # 'tr' default
+        fc_x, fc_y = src_w - fc_w, 0
+
+    fc_x = max(0, min(src_w - 2, fc_x))
+    fc_y = max(0, min(src_h - 2, fc_y))
+    facecam = frame[fc_y:fc_y + fc_h, fc_x:fc_x + fc_w]
+
+    tile_h = output_height // 2
+    top_tile = _letterbox_fit(facecam, output_width, tile_h)
+    bottom_tile = _letterbox_fit(frame, output_width, output_height - tile_h)
+
+    output = np.vstack([top_tile, bottom_tile])
+
+    # Defensive: ensure exact target shape
+    if output.shape[0] != output_height or output.shape[1] != output_width:
+        canvas = np.zeros((output_height, output_width, 3), dtype=output.dtype)
+        h = min(output.shape[0], output_height)
+        w = min(output.shape[1], output_width)
+        canvas[:h, :w] = output[:h, :w]
+        output = canvas
+    return output
+
+
 def create_general_frame(frame, output_width, output_height):
     """
     Creates a 'General Shot' frame: 
@@ -575,9 +693,16 @@ Technical Details: {str(e)}
     
     return downloaded_file, sanitized_title
 
-def process_video_to_vertical(input_video, final_output_video):
+def process_video_to_vertical(input_video, final_output_video,
+                              reframe_mode='auto', facecam_corner='tr'):
     """
-    Core logic to convert horizontal video to vertical using scene detection and Active Speaker Tracking (MediaPipe).
+    Core logic to convert horizontal video to vertical.
+
+    reframe_mode:
+      'auto'     - per-scene TRACK (face follow) or GENERAL (blurred bg) — default.
+      'streamer' - top tile = face-cam corner, bottom tile = full frame letterboxed.
+                   Skips per-frame detection entirely.
+    facecam_corner: 'tl' | 'tr' | 'bl' | 'br' — used only when reframe_mode='streamer'.
     """
     script_start_time = time.time()
     
@@ -592,35 +717,45 @@ def process_video_to_vertical(input_video, final_output_video):
     if os.path.exists(final_output_video): os.remove(final_output_video)
 
     print(f"🎬 Processing clip: {input_video}")
-    print("   Step 1: Detecting scenes...")
-    scenes, fps = detect_scenes(input_video)
-    
-    if not scenes:
-        print("   ❌ No scenes were detected. Using full video as one scene.")
-        # If scene detection fails or finds nothing, treat whole video as one scene
-        cap = cv2.VideoCapture(input_video)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        cap.release()
-        from scenedetect import FrameTimecode
-        scenes = [(FrameTimecode(0, fps), FrameTimecode(total_frames, fps))]
+    if reframe_mode == 'streamer':
+        print(f"   ▶ Streamer split-screen mode (face cam: {facecam_corner})")
+        # Get FPS without scene detection — single uniform strategy.
+        cap_meta = cv2.VideoCapture(input_video)
+        fps = cap_meta.get(cv2.CAP_PROP_FPS) or 30.0
+        cap_meta.release()
+        scenes = []  # unused in streamer branch below
+        scene_strategies = []
+    else:
+        print("   Step 1: Detecting scenes...")
+        scenes, fps = detect_scenes(input_video)
 
-    print(f"   ✅ Found {len(scenes)} scenes.")
+        if not scenes:
+            print("   ❌ No scenes were detected. Using full video as one scene.")
+            # If scene detection fails or finds nothing, treat whole video as one scene
+            cap = cv2.VideoCapture(input_video)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap.release()
+            from scenedetect import FrameTimecode
+            scenes = [(FrameTimecode(0, fps), FrameTimecode(total_frames, fps))]
+
+        print(f"   ✅ Found {len(scenes)} scenes.")
 
     print("\n   🧠 Step 2: Preparing Active Tracking...")
     original_width, original_height = get_video_resolution(input_video)
-    
+
     OUTPUT_HEIGHT = original_height
     OUTPUT_WIDTH = int(OUTPUT_HEIGHT * ASPECT_RATIO)
     if OUTPUT_WIDTH % 2 != 0:
         OUTPUT_WIDTH += 1
 
-    # Initialize Cameraman
+    # Initialize Cameraman (only used in 'auto' mode)
     cameraman = SmoothedCameraman(OUTPUT_WIDTH, OUTPUT_HEIGHT, original_width, original_height)
-    
-    # --- New Strategy: Per-Scene Analysis ---
-    print("\n   🤖 Step 3: Analyzing Scenes for Strategy (Single vs Group)...")
-    scene_strategies = analyze_scenes_strategy(input_video, scenes)
-    # scene_strategies is a list of 'TRACK' or 'General' corresponding to scenes
+
+    if reframe_mode != 'streamer':
+        # --- New Strategy: Per-Scene Analysis ---
+        print("\n   🤖 Step 3: Analyzing Scenes for Strategy (Single vs Group)...")
+        scene_strategies = analyze_scenes_strategy(input_video, scenes)
+        # scene_strategies is a list of 'TRACK' or 'General' corresponding to scenes
     
     print("\n   ✂️ Step 4: Processing video frames...")
     
@@ -653,15 +788,25 @@ def process_video_to_vertical(input_video, final_output_video):
             if not ret:
                 break
 
+            if reframe_mode == 'streamer':
+                # Skip scene/strategy logic — uniform split-screen composition.
+                output_frame = create_streamer_frame(
+                    frame, OUTPUT_WIDTH, OUTPUT_HEIGHT, facecam_corner=facecam_corner
+                )
+                ffmpeg_process.stdin.write(output_frame.tobytes())
+                frame_number += 1
+                pbar.update(1)
+                continue
+
             # Update Scene Index
             if current_scene_index < len(scene_boundaries):
                 start_f, end_f = scene_boundaries[current_scene_index]
                 if frame_number >= end_f and current_scene_index < len(scene_boundaries) - 1:
                     current_scene_index += 1
-            
+
             # Determine Strategy for current frame based on scene
             current_strategy = scene_strategies[current_scene_index] if current_scene_index < len(scene_strategies) else 'TRACK'
-            
+
             # Apply Strategy
             if current_strategy == 'GENERAL':
                 # "Plano General" -> Blur Background + Fit Width
@@ -883,6 +1028,223 @@ def get_viral_clips(transcript_result, video_duration):
         print(f"❌ Gemini Error: {e}")
         return None
 
+
+def get_summary_segments(transcript_result, video_duration, target_duration):
+    """Ask Gemini to pick chronological segments forming a ~target_duration summary reel."""
+    print(f"🤖  Analyzing for {target_duration}s summary reel with Gemini...")
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("❌ Error: GEMINI_API_KEY not found in environment variables.")
+        return None
+
+    client = genai.Client(api_key=api_key)
+    model_name = 'gemini-2.5-flash'
+
+    words = []
+    for segment in transcript_result['segments']:
+        for word in segment.get('words', []):
+            words.append({'w': word['word'], 's': word['start'], 'e': word['end']})
+
+    # Allow ±20% slack on the total duration so Gemini can pick natural sentence boundaries.
+    min_total = max(10, int(target_duration * 0.8))
+    max_total = max(min_total + 5, int(target_duration * 1.2))
+
+    prompt = SUMMARY_PROMPT_TEMPLATE.format(
+        video_duration=video_duration,
+        target_duration=target_duration,
+        min_total=min_total,
+        max_total=max_total,
+        transcript_text=json.dumps(transcript_result['text']),
+        words_json=json.dumps(words)
+    )
+
+    try:
+        response = client.models.generate_content(model=model_name, contents=prompt)
+
+        cost_analysis = None
+        try:
+            usage = response.usage_metadata
+            if usage:
+                input_price_per_million = 0.10
+                output_price_per_million = 0.40
+                prompt_tokens = usage.prompt_token_count
+                output_tokens = usage.candidates_token_count
+                input_cost = (prompt_tokens / 1_000_000) * input_price_per_million
+                output_cost = (output_tokens / 1_000_000) * output_price_per_million
+                cost_analysis = {
+                    "input_tokens": prompt_tokens,
+                    "output_tokens": output_tokens,
+                    "input_cost": input_cost,
+                    "output_cost": output_cost,
+                    "total_cost": input_cost + output_cost,
+                    "model": model_name,
+                }
+                print(f"💰 Token Usage ({model_name}):")
+                print(f"   - Input Tokens: {prompt_tokens} (${input_cost:.6f})")
+                print(f"   - Output Tokens: {output_tokens} (${output_cost:.6f})")
+                print(f"   - Total Estimated Cost: ${cost_analysis['total_cost']:.6f}")
+        except Exception as e:
+            print(f"⚠️ Could not calculate cost: {e}")
+
+        text = response.text
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+        result_json = json.loads(text)
+
+        # Validate + sort + clamp segments.
+        segments = result_json.get('segments') or []
+        cleaned = []
+        for seg in segments:
+            try:
+                s = max(0.0, float(seg['start']))
+                e = min(float(video_duration), float(seg['end']))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if e - s < 1.0:
+                continue
+            cleaned.append({"start": s, "end": e, "reason": seg.get("reason", "")})
+        cleaned.sort(key=lambda x: x['start'])
+
+        if not cleaned:
+            print("❌ Gemini returned no valid summary segments.")
+            return None
+
+        result_json['segments'] = cleaned
+        if cost_analysis:
+            result_json['cost_analysis'] = cost_analysis
+        return result_json
+    except Exception as e:
+        print(f"❌ Gemini Error: {e}")
+        return None
+
+
+def build_summary_transcript(source_transcript, segments):
+    """
+    Given the source transcript and a list of {start, end} segments (in source time),
+    return a synthetic transcript whose word timestamps are remapped to the concatenated
+    reel's timeline, so existing /api/subtitle plumbing works on the summary reel.
+    """
+    new_segments = []
+    full_text_parts = []
+    cumulative_offset = 0.0
+
+    for seg in segments:
+        s, e = seg['start'], seg['end']
+        seg_words = []
+        seg_text_parts = []
+        for src_seg in source_transcript.get('segments', []):
+            for word in src_seg.get('words', []):
+                if word['end'] > s and word['start'] < e:
+                    new_start = max(0.0, word['start'] - s) + cumulative_offset
+                    new_end = max(new_start + 0.05, word['end'] - s + cumulative_offset)
+                    seg_words.append({
+                        'word': word['word'],
+                        'start': new_start,
+                        'end': new_end,
+                    })
+                    seg_text_parts.append(word['word'])
+        if seg_words:
+            seg_text = " ".join(seg_text_parts).strip()
+            full_text_parts.append(seg_text)
+            new_segments.append({
+                'start': cumulative_offset,
+                'end': cumulative_offset + (e - s),
+                'text': seg_text,
+                'words': seg_words,
+            })
+        cumulative_offset += (e - s)
+
+    return {
+        'segments': new_segments,
+        'language': source_transcript.get('language', 'en'),
+        'text': " ".join(full_text_parts),
+    }
+
+
+def assemble_summary_reel(input_video, segments, output_dir, base_name,
+                          reframe_mode='auto', facecam_corner='tr'):
+    """
+    Cut each segment, concat them, then reframe vertical.
+    Writes the final reel to `<output_dir>/<base_name>_clip_1.mp4` so the dashboard
+    discovers it via the existing metadata convention.
+    Returns (final_path, total_reel_seconds) on success, (None, 0) on failure.
+    """
+    if not segments:
+        return None, 0.0
+
+    work_dir = os.path.join(output_dir, "_summary_work")
+    os.makedirs(work_dir, exist_ok=True)
+
+    seg_paths = []
+    total_seconds = 0.0
+    for i, seg in enumerate(segments):
+        s, e = seg['start'], seg['end']
+        seg_path = os.path.join(work_dir, f"seg_{i:02d}.mp4")
+        cut_cmd = [
+            'ffmpeg', '-y',
+            '-ss', f"{s:.3f}",
+            '-to', f"{e:.3f}",
+            '-i', input_video,
+            '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+            '-c:a', 'aac', '-ar', '48000', '-ac', '2',
+            seg_path,
+        ]
+        result = subprocess.run(cut_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            print(f"❌ Failed to cut segment {i}: {result.stderr.decode()[:300]}")
+            return None, 0.0
+        seg_paths.append(seg_path)
+        total_seconds += (e - s)
+
+    # Concat via demuxer.
+    concat_list = os.path.join(work_dir, "concat.txt")
+    with open(concat_list, 'w') as f:
+        for p in seg_paths:
+            f.write(f"file '{os.path.abspath(p)}'\n")
+
+    concat_path = os.path.join(work_dir, "concat.mp4")
+    concat_cmd = [
+        'ffmpeg', '-y',
+        '-f', 'concat', '-safe', '0',
+        '-i', concat_list,
+        '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+        '-c:a', 'aac', '-ar', '48000', '-ac', '2',
+        concat_path,
+    ]
+    result = subprocess.run(concat_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if result.returncode != 0:
+        print(f"❌ Failed to concat segments: {result.stderr.decode()[:300]}")
+        return None, 0.0
+
+    final_path = os.path.join(output_dir, f"{base_name}_clip_1.mp4")
+    success = process_video_to_vertical(
+        concat_path, final_path,
+        reframe_mode=reframe_mode, facecam_corner=facecam_corner,
+    )
+    if not success:
+        return None, 0.0
+
+    # Best-effort cleanup of intermediates.
+    try:
+        for p in seg_paths:
+            if os.path.exists(p):
+                os.remove(p)
+        if os.path.exists(concat_list):
+            os.remove(concat_list)
+        if os.path.exists(concat_path):
+            os.remove(concat_path)
+        os.rmdir(work_dir)
+    except OSError:
+        pass
+
+    return final_path, total_seconds
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="AutoCrop-Vertical with Viral Clip Detection.")
     
@@ -893,7 +1255,15 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', type=str, help="Output directory or file (if processing whole video).")
     parser.add_argument('--keep-original', action='store_true', help="Keep the downloaded YouTube video.")
     parser.add_argument('--skip-analysis', action='store_true', help="Skip AI analysis and convert the whole video.")
-    
+    parser.add_argument('--mode', type=str, choices=['viral', 'summary'], default='viral',
+                        help="viral=multiple viral clips (default); summary=one concatenated summary reel.")
+    parser.add_argument('--target-duration', type=int, default=30,
+                        help="Target length in seconds for --mode summary (default 30).")
+    parser.add_argument('--reframe-mode', type=str, choices=['auto', 'streamer'], default='auto',
+                        help="auto=face-track or blurred-bg per scene (default); streamer=top tile face cam, bottom tile full frame.")
+    parser.add_argument('--facecam-corner', type=str, choices=['tl', 'tr', 'bl', 'br'], default='tr',
+                        help="For --reframe-mode streamer: which corner the face cam occupies (default tr).")
+
     args = parser.parse_args()
 
     script_start_time = time.time()
@@ -944,11 +1314,73 @@ if __name__ == '__main__':
     if args.skip_analysis:
         print("⏩ Skipping analysis, processing entire video...")
         output_file = args.output if args.output else os.path.join(output_dir, f"{video_title}_vertical.mp4")
-        process_video_to_vertical(input_video, output_file)
+        process_video_to_vertical(
+            input_video, output_file,
+            reframe_mode=args.reframe_mode, facecam_corner=args.facecam_corner,
+        )
+    elif args.mode == 'summary':
+        # Summary reel: pick segments, concat, reframe — produce a single clip.
+        print(f"📰  Summary mode: target ~{args.target_duration}s reel")
+        transcript = transcribe_video(input_video)
+
+        cap = cv2.VideoCapture(input_video)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = frame_count / fps
+        cap.release()
+
+        summary_data = get_summary_segments(transcript, duration, args.target_duration)
+
+        if not summary_data or not summary_data.get('segments'):
+            print("❌ Failed to identify summary segments. Falling back to whole-video vertical convert.")
+            output_file = os.path.join(output_dir, f"{video_title}_vertical.mp4")
+            process_video_to_vertical(
+                input_video, output_file,
+                reframe_mode=args.reframe_mode, facecam_corner=args.facecam_corner,
+            )
+        else:
+            segments = summary_data['segments']
+            print(f"🪄  Building summary reel from {len(segments)} segments...")
+            for i, seg in enumerate(segments):
+                print(f"   {i+1}. {seg['start']:.2f}s → {seg['end']:.2f}s  ({seg.get('reason','')})")
+
+            final_path, total_seconds = assemble_summary_reel(
+                input_video, segments, output_dir, video_title,
+                reframe_mode=args.reframe_mode, facecam_corner=args.facecam_corner,
+            )
+            if not final_path:
+                print("❌ Summary reel assembly failed.")
+            else:
+                # Build a synthetic transcript with timestamps remapped to the reel timeline,
+                # so downstream subtitle/edit/hook endpoints work unchanged.
+                synthetic_transcript = build_summary_transcript(transcript, segments)
+
+                metadata = {
+                    'mode': 'summary',
+                    'target_duration': args.target_duration,
+                    'reel_duration': total_seconds,
+                    'source_segments': segments,
+                    'shorts': [{
+                        'start': 0.0,
+                        'end': total_seconds,
+                        'video_title_for_youtube_short': summary_data.get('video_title_for_youtube_short', f"{video_title} - Summary"),
+                        'video_description_for_tiktok': summary_data.get('video_description_for_tiktok', ''),
+                        'video_description_for_instagram': summary_data.get('video_description_for_instagram', ''),
+                        'viral_hook_text': summary_data.get('viral_hook_text', ''),
+                        'is_summary': True,
+                    }],
+                    'transcript': synthetic_transcript,
+                    'cost_analysis': summary_data.get('cost_analysis'),
+                }
+                metadata_file = os.path.join(output_dir, f"{video_title}_metadata.json")
+                with open(metadata_file, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                print(f"✅ Summary reel ready: {final_path} ({total_seconds:.1f}s)")
+                print(f"   Saved metadata to {metadata_file}")
     else:
         # 3. Transcribe
         transcript = transcribe_video(input_video)
-        
+
         # Get duration
         cap = cv2.VideoCapture(input_video)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -962,7 +1394,10 @@ if __name__ == '__main__':
         if not clips_data or 'shorts' not in clips_data:
             print("❌ Failed to identify clips. Converting whole video as fallback.")
             output_file = os.path.join(output_dir, f"{video_title}_vertical.mp4")
-            process_video_to_vertical(input_video, output_file)
+            process_video_to_vertical(
+                input_video, output_file,
+                reframe_mode=args.reframe_mode, facecam_corner=args.facecam_corner,
+            )
         else:
             print(f"🔥 Found {len(clips_data['shorts'])} viral clips!")
             
@@ -999,7 +1434,10 @@ if __name__ == '__main__':
                 subprocess.run(cut_command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
                 
                 # Process vertical
-                success = process_video_to_vertical(clip_temp_path, clip_final_path)
+                success = process_video_to_vertical(
+                    clip_temp_path, clip_final_path,
+                    reframe_mode=args.reframe_mode, facecam_corner=args.facecam_corner,
+                )
                 
                 if success:
                     print(f"   ✅ Clip {i+1} ready: {clip_final_path}")

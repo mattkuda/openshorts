@@ -318,7 +318,11 @@ async def process_endpoint(
     request: Request,
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
-    acknowledged: Optional[str] = Form(None)
+    acknowledged: Optional[str] = Form(None),
+    mode: Optional[str] = Form("viral"),
+    target_duration: Optional[int] = Form(30),
+    reframe_mode: Optional[str] = Form("auto"),
+    facecam_corner: Optional[str] = Form("tr"),
 ):
     api_key = request.headers.get("X-Gemini-Key")
     if not api_key:
@@ -332,6 +336,18 @@ async def process_endpoint(
         body = await request.json()
         url = body.get("url")
         ack_flag = bool(body.get("acknowledged"))
+        mode = body.get("mode") or mode
+        target_duration = int(body.get("target_duration") or target_duration)
+        reframe_mode = body.get("reframe_mode") or reframe_mode
+        facecam_corner = body.get("facecam_corner") or facecam_corner
+
+    if mode not in ("viral", "summary"):
+        mode = "viral"
+    target_duration = max(10, min(120, int(target_duration or 30)))
+    if reframe_mode not in ("auto", "streamer"):
+        reframe_mode = "auto"
+    if facecam_corner not in ("tl", "tr", "bl", "br"):
+        facecam_corner = "tr"
 
     if not url and not file:
         raise HTTPException(status_code=400, detail="Must provide URL or File")
@@ -387,6 +403,12 @@ async def process_endpoint(
         cmd.extend(["-i", input_path])
 
     cmd.extend(["-o", job_output_dir])
+
+    if mode == "summary":
+        cmd.extend(["--mode", "summary", "--target-duration", str(target_duration)])
+
+    if reframe_mode == "streamer":
+        cmd.extend(["--reframe-mode", "streamer", "--facecam-corner", facecam_corner])
 
     print(f"[attestation] job={job_id} ip={attestation['ip']} source={attestation['source']} ack=true")
 
