@@ -430,7 +430,7 @@ function App() {
     const user = { name: 'Matt Kuda', email: 'mattkuda@gmail.com', initials: 'MK' };
 
     return (
-      <div className={`group/sidebar ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-border flex flex-col h-full shrink-0 overflow-x-hidden transition-[width] duration-300 ease-out`}>
+      <div className={`group/sidebar ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-border flex flex-col h-full shrink-0 overflow-x-hidden transition-[width] duration-200 ease-out`}>
         {/* Header: collapsed shows the logo (→ toggle on hover); expanded shows brand + toggle */}
         <div className="h-16 flex items-center border-b border-border shrink-0 px-3">
           {sidebarCollapsed ? (
