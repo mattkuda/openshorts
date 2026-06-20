@@ -129,7 +129,7 @@ const ProcessingAnimation = ({ media, isComplete, syncedTime, isSyncedPlaying, s
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  const containerClasses = `relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl mb-8 group animate-[fadeIn_0.5s_ease-out] transition-all duration-500 
+  const containerClasses = `relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-2xl mb-8 group animate-[fadeIn_0.5s_ease-out] transition-all duration-500 
     ${isComplete && !isSyncedPlaying ? 'grayscale brightness-50' : ''} 
     ${isSyncedPlaying ? 'ring-2 ring-primary ring-offset-2 ring-offset-black shadow-primary/20' : ''}`;
 
@@ -165,7 +165,7 @@ const ProcessingAnimation = ({ media, isComplete, syncedTime, isSyncedPlaying, s
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-             <div className="w-16 h-16 border-4 border-zinc-700 border-t-zinc-500 rounded-full animate-spin"></div>
+             <div className="w-16 h-16 border-4 border-border border-t-zinc-500 rounded-full animate-spin"></div>
           </div>
         )}
       </div>
@@ -181,7 +181,7 @@ const ProcessingAnimation = ({ media, isComplete, syncedTime, isSyncedPlaying, s
 
       {/* HUD Elements - Hide when synced playing */}
       {!isSyncedPlaying && (
-          <div className={`absolute top-4 left-4 z-30 flex items-center gap-2 px-3 py-1.5 backdrop-blur-md rounded-lg border text-xs font-mono font-bold uppercase transition-all duration-500 ${isComplete ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-black/60 border-primary/30 text-primary animate-pulse'}`}>
+          <div className={`absolute top-4 left-4 z-30 flex items-center gap-2 px-3 py-1.5 backdrop-blur-md rounded-lg border text-xs font-mono font-bold uppercase transition-all duration-500 ${isComplete ? 'bg-green-500/10 border-green-500/20 text-green-700' : 'bg-black/60 border-primary/30 text-primary-strong animate-pulse'}`}>
             {isComplete ? (
                 <>
                     <CheckCircle size={14} /> Analysis Complete
@@ -195,7 +195,7 @@ const ProcessingAnimation = ({ media, isComplete, syncedTime, isSyncedPlaying, s
       )}
       
       {!isSyncedPlaying && !isComplete && (
-          <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 text-white/50 text-[10px] font-mono">
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-border text-foreground/50 text-[10px] font-mono">
             AI_MODEL: GEMINI-2.5-PRO
           </div>
       )}
@@ -205,26 +205,26 @@ const ProcessingAnimation = ({ media, isComplete, syncedTime, isSyncedPlaying, s
           <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
              <div className="absolute top-0 bottom-0 left-[35%] w-[1px] bg-yellow-500/20 border-r border-dashed border-yellow-500/40"></div>
              <div className="absolute top-0 bottom-0 right-[35%] w-[1px] bg-yellow-500/20 border-l border-dashed border-yellow-500/40"></div>
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 border border-white/20 rounded-full flex items-center justify-center">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 border border-border rounded-full flex items-center justify-center">
                 <div className="w-1 h-1 bg-red-500 rounded-full animate-ping"></div>
              </div>
              <div className="absolute bottom-1/3 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-2 opacity-60">
-                 <Scissors size={24} className="text-white/20" />
+                 <Scissors size={24} className="text-foreground/20" />
              </div>
           </div>
       )}
 
        {/* Synced Playing Indicator */}
        {isSyncedPlaying && (
-           <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 bg-red-600/90 backdrop-blur text-white rounded-lg shadow-lg animate-pulse font-bold text-[10px] uppercase tracking-wider border border-white/20">
+           <div className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3 py-1.5 bg-red-600/90 backdrop-blur text-foreground rounded-lg shadow-lg animate-pulse font-bold text-[10px] uppercase tracking-wider border border-border">
                <Activity size={12} /> Live Sync
            </div>
        )}
       
        {/* Bottom Info Bar */}
       {!isSyncedPlaying && !isComplete && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent z-30 flex justify-between items-end border-t border-white/5">
-              <div className="font-mono text-[10px] text-primary/80 space-y-1">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent z-30 flex justify-between items-end border-t border-border">
+              <div className="font-mono text-[10px] text-primary-strong/80 space-y-1">
                  <div className="flex items-center gap-2"><Activity size={10} className="animate-bounce" /> > ANALYSIS_THREAD_01: ACTIVE</div>
                  <div className="flex items-center gap-2"><Radio size={10} /> > AUDIO_TRANSCRIPT: PROCESSING</div>
               </div>

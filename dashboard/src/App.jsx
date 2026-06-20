@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown } from 'lucide-react';
+import AccountModal from './components/AccountModal';
+import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
 import MediaInput from './components/MediaInput';
 import ResultCard from './components/ResultCard';
@@ -68,19 +70,19 @@ const UserProfileSelector = ({ profiles, selectedUserId, onSelect }) => {
     <div className="relative z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 transition-colors min-w-[180px]"
+        className="flex items-center justify-between bg-surface border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors min-w-[180px]"
       >
         <span className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-[10px] font-bold text-white">
+          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-[10px] font-bold text-foreground">
             {selectedProfile?.username?.substring(0, 1).toUpperCase() || "U"}
           </div>
-          <span className="font-medium text-white truncate max-w-[100px]">{selectedProfile?.username || "Select User"}</span>
+          <span className="font-medium text-foreground truncate max-w-[100px]">{selectedProfile?.username || "Select User"}</span>
         </span>
-        <ChevronDown size={14} className={`text-zinc-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 right-0 w-64 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute top-full mt-2 right-0 w-64 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="max-h-60 overflow-y-auto custom-scrollbar">
             {profiles.map((profile) => (
               <button
@@ -89,31 +91,31 @@ const UserProfileSelector = ({ profiles, selectedUserId, onSelect }) => {
                   onSelect(profile.username);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left group border-b border-white/5 last:border-0"
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors text-left group border-b border-border last:border-0"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-xs font-bold text-white border border-white/10 shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-xs font-bold text-foreground border border-border shrink-0">
                     {profile.username.substring(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors truncate">
+                    <div className="text-sm font-medium text-foreground group-hover:text-foreground transition-colors truncate">
                       {profile.username}
                     </div>
                     <div className="flex gap-2 mt-0.5">
                       {/* Status indicators */}
-                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('tiktok') ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('tiktok') ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                         <TikTokIcon size={10} />
                       </div>
-                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('instagram') ? 'text-pink-400' : 'text-zinc-600'}`}>
+                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('instagram') ? 'text-pink-400' : 'text-muted-foreground'}`}>
                         <Instagram size={10} />
                       </div>
-                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('youtube') ? 'text-red-400' : 'text-zinc-600'}`}>
+                      <div className={`flex items-center gap-1 text-[10px] ${profile.connected.includes('youtube') ? 'text-red-600' : 'text-muted-foreground'}`}>
                         <Youtube size={10} />
                       </div>
                     </div>
                   </div>
                 </div>
-                {selectedUserId === profile.username && <Check size={14} className="text-primary shrink-0" />}
+                {selectedUserId === profile.username && <Check size={14} className="text-primary-strong shrink-0" />}
               </button>
             ))}
           </div>
@@ -165,6 +167,27 @@ function App() {
   const [logsVisible, setLogsVisible] = useState(true);
   const [processingMedia, setProcessingMedia] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, settings
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('aishorts_sidebar_collapsed') === '1');
+  const toggleSidebar = () => setSidebarCollapsed((prev) => {
+    const next = !prev;
+    localStorage.setItem('aishorts_sidebar_collapsed', next ? '1' : '0');
+    return next;
+  });
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // --- Local debug mode (enable with ?debug=true) ---
+  const [debug, setDebugState] = useState(() => {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('clipzoo_debug') || '{}'); } catch (e) { /* ignore */ }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debug') === 'true') { saved.enabled = true; saved.hidden = false; }
+    return { enabled: false, hidden: false, mockAuth: false, mockAI: false, mockProcessing: false, ...saved };
+  });
+  const setDebug = (patch) => setDebugState((prev) => {
+    const next = { ...prev, ...patch };
+    localStorage.setItem('clipzoo_debug', JSON.stringify(next));
+    return next;
+  });
 
   const [sessionRecovered, setSessionRecovered] = useState(false);
   const [showScheduleWeek, setShowScheduleWeek] = useState(false);
@@ -387,104 +410,141 @@ function App() {
 
   // --- UI Components ---
 
-  const Sidebar = () => (
-    <div className="w-20 lg:w-64 bg-surface border-r border-white/5 flex flex-col h-full shrink-0 transition-all duration-300">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-white/5">
-          <img src="/logo-openshorts.png" alt="Logo" className="w-full h-full object-cover" />
+  const Sidebar = () => {
+    const navItems = [
+      { id: 'dashboard', label: 'Clip Generator', icon: LayoutDashboard },
+      { id: 'saasshorts', label: 'AI Shorts', icon: Sparkles },
+      { id: 'ai-agent', label: 'AI Agent', icon: Bot },
+      { id: 'ugc-gallery', label: 'UGC Gallery', icon: LayoutGrid },
+      { id: 'thumbnails', label: 'YouTube Studio', icon: Image },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ];
+
+    // Tooltip shown only when collapsed (lightweight, no Radix dependency).
+    const tip = (label) => (
+      <span className="pointer-events-none absolute left-full ml-2 z-50 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+        {label}
+      </span>
+    );
+
+    const user = { name: 'Matt Kuda', email: 'mattkuda@gmail.com', initials: 'MK' };
+
+    return (
+      <div className={`group/sidebar ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-border flex flex-col h-full shrink-0 overflow-x-hidden transition-[width] duration-200 ease-out`}>
+        {/* Header: collapsed shows the logo (→ toggle on hover); expanded shows brand + toggle */}
+        <div className="h-16 flex items-center border-b border-border shrink-0 px-3">
+          {sidebarCollapsed ? (
+            <button
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+              className="relative w-9 h-9 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 overflow-hidden"
+            >
+              <img src="/logo-clipzoo.png" alt="ClipZoo" className="w-full h-full object-contain transition-opacity group-hover/sidebar:opacity-0" />
+              <PanelLeft size={18} className="absolute text-foreground opacity-0 transition-opacity group-hover/sidebar:opacity-100" />
+            </button>
+          ) : (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-card border border-border rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                  <img src="/logo-clipzoo.png" alt="ClipZoo" className="w-full h-full object-contain" />
+                </div>
+                <span className="font-bold text-lg text-foreground tracking-tight whitespace-nowrap">ClipZoo</span>
+              </div>
+              <button
+                onClick={toggleSidebar}
+                title="Collapse sidebar"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              >
+                <PanelLeft size={18} />
+              </button>
+            </div>
+          )}
         </div>
-        <span className="font-bold text-lg text-white hidden lg:block tracking-tight">OpenShorts</span>
+
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-1">
+          {navItems.map(({ id, label, icon: Icon }) => {
+            const active = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`group relative w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-colors ${active ? 'bg-primary/20 text-primary-strong' : 'text-foreground/70 hover:text-foreground hover:bg-muted'}`}
+              >
+                <Icon size={20} className="shrink-0" />
+                {!sidebarCollapsed && <span className="font-medium text-sm whitespace-nowrap">{label}</span>}
+                {sidebarCollapsed && tip(label)}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Footer cluster (ReelFarm-style) */}
+        <div className="border-t border-border shrink-0">
+          <div className="px-3 pt-3">
+            <button className="group relative w-full flex items-center gap-3 px-3 h-9 rounded-xl text-foreground/70 hover:text-foreground hover:bg-muted transition-colors">
+              <HelpCircle size={18} className="shrink-0" />
+              {!sidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Support</span>}
+              {sidebarCollapsed && tip('Support')}
+            </button>
+          </div>
+
+          {!sidebarCollapsed && (
+            <div className="px-3 pt-3 space-y-3">
+              {/* Credits notice (placeholder) */}
+              <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2.5 text-center">
+                <p className="text-sm font-bold text-red-700">You have no credits remaining.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Upgrade or purchase credits to continue creating posts.</p>
+              </div>
+
+              {/* Subscription checklist (placeholder) */}
+              <div className="rounded-xl border border-border bg-card p-3.5">
+                <p className="text-sm font-semibold text-foreground mb-3">Start Subscription Today</p>
+                <ul className="space-y-2 mb-3">
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded-full bg-foreground text-background flex items-center justify-center shrink-0"><Check size={12} /></span>
+                    <span className="text-muted-foreground line-through">Create an automation</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded-full border-2 border-border shrink-0" />
+                    <span className="text-foreground">Connect a TikTok account</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-sm">
+                    <span className="w-5 h-5 rounded-full border-2 border-border shrink-0" />
+                    <span className="text-foreground">Start subscription</span>
+                  </li>
+                </ul>
+                <button className="w-full bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold py-2 rounded-lg transition-colors active:scale-[0.98]">
+                  Upgrade Now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* User row → opens account modal */}
+          <div className="p-3">
+            <button
+              onClick={() => setShowAccountModal(true)}
+              className="group relative w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-muted transition-colors"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-strong flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
+                {user.initials}
+              </div>
+              {!sidebarCollapsed && (
+                <>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-semibold text-foreground truncate leading-tight">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <ChevronsUpDown size={16} className="text-muted-foreground shrink-0" />
+                </>
+              )}
+              {sidebarCollapsed && tip(user.name)}
+            </button>
+          </div>
+        </div>
       </div>
-
-      <nav className="flex-1 px-4 py-4 space-y-2">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'dashboard' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <LayoutDashboard size={20} />
-          <span className="font-medium hidden lg:block">Clip Generator</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('saasshorts')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'saasshorts' ? 'bg-violet-500/10 text-violet-400' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Sparkles size={20} />
-          <span className="font-medium hidden lg:block">AI Shorts</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ai-agent')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'ai-agent' ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Bot size={20} />
-          <span className="font-medium hidden lg:block">AI Agent</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ugc-gallery')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'ugc-gallery' ? 'bg-violet-500/10 text-violet-400' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <LayoutGrid size={20} />
-          <span className="font-medium hidden lg:block">UGC Gallery</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('thumbnails')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'thumbnails' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Image size={20} />
-          <span className="font-medium hidden lg:block">YouTube Studio</span>
-        </button>
-
-        {/* <button
-          onClick={() => setActiveTab('gallery')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'gallery' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <LayoutGrid size={20} />
-          <span className="font-medium hidden lg:block">Gallery</span>
-        </button> */}
-
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${activeTab === 'settings' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-        >
-          <Settings size={20} />
-          <span className="font-medium hidden lg:block">Settings</span>
-        </button>
-      </nav>
-
-      <div className="p-4 border-t border-white/5 space-y-2">
-        <a
-          href="#"
-          onClick={(e) => { e.preventDefault(); localStorage.removeItem('openshorts_skip_landing'); window.location.hash = ''; window.location.reload(); }}
-          className="flex items-center gap-2 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group"
-        >
-          <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
-            <Globe size={16} />
-          </div>
-          <div className="hidden lg:block overflow-hidden">
-            <p className="text-sm font-bold text-white leading-none mb-0.5">Landing Page</p>
-            <p className="text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors truncate">View website</p>
-          </div>
-        </a>
-        <a
-          href="https://github.com/mutonby/openshorts"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group"
-        >
-          <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center shrink-0">
-            <svg height="20" viewBox="0 0 16 16" version="1.1" width="20" aria-hidden="true"><path fillRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-          </div>
-          <div className="hidden lg:block overflow-hidden">
-            <p className="text-sm font-bold text-white leading-none mb-0.5">Open Source</p>
-            <p className="text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors truncate">Free & Community Driven</p>
-          </div>
-        </a>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/30">
@@ -497,12 +557,12 @@ function App() {
         </div>
 
         {/* Top Header */}
-        <header className="h-16 border-b border-white/5 bg-background/50 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-10">
+        <header className="h-16 border-b border-border bg-background/50 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-10">
           <div className="flex items-center gap-4">
             {status !== 'idle' && (
               <button
                 onClick={handleReset}
-                className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <PlusCircle size={16} />
                 <span className="hidden sm:inline">New Project</span>
@@ -519,10 +579,10 @@ function App() {
               />
             )}
 
-            {(!apiKey || !uploadPostKey) && (
+            {(!apiKey || !uploadPostKey) && !debug.mockAuth && (
               <button
                 onClick={() => setActiveTab('settings')}
-                className="text-xs text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 transition-colors flex items-center gap-1.5"
+                className="text-xs text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 transition-colors flex items-center gap-1.5"
                 title="Click to configure your API keys"
               >
                 <AlertTriangle size={12} />
@@ -537,13 +597,13 @@ function App() {
         </header>
 
         {/* Persistent Missing Keys Banner — visible on every screen */}
-        {(!apiKey || !uploadPostKey) && activeTab !== 'settings' && (
+        {(!apiKey || !uploadPostKey) && !debug.mockAuth && activeTab !== 'settings' && (
           <div className="mx-6 mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-4 shrink-0 animate-[fadeIn_0.3s_ease-out]">
-            <div className="flex items-center gap-3 text-sm text-amber-200">
-              <KeyRound size={16} className="shrink-0 text-amber-400" />
+            <div className="flex items-center gap-3 text-sm text-amber-700">
+              <KeyRound size={16} className="shrink-0 text-amber-700" />
               <div>
                 <span className="font-semibold">Required API keys missing.</span>{' '}
-                <span className="text-amber-200/80">
+                <span className="text-amber-700">
                   {!apiKey && !uploadPostKey
                     ? 'Set your Gemini and Upload-Post API keys to use OpenShorts.'
                     : !apiKey
@@ -564,12 +624,12 @@ function App() {
         {/* Session Recovery Banner */}
         {sessionRecovered && (
           <div className="mx-6 mt-2 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between animate-[fadeIn_0.3s_ease-out] shrink-0">
-            <div className="flex items-center gap-2 text-sm text-primary">
+            <div className="flex items-center gap-2 text-sm text-primary-strong">
               <RotateCcw size={16} />
               <span className="font-medium">Session recovered</span>
-              <span className="text-zinc-400 text-xs">Your previous work has been restored.</span>
+              <span className="text-muted-foreground text-xs">Your previous work has been restored.</span>
             </div>
-            <button onClick={() => setSessionRecovered(false)} className="text-zinc-500 hover:text-white transition-colors">
+            <button onClick={() => setSessionRecovered(false)} className="text-muted-foreground hover:text-foreground transition-colors">
               <X size={14} />
             </button>
           </div>
@@ -583,7 +643,7 @@ function App() {
             <div className="h-full overflow-y-auto p-8 max-w-2xl mx-auto animate-[fadeIn_0.3s_ease-out]">
               <div className="flex items-center justify-between mb-8">
                 <h1 className="text-2xl font-bold">Settings</h1>
-                <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-[10px] text-green-400 font-medium flex items-center gap-2">
+                <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-[10px] text-green-700 font-medium flex items-center gap-2">
                   <Shield size={12} /> Privacy: keys only live in your browser (sent to backend just to process)
                 </div>
               </div>
@@ -592,14 +652,14 @@ function App() {
               <div className={`glass-panel p-6 mt-8 ${!uploadPostKey ? 'border-amber-500/30 ring-1 ring-amber-500/20' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold">Social Integration</h2>
-                  <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-amber-400 uppercase tracking-wider">Required</span>
+                  <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-amber-700 uppercase tracking-wider">Required</span>
                 </div>
-                <p className="text-xs text-zinc-500 mb-6 leading-relaxed">
+                <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                   Required to publish your clips to TikTok, Instagram Reels, and YouTube Shorts via <strong>Upload-Post</strong>.
                   Includes a <strong>free tier</strong> (no credit card required).
                 </p>
                 <div className="space-y-4">
-                  <label className="block text-sm text-zinc-400">Upload-Post API Key</label>
+                  <label className="block text-sm text-muted-foreground">Upload-Post API Key</label>
                   <div className="flex gap-2">
                     <input
                       type="password"
@@ -612,24 +672,24 @@ function App() {
                       Connect
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Connect your Upload-Post account to enable one-click publishing.
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <a href="https://app.upload-post.com/login" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">1. Login</span>
-                        <span className="text-[10px] text-zinc-600">Register account</span>
+                      <a href="https://app.upload-post.com/login" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">1. Login</span>
+                        <span className="text-[10px] text-muted-foreground">Register account</span>
                       </a>
-                      <a href="https://app.upload-post.com/manage-users" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">2. Profiles</span>
-                        <span className="text-[10px] text-zinc-600">Create & Connect</span>
+                      <a href="https://app.upload-post.com/manage-users" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">2. Profiles</span>
+                        <span className="text-[10px] text-muted-foreground">Create & Connect</span>
                       </a>
-                      <a href="https://app.upload-post.com/api-keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">3. API Key</span>
-                        <span className="text-[10px] text-zinc-600">Generate key</span>
+                      <a href="https://app.upload-post.com/api-keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">3. API Key</span>
+                        <span className="text-[10px] text-muted-foreground">Generate key</span>
                       </a>
                     </div>
                     <br />
-                    <span className="text-zinc-600 italic">
+                    <span className="text-muted-foreground italic">
                       Keys are only stored in your browser. They are sent to the backend only to process your request, never stored server-side.
                     </span>
                   </p>
@@ -639,14 +699,14 @@ function App() {
               <div className="glass-panel p-6 mt-8">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold">Video Translation</h2>
-                  <span className="text-[10px] bg-white/5 border border-white/5 px-2 py-0.5 rounded text-zinc-500 uppercase tracking-wider">Optional</span>
+                  <span className="text-[10px] bg-muted border border-border px-2 py-0.5 rounded text-muted-foreground uppercase tracking-wider">Optional</span>
                 </div>
-                <p className="text-xs text-zinc-500 mb-6 leading-relaxed">
+                <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                   Translate your clips to different languages using <strong>ElevenLabs</strong> AI dubbing.
                   Automatically translates speech while preserving the original voice characteristics.
                 </p>
                 <div className="space-y-4">
-                  <label className="block text-sm text-zinc-400">ElevenLabs API Key</label>
+                  <label className="block text-sm text-muted-foreground">ElevenLabs API Key</label>
                   <div className="flex gap-2">
                     <input
                       type="password"
@@ -667,20 +727,20 @@ function App() {
                       Save
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Get your API key from ElevenLabs to enable video translation.
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <a href="https://elevenlabs.io/sign-up" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">1. Sign Up</span>
-                        <span className="text-[10px] text-zinc-600">Create account</span>
+                      <a href="https://elevenlabs.io/sign-up" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">1. Sign Up</span>
+                        <span className="text-[10px] text-muted-foreground">Create account</span>
                       </a>
-                      <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">2. API Key</span>
-                        <span className="text-[10px] text-zinc-600">Generate key</span>
+                      <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">2. API Key</span>
+                        <span className="text-[10px] text-muted-foreground">Generate key</span>
                       </a>
                     </div>
                     <br />
-                    <span className="text-zinc-600 italic">
+                    <span className="text-muted-foreground italic">
                       Keys are only stored in your browser. They are sent to the backend only to process your request, never stored server-side.
                     </span>
                   </p>
@@ -692,12 +752,12 @@ function App() {
                   <h2 className="text-lg font-semibold">AI Shorts (UGC Videos)</h2>
                   <span className="text-[10px] bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded text-violet-400 uppercase tracking-wider">New</span>
                 </div>
-                <p className="text-xs text-zinc-500 mb-6 leading-relaxed">
+                <p className="text-xs text-muted-foreground mb-6 leading-relaxed">
                   Generate UGC-style videos with AI actors for any product or business using <strong>fal.ai</strong>.
                   Just describe your product or paste a URL. Requires fal.ai + ElevenLabs API keys.
                 </p>
                 <div className="space-y-4">
-                  <label className="block text-sm text-zinc-400">fal.ai API Key</label>
+                  <label className="block text-sm text-muted-foreground">fal.ai API Key</label>
                   <div className="flex gap-2">
                     <input
                       type="password"
@@ -718,20 +778,20 @@ function App() {
                       Save
                     </button>
                   </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Get your API key from fal.ai to enable AI actor video generation.
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">1. Sign Up</span>
-                        <span className="text-[10px] text-zinc-600">Create fal.ai account</span>
+                      <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">1. Sign Up</span>
+                        <span className="text-[10px] text-muted-foreground">Create fal.ai account</span>
                       </a>
-                      <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-white/5 rounded-lg hover:bg-white/5 transition-colors flex flex-col gap-1">
-                        <span className="text-zinc-400 font-medium">2. API Key</span>
-                        <span className="text-[10px] text-zinc-600">Generate key</span>
+                      <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" className="p-2 border border-border rounded-lg hover:bg-muted transition-colors flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">2. API Key</span>
+                        <span className="text-[10px] text-muted-foreground">Generate key</span>
                       </a>
                     </div>
                     <br />
-                    <span className="text-zinc-600 italic">
+                    <span className="text-muted-foreground italic">
                       Keys are only stored in your browser. Sent to backend only to process requests.
                     </span>
                   </p>
@@ -752,23 +812,23 @@ function App() {
 
                 {/* Header */}
                 <div className="space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] uppercase tracking-wider text-emerald-400 font-semibold">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] uppercase tracking-wider text-emerald-700 font-semibold">
                     <Bot size={12} /> Autonomous Skill
                   </div>
-                  <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+                  <h1 className="text-3xl md:text-4xl font-black bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Your Personal Clipping Team
                   </h1>
-                  <p className="text-zinc-400 text-base md:text-lg leading-relaxed max-w-2xl">
+                  <p className="text-muted-foreground text-base md:text-lg leading-relaxed max-w-2xl">
                     Drop your videos in a folder and a team of AI clippers picks the viral moments, edits them, and queues them for your approval — like having a 24/7 short-form editing crew on autopilot.
                   </p>
                 </div>
 
                 {/* Mobile-format warning */}
                 <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
-                  <Smartphone size={20} className="text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-sm text-amber-100">
-                    <p className="font-semibold text-amber-300 mb-1">Upload videos already in vertical (9:16) mobile format.</p>
-                    <p className="text-amber-100/80 leading-relaxed">
+                  <Smartphone size={20} className="text-amber-700 shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-700">
+                    <p className="font-semibold text-amber-700 mb-1">Upload videos already in vertical (9:16) mobile format.</p>
+                    <p className="text-amber-700 leading-relaxed">
                       The agent does not reframe horizontal footage. Make sure every source video is shot or pre-cropped to mobile/portrait format before dropping it into the input folder.
                     </p>
                   </div>
@@ -777,31 +837,31 @@ function App() {
                 {/* Workflow */}
                 <div className="grid md:grid-cols-3 gap-4">
                   <div className="glass-panel p-5 space-y-2">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                       <Upload size={18} />
                     </div>
-                    <h3 className="font-semibold text-white">1. Drop your videos</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <h3 className="font-semibold text-foreground">1. Drop your videos</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Put your long-form vertical footage in the watched folder. The skill picks one video per run.
                     </p>
                   </div>
 
                   <div className="glass-panel p-5 space-y-2">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                       <Users size={18} />
                     </div>
-                    <h3 className="font-semibold text-white">2. AI clippers work</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <h3 className="font-semibold text-foreground">2. AI clippers work</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Whisper transcribes, Gemini 3 Flash spots viral beats, FFmpeg cuts each clip and adds a hook overlay.
                     </p>
                   </div>
 
                   <div className="glass-panel p-5 space-y-2">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                       <CheckCircle2 size={18} />
                     </div>
-                    <h3 className="font-semibold text-white">3. You validate, it ships</h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
+                    <h3 className="font-semibold text-foreground">3. You validate, it ships</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Approve the candidates you like and the skill auto-publishes them to TikTok, Reels and YouTube Shorts via Upload-Post.
                     </p>
                   </div>
@@ -811,8 +871,8 @@ function App() {
                 <div className="glass-panel p-6 md:p-8 space-y-5">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <h2 className="text-xl font-bold text-white mb-1">skill-autoshorts</h2>
-                      <p className="text-sm text-zinc-400">
+                      <h2 className="text-xl font-bold text-foreground mb-1">skill-autoshorts</h2>
+                      <p className="text-sm text-muted-foreground">
                         The Claude Code skill that powers this workflow. Install it once and trigger it whenever you want a fresh batch of clips.
                       </p>
                     </div>
@@ -826,11 +886,11 @@ function App() {
                     </a>
                   </div>
 
-                  <div className="bg-[#0c0c0e] border border-white/10 rounded-lg p-4 font-mono text-xs text-zinc-300 flex items-center justify-between gap-3">
+                  <div className="bg-muted border border-border rounded-lg p-4 font-mono text-xs text-muted-foreground flex items-center justify-between gap-3">
                     <span className="truncate">git clone https://github.com/mutonby/skill-autoshorts</span>
                     <button
                       onClick={() => navigator.clipboard.writeText('git clone https://github.com/mutonby/skill-autoshorts')}
-                      className="text-zinc-500 hover:text-white transition-colors shrink-0"
+                      className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       title="Copy"
                     >
                       <Copy size={14} />
@@ -838,20 +898,20 @@ function App() {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-start gap-2 text-zinc-300">
-                      <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <Check size={16} className="text-emerald-700 shrink-0 mt-0.5" />
                       <span>Daily batch — picks one long video per run</span>
                     </div>
-                    <div className="flex items-start gap-2 text-zinc-300">
-                      <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <Check size={16} className="text-emerald-700 shrink-0 mt-0.5" />
                       <span>Whisper transcription with word-level timing</span>
                     </div>
-                    <div className="flex items-start gap-2 text-zinc-300">
-                      <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <Check size={16} className="text-emerald-700 shrink-0 mt-0.5" />
                       <span>Gemini 3 Flash multimodal moment detection</span>
                     </div>
-                    <div className="flex items-start gap-2 text-zinc-300">
-                      <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <Check size={16} className="text-emerald-700 shrink-0 mt-0.5" />
                       <span>Auto-publish to TikTok, Reels & YouTube Shorts</span>
                     </div>
                   </div>
@@ -881,17 +941,17 @@ function App() {
             <div className="h-full flex flex-col items-center justify-center p-6 animate-[fadeIn_0.3s_ease-out]">
               <div className="max-w-xl w-full text-center space-y-8">
                 <div className="space-y-4">
-                  <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+                  <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Create Viral Shorts
                   </h1>
-                  <p className="text-zinc-400 text-lg">
+                  <p className="text-muted-foreground text-lg">
                     Drop your long-form video below to instantly generate viral clips with AI.
                   </p>
                 </div>
 
                 <MediaInput onProcess={handleProcess} isProcessing={status === 'processing'} />
 
-                <div className="flex items-center justify-center gap-8 text-zinc-500 text-sm">
+                <div className="flex items-center justify-center gap-8 text-muted-foreground text-sm">
                   <span className="flex items-center gap-2"><Youtube size={16} /> YouTube</span>
                   <span className="flex items-center gap-2"><Instagram size={16} /> Instagram</span>
                   <span className="flex items-center gap-2"><TikTokIcon size={16} /> TikTok</span>
@@ -905,15 +965,15 @@ function App() {
             <div className="h-full flex flex-col md:flex-row animate-[fadeIn_0.3s_ease-out]">
 
               {/* Left Panel: Preview & Status */}
-              <div className={`${status === 'complete' ? 'w-full md:w-[30%] lg:w-[25%]' : 'w-full md:w-[55%] lg:w-[60%]'} h-full flex flex-col border-r border-white/5 bg-black/20 p-6 overflow-y-auto custom-scrollbar transition-all duration-700 ease-in-out`}>
+              <div className={`${status === 'complete' ? 'w-full md:w-[30%] lg:w-[25%]' : 'w-full md:w-[55%] lg:w-[60%]'} h-full flex flex-col border-r border-border bg-black/20 p-6 overflow-y-auto custom-scrollbar transition-all duration-700 ease-in-out`}>
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Activity className={`text-primary ${status === 'processing' ? 'animate-pulse' : ''}`} size={20} />
+                    <Activity className={`text-primary-strong ${status === 'processing' ? 'animate-pulse' : ''}`} size={20} />
                     Live Analysis
                   </h2>
-                  <span className={`text-xs px-2 py-1 rounded-full border ${status === 'processing' ? 'bg-primary/10 border-primary/20 text-primary' :
-                    status === 'complete' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
-                      'bg-red-500/10 border-red-500/20 text-red-400'
+                  <span className={`text-xs px-2 py-1 rounded-full border ${status === 'processing' ? 'bg-primary/10 border-primary/20 text-primary-strong' :
+                    status === 'complete' ? 'bg-green-500/10 border-green-500/20 text-green-700' :
+                      'bg-red-500/10 border-red-500/20 text-red-600'
                     }`}>
                     {status.toUpperCase()}
                   </span>
@@ -931,25 +991,25 @@ function App() {
                 )}
 
                 {/* Logs Terminal */}
-                <div className={`bg-[#0c0c0e] rounded-xl border border-white/10 overflow-hidden flex flex-col transition-all duration-500 ${status === 'complete' ? 'h-32 min-h-0 opacity-50 hover:opacity-100' : 'flex-1 min-h-[200px]'}`}>
-                  <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between bg-white/5 shrink-0">
-                    <span className="text-xs font-mono text-zinc-400 flex items-center gap-2">
+                <div className={`bg-muted rounded-xl border border-border overflow-hidden flex flex-col transition-all duration-500 ${status === 'complete' ? 'h-32 min-h-0 opacity-50 hover:opacity-100' : 'flex-1 min-h-[200px]'}`}>
+                  <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted shrink-0">
+                    <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
                       <Terminal size={12} /> System Logs
                     </span>
-                    <button onClick={() => setLogsVisible(!logsVisible)} className="text-zinc-500 hover:text-white transition-colors">
+                    <button onClick={() => setLogsVisible(!logsVisible)} className="text-muted-foreground hover:text-foreground transition-colors">
                       {logsVisible ? <ChevronDown size={14} /> : <ChevronDown size={14} className="rotate-180" />}
                     </button>
                   </div>
                   {logsVisible && (
-                    <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 custom-scrollbar text-zinc-400">
+                    <div className="flex-1 p-4 overflow-y-auto font-mono text-xs space-y-1.5 custom-scrollbar text-muted-foreground">
                       {logs.map((log, i) => (
-                        <div key={i} className={`flex gap-2 ${log.toLowerCase().includes('error') ? 'text-red-400' : 'text-zinc-400'}`}>
-                          <span className="text-zinc-700 shrink-0">{new Date().toLocaleTimeString()}</span>
+                        <div key={i} className={`flex gap-2 ${log.toLowerCase().includes('error') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          <span className="text-muted-foreground shrink-0">{new Date().toLocaleTimeString()}</span>
                           <span>{log}</span>
                         </div>
                       ))}
                       {status === 'processing' && (
-                        <div className="animate-pulse text-primary/70">_</div>
+                        <div className="animate-pulse text-primary-strong/70">_</div>
                       )}
                     </div>
                   )}
@@ -959,15 +1019,15 @@ function App() {
               {/* Right Panel: Results Grid */}
               <div className={`${status === 'complete' ? 'w-full md:w-[70%] lg:w-[75%]' : 'w-full md:w-[45%] lg:w-[40%]'} h-full flex flex-col bg-background p-6 transition-all duration-700 ease-in-out`}>
                 <h2 className="text-lg font-semibold mb-6 flex items-center gap-2 shrink-0">
-                  <Sparkles className="text-yellow-400" size={20} />
+                  <Sparkles className="text-yellow-600" size={20} />
                   Generated Shorts
                   {results?.clips?.length > 0 && (
-                    <span className="text-xs bg-white/10 text-white px-2 py-0.5 rounded-full ml-auto">
+                    <span className="text-xs bg-muted text-foreground px-2 py-0.5 rounded-full ml-auto">
                       {results.clips.length} Clips
                     </span>
                   )}
                   {results?.cost_analysis && (
-                    <span className="text-xs bg-green-500/10 border border-green-500/20 text-green-400 px-2 py-0.5 rounded-full ml-2" title={`Input: ${results.cost_analysis.input_tokens} | Output: ${results.cost_analysis.output_tokens}`}>
+                    <span className="text-xs bg-green-500/10 border border-green-500/20 text-green-700 px-2 py-0.5 rounded-full ml-2" title={`Input: ${results.cost_analysis.input_tokens} | Output: ${results.cost_analysis.output_tokens}`}>
                       ${results.cost_analysis.total_cost.toFixed(5)}
                     </span>
                   )}
@@ -1002,12 +1062,12 @@ function App() {
                     </div>
                   ) : (
                     status === 'processing' ? (
-                      <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 opacity-50">
-                        <div className="w-12 h-12 rounded-full border-2 border-zinc-800 border-t-primary animate-spin" />
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-4 opacity-50">
+                        <div className="w-12 h-12 rounded-full border-2 border-border border-t-primary animate-spin" />
                         <p className="text-sm">Waiting for clips...</p>
                       </div>
                     ) : status === 'error' ? (
-                      <div className="h-full flex flex-col items-center justify-center text-red-400 space-y-2">
+                      <div className="h-full flex flex-col items-center justify-center text-red-600 space-y-2">
                         <p>Generation failed.</p>
                       </div>
                     ) : null
@@ -1025,27 +1085,27 @@ function App() {
       {/* Missing API Key Modal */}
       {showKeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowKeyModal(false)}>
-          <div className="bg-[#18181b] border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-white">
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-foreground">
               {!apiKey && !uploadPostKey
                 ? 'Required API Keys Missing'
                 : !apiKey
                   ? 'Gemini API Key Required'
                   : 'Upload-Post API Key Required'}
             </h2>
-            <p className="text-sm text-zinc-400">
-              OpenShorts needs both a <strong className="text-zinc-200">Gemini</strong> API key and an <strong className="text-zinc-200">Upload-Post</strong> API key. Both have free tiers.
+            <p className="text-sm text-muted-foreground">
+              OpenShorts needs both a <strong className="text-foreground">Gemini</strong> API key and an <strong className="text-foreground">Upload-Post</strong> API key. Both have free tiers.
             </p>
 
             {/* Gemini block */}
-            <div className={`rounded-lg p-4 space-y-2 border ${!apiKey ? 'bg-blue-500/5 border-blue-500/30' : 'bg-white/5 border-white/10 opacity-70'}`}>
-              <p className="text-xs font-semibold text-zinc-200 flex items-center gap-2">
-                {apiKey ? <Check size={12} className="text-green-400" /> : <AlertTriangle size={12} className="text-amber-400" />}
-                Gemini API Key {apiKey && <span className="text-green-400">— set</span>}
+            <div className={`rounded-lg p-4 space-y-2 border ${!apiKey ? 'bg-blue-500/5 border-blue-500/30' : 'bg-muted border-border opacity-70'}`}>
+              <p className="text-xs font-semibold text-foreground flex items-center gap-2">
+                {apiKey ? <Check size={12} className="text-green-700" /> : <AlertTriangle size={12} className="text-amber-700" />}
+                Gemini API Key {apiKey && <span className="text-green-700">— set</span>}
               </p>
               {!apiKey && (
                 <>
-                  <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside">
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">aistudio.google.com/app/apikey</a></li>
                     <li>Sign in with your Google account</li>
                     <li>Click "Create API Key"</li>
@@ -1054,7 +1114,7 @@ function App() {
                   <input
                     type="text"
                     placeholder="Paste your Gemini API key here..."
-                    className="w-full bg-black/50 border border-white/20 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && e.target.value.trim()) {
                         setApiKey(e.target.value.trim());
@@ -1066,17 +1126,17 @@ function App() {
             </div>
 
             {/* Upload-Post block */}
-            <div className={`rounded-lg p-4 space-y-2 border ${!uploadPostKey ? 'bg-violet-500/5 border-violet-500/30' : 'bg-white/5 border-white/10 opacity-70'}`}>
-              <p className="text-xs font-semibold text-zinc-200 flex items-center gap-2">
-                {uploadPostKey ? <Check size={12} className="text-green-400" /> : <AlertTriangle size={12} className="text-amber-400" />}
-                Upload-Post API Key {uploadPostKey && <span className="text-green-400">— set</span>}
+            <div className={`rounded-lg p-4 space-y-2 border ${!uploadPostKey ? 'bg-violet-500/5 border-violet-500/30' : 'bg-muted border-border opacity-70'}`}>
+              <p className="text-xs font-semibold text-foreground flex items-center gap-2">
+                {uploadPostKey ? <Check size={12} className="text-green-700" /> : <AlertTriangle size={12} className="text-amber-700" />}
+                Upload-Post API Key {uploadPostKey && <span className="text-green-700">— set</span>}
               </p>
               {!uploadPostKey && (
                 <>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-muted-foreground">
                     Required to publish your clips to TikTok, Instagram Reels, and YouTube Shorts. Free tier available, no credit card needed.
                   </p>
-                  <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside">
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Register at <a href="https://app.upload-post.com/login" target="_blank" rel="noopener noreferrer" className="text-violet-400 underline">app.upload-post.com</a></li>
                     <li>Connect your TikTok, Instagram, or YouTube accounts</li>
                     <li>Go to <a href="https://app.upload-post.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-violet-400 underline">API Keys</a> and generate one</li>
@@ -1085,7 +1145,7 @@ function App() {
                   <input
                     type="text"
                     placeholder="Paste your Upload-Post API key here..."
-                    className="w-full bg-black/50 border border-white/20 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500"
+                    className="w-full bg-muted border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && e.target.value.trim()) {
                         setUploadPostKey(e.target.value.trim());
@@ -1099,13 +1159,13 @@ function App() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowKeyModal(false)}
-                className="flex-1 text-sm text-zinc-400 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                className="flex-1 text-sm text-muted-foreground py-2 rounded-lg border border-border hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { setShowKeyModal(false); setActiveTab('settings'); }}
-                className="flex-1 text-sm text-white py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors font-medium"
+                className="flex-1 text-sm text-foreground py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors font-medium"
               >
                 Go to Settings
               </button>
@@ -1122,6 +1182,17 @@ function App() {
         uploadPostKey={uploadPostKey}
         uploadUserId={uploadUserId}
       />
+
+      <AccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        user={{ name: 'Matt Kuda', email: 'mattkuda@gmail.com', initials: 'MK' }}
+        onOpenSettings={() => { setShowAccountModal(false); setActiveTab('settings'); }}
+      />
+
+      {debug.enabled && !debug.hidden && (
+        <DebugMenu debug={debug} setDebug={setDebug} />
+      )}
     </div>
   );
 }

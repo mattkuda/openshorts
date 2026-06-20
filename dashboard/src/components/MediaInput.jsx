@@ -45,14 +45,14 @@ export default function MediaInput({ onProcess, isProcessing }) {
     };
 
     return (
-        <div className="bg-surface border border-white/5 rounded-2xl p-6 animate-[fadeIn_0.6s_ease-out]">
-            <div className="flex gap-4 mb-6 border-b border-white/5 pb-4">
+        <div className="bg-surface border border-border rounded-2xl p-6 animate-[fadeIn_0.6s_ease-out]">
+            <div className="flex gap-4 mb-6 border-b border-border pb-4">
                 {youtubeUrlEnabled && (
                     <button
                         onClick={() => setMode('url')}
                         className={`flex items-center gap-2 pb-2 px-2 transition-all ${mode === 'url'
-                            ? 'text-primary border-b-2 border-primary -mb-[17px]'
-                            : 'text-zinc-400 hover:text-white'
+                            ? 'text-primary-strong border-b-2 border-primary -mb-[17px]'
+                            : 'text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <Youtube size={18} />
@@ -62,8 +62,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                 <button
                     onClick={() => setMode('file')}
                     className={`flex items-center gap-2 pb-2 px-2 transition-all ${mode === 'file'
-                        ? 'text-primary border-b-2 border-primary -mb-[17px]'
-                        : 'text-zinc-400 hover:text-white'
+                        ? 'text-primary-strong border-b-2 border-primary -mb-[17px]'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                 >
                     <Upload size={18} />
@@ -85,19 +85,19 @@ export default function MediaInput({ onProcess, isProcessing }) {
                     </div>
                 ) : (
                     <div
-                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${file ? 'border-primary/50 bg-primary/5' : 'border-zinc-700 hover:border-zinc-500 bg-white/5'
+                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${file ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-border bg-muted'
                             }`}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                     >
                         {file ? (
-                            <div className="flex items-center justify-center gap-3 text-white">
-                                <FileVideo className="text-primary" />
+                            <div className="flex items-center justify-center gap-3 text-foreground">
+                                <FileVideo className="text-primary-strong" />
                                 <span className="font-medium">{file.name}</span>
                                 <button
                                     type="button"
                                     onClick={() => setFile(null)}
-                                    className="p-1 hover:bg-white/10 rounded-full"
+                                    className="p-1 hover:bg-muted rounded-full"
                                 >
                                     <X size={16} />
                                 </button>
@@ -110,9 +110,9 @@ export default function MediaInput({ onProcess, isProcessing }) {
                                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                                     className="hidden"
                                 />
-                                <Upload className="mx-auto mb-3 text-zinc-500" size={24} />
-                                <p className="text-zinc-400">Click to upload or drag and drop</p>
-                                <p className="text-xs text-zinc-600 mt-1">MP4, MOV up to 500MB</p>
+                                <Upload className="mx-auto mb-3 text-muted-foreground" size={24} />
+                                <p className="text-muted-foreground">Click to upload or drag and drop</p>
+                                <p className="text-xs text-muted-foreground mt-1">MP4, MOV up to 500MB</p>
                             </label>
                         )}
                     </div>
@@ -123,8 +123,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                         type="button"
                         onClick={() => setGenerationMode('viral')}
                         className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border transition-all text-sm ${generationMode === 'viral'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white'
+                            ? 'border-primary bg-primary/10 text-primary-strong'
+                            : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <Scissors size={16} />
@@ -134,8 +134,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                         type="button"
                         onClick={() => setGenerationMode('summary')}
                         className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border transition-all text-sm ${generationMode === 'summary'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white'
+                            ? 'border-primary bg-primary/10 text-primary-strong'
+                            : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <Film size={16} />
@@ -144,10 +144,10 @@ export default function MediaInput({ onProcess, isProcessing }) {
                 </div>
 
                 {generationMode === 'summary' && (
-                    <div className="mt-3 bg-white/5 border border-white/5 rounded-xl p-4">
-                        <div className="flex justify-between items-center mb-2 text-xs text-zinc-400">
+                    <div className="mt-3 bg-muted border border-border rounded-xl p-4">
+                        <div className="flex justify-between items-center mb-2 text-xs text-muted-foreground">
                             <span>Target length</span>
-                            <span className="font-mono text-white">{targetDuration}s</span>
+                            <span className="font-mono text-foreground">{targetDuration}s</span>
                         </div>
                         <input
                             type="range"
@@ -158,7 +158,7 @@ export default function MediaInput({ onProcess, isProcessing }) {
                             onChange={(e) => setTargetDuration(Number(e.target.value))}
                             className="w-full accent-primary"
                         />
-                        <p className="text-[11px] text-zinc-500 mt-2">
+                        <p className="text-[11px] text-muted-foreground mt-2">
                             One concatenated reel covering the major beats — hook, key points, takeaway.
                         </p>
                     </div>
@@ -169,8 +169,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                         type="button"
                         onClick={() => setReframeMode('auto')}
                         className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border transition-all text-sm ${reframeMode === 'auto'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white'
+                            ? 'border-primary bg-primary/10 text-primary-strong'
+                            : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <Layout size={16} />
@@ -180,8 +180,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                         type="button"
                         onClick={() => setReframeMode('streamer')}
                         className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border transition-all text-sm ${reframeMode === 'streamer'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white'
+                            ? 'border-primary bg-primary/10 text-primary-strong'
+                            : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <User size={16} />
@@ -190,8 +190,8 @@ export default function MediaInput({ onProcess, isProcessing }) {
                 </div>
 
                 {reframeMode === 'streamer' && (
-                    <div className="mt-3 bg-white/5 border border-white/5 rounded-xl p-4">
-                        <div className="text-xs text-zinc-400 mb-2">Where is your face cam in the source?</div>
+                    <div className="mt-3 bg-muted border border-border rounded-xl p-4">
+                        <div className="text-xs text-muted-foreground mb-2">Where is your face cam in the source?</div>
                         <div className="grid grid-cols-2 gap-2 max-w-[200px]">
                             {[
                                 { v: 'tl', label: '↖ Top left' },
@@ -204,21 +204,21 @@ export default function MediaInput({ onProcess, isProcessing }) {
                                     type="button"
                                     onClick={() => setFacecamCorner(c.v)}
                                     className={`py-2 px-2 rounded-lg border text-xs transition-all ${facecamCorner === c.v
-                                        ? 'border-primary bg-primary/10 text-primary'
-                                        : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white'
+                                        ? 'border-primary bg-primary/10 text-primary-strong'
+                                        : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                                         }`}
                                 >
                                     {c.label}
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-3">
+                        <p className="text-[11px] text-muted-foreground mt-3">
                             Top tile = your face cam zoomed in. Bottom tile = the full source frame letterboxed (game / screen).
                         </p>
                     </div>
                 )}
 
-                <label className="flex items-start gap-2 mt-5 text-xs text-zinc-400 cursor-pointer select-none">
+                <label className="flex items-start gap-2 mt-5 text-xs text-muted-foreground cursor-pointer select-none">
                     <input
                         type="checkbox"
                         checked={acknowledged}
@@ -226,7 +226,7 @@ export default function MediaInput({ onProcess, isProcessing }) {
                         className="mt-0.5 accent-primary cursor-pointer"
                     />
                     <span>
-                        I confirm I own this content or have the rights to process it. I am responsible for any content I submit. See our <a href="/#legal" target="_blank" rel="noopener noreferrer" className="text-primary underline" onClick={(e) => e.stopPropagation()}>Terms & Privacy</a>.
+                        I confirm I own this content or have the rights to process it. I am responsible for any content I submit. See our <a href="/#legal" target="_blank" rel="noopener noreferrer" className="text-primary-strong underline" onClick={(e) => e.stopPropagation()}>Terms & Privacy</a>.
                     </span>
                 </label>
 
@@ -237,7 +237,7 @@ export default function MediaInput({ onProcess, isProcessing }) {
                 >
                     {isProcessing ? (
                         <>
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
                             Processing Video...
                         </>
                     ) : (

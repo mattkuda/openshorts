@@ -143,18 +143,18 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-[#121214] border border-white/10 p-6 rounded-2xl w-full max-w-5xl shadow-2xl relative flex flex-col md:flex-row gap-6 max-h-[90vh]">
+            <div className="bg-card border border-border p-6 rounded-2xl w-full max-w-5xl shadow-2xl relative flex flex-col md:flex-row gap-6 max-h-[90vh]">
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-zinc-500 hover:text-white z-10"
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground z-10"
                 >
                     <X size={20} />
                 </button>
 
                 {/* Left: Preview */}
-                <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg border border-white/5 overflow-hidden relative aspect-[9/16] max-h-[600px]">
+                <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg border border-border overflow-hidden relative aspect-[9/16] max-h-[600px]">
                     {captionsLoading ? (
-                        <div className="flex items-center gap-2 text-zinc-400">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                             <Loader2 size={16} className="animate-spin" />
                             <span className="text-sm">Loading preview...</span>
                         </div>
@@ -183,20 +183,20 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                 {/* Right: Controls */}
                 <div className="w-full md:w-80 flex flex-col">
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2 shrink-0">
-                        <Type className="text-primary" /> Auto Subtitles
+                    <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2 shrink-0">
+                        <Type className="text-primary-strong" /> Auto Subtitles
                     </h3>
 
                     <div className="space-y-5 flex-1 overflow-y-auto custom-scrollbar pr-1">
                         {/* Position Selector */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Position</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Position</label>
                             <div className="grid grid-cols-3 gap-2">
                                 {['top', 'middle', 'bottom'].map((pos) => (
                                     <button
                                         key={pos}
                                         onClick={() => setPosition(pos)}
-                                        className={`p-2 rounded-lg border text-center text-xs font-medium transition-all ${position === pos ? 'bg-primary/20 border-primary text-white' : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10'}`}
+                                        className={`p-2 rounded-lg border text-center text-xs font-medium transition-all ${position === pos ? 'bg-primary/20 border-primary text-foreground' : 'bg-muted border-border text-muted-foreground hover:bg-muted'}`}
                                     >
                                         {pos.charAt(0).toUpperCase() + pos.slice(1)}
                                     </button>
@@ -206,13 +206,13 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                         {/* Animation Style (new) */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Animation</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Animation</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {ANIMATION_OPTIONS.map((opt) => (
                                     <button
                                         key={opt.value}
                                         onClick={() => setAnimation(opt.value)}
-                                        className={`p-2 rounded-lg border text-center text-xs font-medium transition-all ${animation === opt.value ? 'bg-primary/20 border-primary text-white' : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10'}`}
+                                        className={`p-2 rounded-lg border text-center text-xs font-medium transition-all ${animation === opt.value ? 'bg-primary/20 border-primary text-foreground' : 'bg-muted border-border text-muted-foreground hover:bg-muted'}`}
                                     >
                                         {opt.label}
                                     </button>
@@ -226,7 +226,7 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
                                 <button
                                     type="button"
                                     onClick={() => setShowTextEditor(!showTextEditor)}
-                                    className="w-full flex items-center justify-between text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2"
+                                    className="w-full flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2"
                                 >
                                     <span>Edit Text ({captions.length} words)</span>
                                     <span className={`transition-transform ${showTextEditor ? 'rotate-180' : ''}`}>▾</span>
@@ -236,7 +236,7 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
                                         value={editableText}
                                         onChange={(e) => handleTextEdit(e.target.value)}
                                         rows={5}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-primary/50 resize-none leading-relaxed animate-[fadeIn_0.15s_ease-out]"
+                                        className="w-full bg-muted border border-border rounded-lg p-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 resize-none leading-relaxed animate-[fadeIn_0.15s_ease-out]"
                                         placeholder="Edit subtitle text..."
                                     />
                                 )}
@@ -245,11 +245,11 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                         {/* Font Family */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Font</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Font</label>
                             <select
                                 value={fontName}
                                 onChange={(e) => setFontName(e.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                                className="w-full bg-muted border border-border rounded-lg p-2 text-sm text-foreground focus:outline-none focus:border-primary/50"
                             >
                                 {FONT_OPTIONS.map((f) => (
                                     <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
@@ -259,19 +259,19 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                         {/* Text Color */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Text Color</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Text Color</label>
                             <div className="flex flex-wrap gap-2">
                                 {COLOR_PRESETS.map((c) => (
                                     <button
                                         key={c.color}
                                         onClick={() => setFontColor(c.color)}
-                                        className={`w-7 h-7 rounded-full border-2 transition-all ${fontColor === c.color ? 'border-white scale-110' : 'border-white/20 hover:border-white/50'}`}
+                                        className={`w-7 h-7 rounded-full border-2 transition-all ${fontColor === c.color ? 'border-foreground scale-110' : 'border-border hover:border-muted-foreground/40'}`}
                                         style={{ backgroundColor: c.color }}
                                         title={c.label}
                                     />
                                 ))}
-                                <label className="w-7 h-7 rounded-full border-2 border-dashed border-white/20 cursor-pointer flex items-center justify-center hover:border-white/50 transition-all overflow-hidden relative" title="Custom color">
-                                    <span className="text-[10px] text-zinc-400">+</span>
+                                <label className="w-7 h-7 rounded-full border-2 border-dashed border-border cursor-pointer flex items-center justify-center hover:border-muted-foreground/40 transition-all overflow-hidden relative" title="Custom color">
+                                    <span className="text-[10px] text-muted-foreground">+</span>
                                     <input type="color" value={fontColor} onChange={(e) => setFontColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </label>
                             </div>
@@ -279,13 +279,13 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                         {/* Highlight Color (new) */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Highlight Color</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Highlight Color</label>
                             <div className="flex flex-wrap gap-2">
                                 {[{ color: '#FFDD00', label: 'Gold' }, { color: '#FF4444', label: 'Red' }, { color: '#00FF88', label: 'Green' }, { color: '#00BBFF', label: 'Blue' }, { color: '#FF69B4', label: 'Pink' }].map((c) => (
                                     <button
                                         key={c.color}
                                         onClick={() => setHighlightColor(c.color)}
-                                        className={`w-7 h-7 rounded-full border-2 transition-all ${highlightColor === c.color ? 'border-white scale-110' : 'border-white/20 hover:border-white/50'}`}
+                                        className={`w-7 h-7 rounded-full border-2 transition-all ${highlightColor === c.color ? 'border-foreground scale-110' : 'border-border hover:border-muted-foreground/40'}`}
                                         style={{ backgroundColor: c.color }}
                                         title={c.label}
                                     />
@@ -295,9 +295,9 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
 
                         {/* Border / Outline */}
                         <div>
-                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 block">Border</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Border</label>
                             <div className="flex items-center gap-3">
-                                <label className="relative w-8 h-8 rounded-lg border border-white/10 cursor-pointer overflow-hidden shrink-0" title="Border color">
+                                <label className="relative w-8 h-8 rounded-lg border border-border cursor-pointer overflow-hidden shrink-0" title="Border color">
                                     <div className="w-full h-full" style={{ backgroundColor: borderColor }} />
                                     <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </label>
@@ -310,7 +310,7 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
                                         onChange={(e) => setBorderWidth(parseInt(e.target.value))}
                                         className="w-full accent-primary"
                                     />
-                                    <div className="flex justify-between text-[10px] text-zinc-500">
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
                                         <span>None</span>
                                         <span>Thick</span>
                                     </div>
@@ -321,16 +321,16 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
                         {/* Background Box */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Background Box</label>
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Background Box</label>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" checked={bgOpacity > 0} onChange={(e) => setBgOpacity(e.target.checked ? 0.5 : 0)} className="sr-only peer" />
-                                    <div className="w-8 h-4 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[0px] after:left-[0px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                                    <div className="w-8 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-foreground after:content-[''] after:absolute after:top-[0px] after:left-[0px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                                 </label>
                             </div>
                             {bgOpacity > 0 && (
                                 <div className="space-y-3 animate-[fadeIn_0.2s_ease-out]">
                                     <div className="flex items-center gap-3">
-                                        <label className="relative w-8 h-8 rounded-lg border border-white/10 cursor-pointer overflow-hidden shrink-0" title="Background color">
+                                        <label className="relative w-8 h-8 rounded-lg border border-border cursor-pointer overflow-hidden shrink-0" title="Background color">
                                             <div className="w-full h-full" style={{ backgroundColor: bgColor }} />
                                             <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
                                         </label>
@@ -343,7 +343,7 @@ export default function SubtitleModal({ isOpen, onClose, onGenerate, isProcessin
                                                 onChange={(e) => setBgOpacity(parseInt(e.target.value) / 100)}
                                                 className="w-full accent-primary"
                                             />
-                                            <div className="flex justify-between text-[10px] text-zinc-500">
+                                            <div className="flex justify-between text-[10px] text-muted-foreground">
                                                 <span>Transparent</span>
                                                 <span>{Math.round(bgOpacity * 100)}%</span>
                                             </div>

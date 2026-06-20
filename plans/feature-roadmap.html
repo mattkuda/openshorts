@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Roadmap — Slideshows, AI Reels, Format Library & Hook Clips</title>
+<style>
+  :root{
+    --bg:#000; --fg:#a1a1aa; --heading:#fff; --line:rgba(255,255,255,0.1);
+    --surface:#0a0a0a; --surface2:#101010; --mint:#6EF882; --mint-dim:#3f7a4a;
+    --comment:#7ee787; --amber:#fbbf24; --rose:#fb7185; --blue:#7aa2ff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:var(--fg);background:var(--bg);}
+  main{max-width:920px;margin:0 auto;padding:56px 32px 160px;}
+  h1{color:var(--heading);font-size:34px;font-weight:800;letter-spacing:-0.02em;margin:0 0 10px;line-height:1.1;}
+  h2{color:var(--heading);font-size:22px;font-weight:700;margin:56px 0 8px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  h3{color:var(--heading);font-size:17px;font-weight:650;margin:30px 0 6px;}
+  h4{color:var(--heading);font-size:14px;font-weight:650;margin:18px 0 4px;text-transform:uppercase;letter-spacing:.06em;}
+  p{margin:0 0 12px;}
+  a{color:var(--mint);text-decoration:none;border-bottom:1px solid rgba(110,248,130,.3);}
+  a:hover{border-bottom-color:var(--mint);}
+  .lede{font-size:18px;max-width:760px;color:#d4d4d8;}
+  .eyebrow{color:var(--mint);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:0 0 14px;}
+  .tldr{background:linear-gradient(180deg,#0c130d,#0a0a0a);border:1px solid rgba(110,248,130,.25);border-radius:14px;padding:22px 24px;margin-top:28px;}
+  .tldr p:last-child{margin-bottom:0;}
+  .pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--fg);margin:0 6px 6px 0;}
+  .pill.mint{border-color:rgba(110,248,130,.4);color:var(--mint);}
+  ul{margin:8px 0 16px;padding-left:20px;} li{margin:5px 0;}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.88em;background:var(--surface);padding:1px 6px;border-radius:5px;color:#e5e7eb;}
+  pre{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.55;margin:12px 0;color:#cbd5e1;}
+  pre .c{color:var(--comment);}
+  pre .k{color:var(--mint);}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:#e4e4e7;font-weight:650;font-size:12px;text-transform:uppercase;letter-spacing:.05em;}
+  td code{font-size:.82em;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+  .built{background:rgba(110,248,130,.14);color:var(--mint);}
+  .partial{background:rgba(251,191,36,.14);color:var(--amber);}
+  .new{background:rgba(251,113,133,.14);color:var(--rose);}
+  details{border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:10px 0;background:var(--surface);}
+  details[open]{padding-bottom:16px;}
+  summary{cursor:pointer;font-weight:650;color:#e4e4e7;}
+  summary::marker{color:var(--mint);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr;}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .card h3{margin-top:0;}
+  .feat{border:1px solid var(--line);border-left:3px solid var(--mint);border-radius:12px;padding:4px 22px 18px;margin:22px 0;background:linear-gradient(180deg,#080808,#000);}
+  .feat .hdr{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;}
+  .feat .hdr h3{margin:0;font-size:19px;}
+  .verdict{font-size:13.5px;background:var(--surface);border:1px dashed rgba(110,248,130,.3);border-radius:8px;padding:11px 14px;margin:12px 0;}
+  .verdict b{color:var(--mint);}
+  /* mockup carve-out — light/branded surfaces */
+  .mock{background:#f6f7f6;border:1px solid #d9dcd9;border-radius:14px;padding:18px;margin:16px 0;}
+  .mock svg{width:100%;height:auto;display:block;border-radius:8px;}
+  .mockcap{font-size:12px;color:#71717a;margin-top:10px;text-align:center;}
+  .legend{font-size:12px;margin:10px 0 0;color:var(--fg);}
+  .legend span{margin-right:14px;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  /* phases */
+  .phase{display:grid;grid-template-columns:120px 1fr;gap:18px;border-top:1px solid var(--line);padding:18px 0;}
+  .phase:first-of-type{border-top:none;}
+  .phase .when{color:var(--mint);font-weight:700;font-size:14px;}
+  .phase .when small{display:block;color:var(--fg);font-weight:400;font-size:12px;margin-top:3px;}
+  /* decisions */
+  .decision{margin:26px 0;}
+  .q-help{color:var(--fg);font-size:13.5px;margin:2px 0 12px;}
+  .options{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px;}
+  .option{text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:13px 15px;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:border-color .12s,background .12s;}
+  .option:hover{border-color:rgba(110,248,130,.4);}
+  .option.selected{border-color:var(--mint);background:rgba(110,248,130,.07);box-shadow:0 0 0 1px var(--mint) inset;}
+  .opt-title{color:var(--heading);font-weight:650;display:flex;align-items:center;gap:8px;font-size:14px;}
+  .opt-title::before{content:"";width:14px;height:14px;border:1px solid rgba(255,255,255,.4);border-radius:999px;flex:0 0 auto;transition:.12s;}
+  .decision[data-select="multi"] .opt-title::before{border-radius:4px;}
+  .option.selected .opt-title::before{background:var(--mint);border-color:var(--mint);box-shadow:inset 0 0 0 3px #000;}
+  .opt-desc{font-size:12.5px;}
+  textarea{width:100%;min-height:120px;resize:vertical;font:inherit;color:var(--heading);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:4px;}
+  textarea::placeholder{color:rgba(255,255,255,.35);}
+  textarea:focus{outline:none;border-color:var(--mint);}
+  .bar{position:sticky;bottom:0;margin:40px -32px -160px;padding:16px 32px;background:linear-gradient(to top,#000 72%,rgba(0,0,0,0));display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  button.action{font:inherit;font-weight:700;background:var(--mint);color:#06250f;border:0;border-radius:9px;padding:11px 18px;cursor:pointer;}
+  button.ghost{background:transparent;color:var(--heading);border:1px solid var(--line);}
+  .hint{color:rgba(255,255,255,.4);font-size:13px;margin-left:auto;}
+  pre#out{display:none;white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">ClipZoo / OpenShorts · Product Roadmap</p>
+  <h1>Slideshows, AI Reels, a Format Library &amp; a Hook-Clip Library</h1>
+  <p class="lede">How to ship the four features you want without reinventing wheels — grounded in what your codebase <em>already</em> has (which is a lot) and how Crayo, Submagic, Icon, Arcads/Creatify and Revid actually do it. Decisions to lock are selectable at the bottom; pick them and paste the export back to me.</p>
+
+  <div class="tldr">
+    <p><strong>TL;DR.</strong> You're further along than it feels. The hard infrastructure already exists: a working <strong>Remotion render service</strong> (the right engine for slideshows + templated reels), a <strong>full AI-UGC pipeline</strong> (<code>saasshorts.py</code>: script → AI actor → ElevenLabs VO → Kling talking-head + B-roll), an FFmpeg compositor, a styled subtitle engine (6 fonts, karaoke/pop/word-highlight), and social scheduling.</p>
+    <p>The thing blocking <em>all four</em> requested features is the same single gap: <strong>there is no database.</strong> Jobs are in-memory dicts, galleries are read-only S3 listings, all user state is <code>localStorage</code>. "Save your own template," "a hook-clip library," and "what users keep" are impossible to build until there's a persistence + identity layer. <strong>That is decision #1 and it gates everything else.</strong></p>
+    <p><span class="pill mint">Already built: ~70% of the plumbing</span><span class="pill">Net-new: data layer · slideshow comp · hook-clip library · TikTok/Snapchat hook text styles</span></p>
+  </div>
+
+  <h2>The one mental model that ties it together</h2>
+  <p>Don't build four features. Build <strong>one parameterized rendering engine</strong> driven by a JSON object — call it a <strong>Format</strong> — and make all four features <em>configurations</em> of it. This is exactly how Submagic ("a preset is a snapshot of caption style, hook, music, effects") and Crayo ("pre-built viral workflows") model it. A Format says: which engine (clip / slideshow / reel / hook-stitch), which caption style, which hook, which music, which transitions, aspect ratio. Your Remotion compositions <em>already</em> take a props object shaped almost exactly like this.</p>
+
+  <div class="mock">
+    <svg viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">
+      <rect width="860" height="280" fill="#f6f7f6"/>
+      <!-- engines column -->
+      <text x="24" y="28" font-size="12" font-weight="700" fill="#3f3f46">ENGINES (inputs)</text>
+      <g font-size="12" fill="#18181b">
+        <rect x="24" y="42" width="170" height="34" rx="7" fill="#fff" stroke="#6EF882" stroke-width="1.5"/><text x="36" y="63">Clip generator ✓ built</text>
+        <rect x="24" y="86" width="170" height="34" rx="7" fill="#fff" stroke="#fb7185" stroke-width="1.5"/><text x="36" y="107">Slideshow ✗ new</text>
+        <rect x="24" y="130" width="170" height="34" rx="7" fill="#fff" stroke="#6EF882" stroke-width="1.5"/><text x="36" y="151">AI UGC reel ✓ built</text>
+        <rect x="24" y="174" width="170" height="34" rx="7" fill="#fff" stroke="#fb7185" stroke-width="1.5"/><text x="36" y="195">Hook-stitch ✗ new</text>
+      </g>
+      <!-- arrows -->
+      <g stroke="#a1a1aa" stroke-width="1.5" fill="none">
+        <path d="M194 59 C 240 59, 250 120, 300 130" marker-end="url(#ar)"/>
+        <path d="M194 103 C 240 103, 250 128, 300 135" marker-end="url(#ar)"/>
+        <path d="M194 147 C 240 147, 250 140, 300 145" marker-end="url(#ar)"/>
+        <path d="M194 191 C 240 191, 250 160, 300 152" marker-end="url(#ar)"/>
+      </g>
+      <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L7 4 L0 8 z" fill="#a1a1aa"/></marker></defs>
+      <!-- format json -->
+      <rect x="300" y="96" width="190" height="92" rx="10" fill="#06250f" />
+      <text x="320" y="120" font-size="13" font-weight="700" fill="#6EF882">Format (JSON)</text>
+      <text x="320" y="140" font-size="10.5" fill="#bbf7c6">engine · captionStyle</text>
+      <text x="320" y="156" font-size="10.5" fill="#bbf7c6">hook · music · transitions</text>
+      <text x="320" y="172" font-size="10.5" fill="#bbf7c6">aspect · brandKit</text>
+      <!-- render -->
+      <path d="M490 142 H 560" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#ar)" fill="none"/>
+      <rect x="560" y="110" width="130" height="64" rx="10" fill="#fff" stroke="#6EF882" stroke-width="1.5"/>
+      <text x="576" y="138" font-size="12.5" font-weight="700" fill="#18181b">Remotion +</text>
+      <text x="576" y="156" font-size="12.5" font-weight="700" fill="#18181b">FFmpeg ✓ built</text>
+      <!-- output -->
+      <path d="M690 142 H 740" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#ar)" fill="none"/>
+      <rect x="740" y="104" width="96" height="76" rx="10" fill="#18181b"/>
+      <rect x="762" y="116" width="52" height="52" rx="6" fill="#6EF882" opacity=".25"/>
+      <text x="788" y="146" font-size="11" fill="#fff" text-anchor="middle">9:16</text>
+      <text x="788" y="194" font-size="10.5" fill="#71717a" text-anchor="middle">render</text>
+    </svg>
+    <div class="legend">
+      <span><span class="dot" style="background:#6EF882"></span>already built</span>
+      <span><span class="dot" style="background:#fb7185"></span>net-new</span>
+      <span>The Format JSON + a DB to store them is the connective tissue. Everything else exists.</span>
+    </div>
+    <div class="mockcap">Proposed architecture — four "engines" all emit/consume one Format object, rendered by the pipeline you already have.</div>
+  </div>
+
+  <h2>1 · What you've already built (so we don't rebuild it)</h2>
+  <p>You explicitly asked me to flag this. Here's the honest inventory from reading the repo. Most of what these four features <em>need</em> is already in here as reusable parts.</p>
+
+  <table>
+    <tr><th>Capability</th><th>Status</th><th>Where / how</th></tr>
+    <tr><td>Long-video → viral clips (Gemini, 15–60s, CTAs)</td><td><span class="tag built">BUILT</span></td><td><code>main.py</code> <code>get_viral_clips()</code></td></tr>
+    <tr><td>Summary reel (4–8 chronological beats → ~30s)</td><td><span class="tag built">BUILT</span></td><td><code>get_summary_segments()</code>, <code>generationMode="summary"</code></td></tr>
+    <tr><td>Streamer split-screen reframe (facecam corner)</td><td><span class="tag built">BUILT</span></td><td><code>reframeMode="streamer"</code>, YOLO person detect</td></tr>
+    <tr><td>Auto vertical reframe (face track / blurred-bg)</td><td><span class="tag built">BUILT</span></td><td>MediaPipe + YOLO, <code>SmoothedCameraman</code></td></tr>
+    <tr><td><strong>Full AI-UGC ad pipeline</strong> (script→actor→VO→talking-head→B-roll→composite)</td><td><span class="tag built">BUILT</span></td><td><code>saasshorts.py</code> — Gemini + Flux 2 Pro + ElevenLabs + Kling (fal.ai)</td></tr>
+    <tr><td>AI actor generation + custom upload + reusable actor gallery</td><td><span class="tag built">BUILT</span></td><td>Flux 2 Pro; S3 actor gallery</td></tr>
+    <tr><td>Subtitle engine: 6 fonts, color presets, <em>pop / karaoke / word-highlight</em></td><td><span class="tag built">BUILT</span></td><td><code>Subtitles.tsx</code> (Remotion)</td></tr>
+    <tr><td>AI-generated video effects (zoom/contrast/sat by transcript)</td><td><span class="tag built">BUILT</span></td><td><code>editor.py</code> + <code>VideoEffects.tsx</code></td></tr>
+    <tr><td>Programmatic render service (Remotion bundle + worker)</td><td><span class="tag built">BUILT</span></td><td><code>render-service/</code>, <code>/api/render</code></td></tr>
+    <tr><td>Multi-language dubbing (28 langs)</td><td><span class="tag built">BUILT</span></td><td><code>translate.py</code> (ElevenLabs)</td></tr>
+    <tr><td>Thumbnail studio + YouTube publish</td><td><span class="tag built">BUILT</span></td><td><code>thumbnail.py</code></td></tr>
+    <tr><td>Social posting + 7-day scheduler (TikTok/IG/YT)</td><td><span class="tag built">BUILT</span></td><td>Upload-Post, <code>ScheduleWeekModal.jsx</code></td></tr>
+    <tr><td>Text-hook overlay (animated: spring/fade/slide-up, position/size)</td><td><span class="tag partial">PARTIAL</span></td><td><code>hooks.py</code> + <code>HookOverlay.tsx</code> — <em>Noto Serif card only</em>; no TikTok/Snapchat styles</td></tr>
+    <tr><td>UGC "styles" (ugc/educational/shock/story/comparison)</td><td><span class="tag partial">PARTIAL</span></td><td>Prompt-level only — <em>not</em> saved templates</td></tr>
+    <tr><td>Slideshow / image-sequence generation</td><td><span class="tag new">NONE</span></td><td>Does not exist</td></tr>
+    <tr><td>Saved templates / "proven format" library</td><td><span class="tag new">NONE</span></td><td>No persistence; can't save/share formats</td></tr>
+    <tr><td><strong>Pre-made MP4 hook-clip library</strong> (stitch in front)</td><td><span class="tag new">NONE</span></td><td>Only text overlay exists; no clip library, no concat-front flow</td></tr>
+    <tr><td>Database / accounts / per-user persistence</td><td><span class="tag new">NONE</span></td><td>In-memory dicts + <code>localStorage</code> + read-only S3</td></tr>
+  </table>
+
+  <h2>2 · How your competitors actually do it</h2>
+  <p>Cited so you can copy the proven flow rather than guess. The pattern is consistent: a <em>library the site provides</em> + <em>things the user saves</em>, both reduced to reusable presets.</p>
+
+  <table>
+    <tr><th>Tool</th><th>What it nails</th><th>The mechanic worth copying</th></tr>
+    <tr>
+      <td><a href="https://crayo.ai/">Crayo</a></td>
+      <td>Templated faceless shorts at volume — Reddit-story, <strong>fake-text slideshows</strong>, split-screen gameplay, quiz</td>
+      <td>You don't "edit a video," you pick a <strong>viral workflow</strong> (=template), drop a prompt/outline, choose background + AI voice + music + caption style → generate unlimited. Format-first, not timeline-first.</td>
+    </tr>
+    <tr>
+      <td><a href="https://www.submagic.co/">Submagic</a></td>
+      <td>Edit templates + <strong>save-your-own presets</strong> + Magic B-Roll</td>
+      <td>"<strong>Save preset</strong> = snapshot of caption style, hook title, music, effects," auto-applied after transcription. Named site templates (kelly/karl/ella). B-roll auto-pulled from Storyblocks by transcript context. This is your exact "save your own + proven library" pattern.</td>
+    </tr>
+    <tr>
+      <td><a href="https://makeiticonic.app/">Icon</a></td>
+      <td>"AI Admaker" with a <strong>Creative Library</strong> of building blocks</td>
+      <td>Connect your video library (Drive/Dropbox/uploads) → it <strong>auto-tags & splits assets into reusable "building blocks"</strong> (hooks, B-roll, demos) → auto-cuts them into ads. This is the model for your hook-clip library + product-demo stitch.</td>
+    </tr>
+    <tr>
+      <td><a href="https://www.arcads.ai/">Arcads</a> / <a href="https://www.creatify.ai/">Creatify</a></td>
+      <td>AI-actor UGC ads (Arcads: 1,000+ actor library) / URL-to-ad with B-roll (Creatify)</td>
+      <td>Arcads = a big <strong>actor/hook library</strong> you remix; Creatify = paste product URL → full ad with B-roll + actor + captions, <strong>batch across SKUs</strong>. You already have most of this in <code>saasshorts.py</code>.</td>
+    </tr>
+    <tr>
+      <td>MagicFit / AdHook</td>
+      <td>Hook-to-ad pairing</td>
+      <td>Generate a hook line + <strong>pair it with an AI-generated OR uploaded clip</strong> → instant UGC ad, scripted as second-by-second beats (hook→demo→benefit→CTA). Direct blueprint for "stitch a hook in front of your demo."</td>
+    </tr>
+    <tr>
+      <td><a href="https://www.revid.ai/">Revid</a></td>
+      <td>Split-screen gameplay overlays, faceless pipeline, AI slideshows</td>
+      <td>"Subway Surfers" overlay generator: adjustable overlay position/size/transparency + captions/music. You already shipped the harder version (streamer reframe); their slideshow + library UX is worth cribbing.</td>
+    </tr>
+  </table>
+
+  <h4>The hook-clip convention (your "girl crying / shocked flight attendant" ask)</h4>
+  <p>These are short (2–4s) emotionally-charged <strong>B-roll hook clips</strong> shared in "hook packs," dropped in front of a product demo with a text overlay in a native style (white TikTok caption, Snapchat-style, CapCut bold). The viewer is stopped by the emotional clip, the overlay poses the hook, then it hard-cuts to the demo. Tools provide a curated library; power users upload their own. <strong>The one thing to get right early: sourcing/licensing those clips</strong> (see Feature D + Decision 4).</p>
+
+  <h2>3 · The four features, each scoped against what you have</h2>
+
+  <!-- FEATURE A -->
+  <div class="feat">
+    <div class="hdr"><h3>A · Slideshow generation</h3><span class="tag new">mostly new — engine exists</span></div>
+    <p><strong>What it is:</strong> a sequence of images/text cards with Ken Burns motion, transitions, captions, AI voiceover and music — the Crayo "fake-text" / listicle / story-slideshow format and the IG photo-dump reel.</p>
+    <p><strong>What you already have:</strong> the entire render+audio stack. Remotion does image sequences trivially (<code>&lt;Series&gt;</code>, <code>&lt;Img&gt;</code>, spring transitions, <code>@remotion/transitions</code>); ElevenLabs VO, the subtitle/caption engine, and music mixing patterns are all present.</p>
+    <p><strong>What's net-new:</strong> a <code>Slideshow.tsx</code> Remotion composition (array of slides → image + per-slide text + duration + transition) and a builder UI (add/reorder slides, per-slide caption, pick transition/voice/music). Optionally an "AI slideshow" mode: Gemini turns a topic/script into slides + image prompts (Flux, which you already call).</p>
+    <div class="verdict"><b>Recommendation:</b> Build it as a Remotion composition driven by a <code>slides[]</code> prop — <em>not</em> FFmpeg <code>image2</code> (harder to do nice transitions/captions). ~1 new comp + 1 modal. Reuse VO + captions verbatim. This is the lowest-effort high-wow feature because the engine is done.</div>
+    <details><summary>Slide schema + builder mockup</summary>
+    <pre><span class="c">// remotion/src/compositions/Slideshow.tsx — props</span>
+{
+  slides: [
+    { <span class="k">image</span>: "url|prompt", <span class="k">text</span>: "POV: you found the cheat code",
+      <span class="k">durationInSec</span>: 3, <span class="k">kenBurns</span>: "zoom-in", <span class="k">transition</span>: "slide" },
+    ...
+  ],
+  captionStyle: <span class="c">/* reuse Subtitles.tsx style object */</span>,
+  voiceUrl: "…", music: "…", aspect: "9:16"
+}</pre>
+    <div class="mock">
+      <svg viewBox="0 0 820 220" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">
+        <rect width="820" height="220" fill="#fff" stroke="#e4e4e7"/>
+        <text x="20" y="28" font-size="13" font-weight="700" fill="#18181b">Slideshow builder</text>
+        <!-- slide strip -->
+        <g>
+          <rect x="20" y="44" width="120" height="150" rx="8" fill="#0b0b0b"/><text x="80" y="120" font-size="10" fill="#6EF882" text-anchor="middle">Slide 1</text><text x="80" y="136" font-size="9" fill="#fff" text-anchor="middle">"POV: …"</text>
+          <rect x="152" y="44" width="120" height="150" rx="8" fill="#0b0b0b"/><text x="212" y="120" font-size="10" fill="#fff" text-anchor="middle">Slide 2</text>
+          <rect x="284" y="44" width="120" height="150" rx="8" fill="#0b0b0b"/><text x="344" y="120" font-size="10" fill="#fff" text-anchor="middle">Slide 3</text>
+          <rect x="416" y="44" width="120" height="150" rx="8" fill="#f4f4f5" stroke="#d4d4d8" stroke-dasharray="4 4"/><text x="476" y="124" font-size="22" fill="#a1a1aa" text-anchor="middle">+</text>
+        </g>
+        <!-- right controls -->
+        <g font-size="11" fill="#3f3f46">
+          <rect x="560" y="44" width="240" height="150" rx="8" fill="#fafafa" stroke="#e4e4e7"/>
+          <text x="576" y="66" font-weight="700" fill="#18181b">Selected slide</text>
+          <rect x="576" y="78" width="208" height="22" rx="5" fill="#fff" stroke="#e4e4e7"/><text x="584" y="93">Caption text…</text>
+          <text x="576" y="120">Transition</text><rect x="660" y="108" width="124" height="18" rx="9" fill="#6EF882" opacity=".25"/><text x="722" y="121" text-anchor="middle" fill="#16691f">slide ▾</text>
+          <text x="576" y="146">Ken Burns</text><rect x="660" y="134" width="124" height="18" rx="9" fill="#eee"/><text x="722" y="147" text-anchor="middle">zoom-in ▾</text>
+          <text x="576" y="172">Voice</text><rect x="660" y="160" width="124" height="18" rx="9" fill="#eee"/><text x="722" y="173" text-anchor="middle">Rachel ▾</text>
+        </g>
+      </svg>
+      <div class="mockcap">Reorderable slide strip + per-slide controls. Render uses the existing Remotion service.</div>
+    </div>
+    </details>
+  </div>
+
+  <!-- FEATURE B -->
+  <div class="feat">
+    <div class="hdr"><h3>B · AI reel generation</h3><span class="tag built">~80% built — needs generalizing</span></div>
+    <p><strong>What it is:</strong> generate a finished short from a prompt/URL — talking-head UGC, or faceless niche reels (quote/story + B-roll + captions + music).</p>
+    <p><strong>What you already have:</strong> <code>saasshorts.py</code> is a complete reel engine — Gemini script (hook→problem→solution→CTA) → Flux actor → ElevenLabs VO → Kling talking-head + B-roll → FFmpeg composite, premium/low-cost modes, 5 styles. Plus the clip generator's summary-reel + streamer modes.</p>
+    <p><strong>What's net-new:</strong> not much engine — mostly <em>productization</em>. Generalize the saasshorts pipeline from "SaaS URL only" into a reusable <strong>reel engine</strong> that any Format can call, with a faceless variant (no actor: B-roll/slideshow + VO + captions). Add batch generation (Creatify's "across SKUs") once a DB exists.</p>
+    <div class="verdict"><b>Recommendation:</b> Refactor <code>saasshorts.py</code>'s stages into composable steps keyed by a Format (which beats: hook-clip? actor? B-roll? slideshow?). Don't build a second pipeline — wrap the one you have. The faceless reel = your slideshow comp + VO + captions, so it falls out of Feature A almost for free.</div>
+  </div>
+
+  <!-- FEATURE C -->
+  <div class="feat">
+    <div class="hdr"><h3>C · Proven-format library + save-your-own templates</h3><span class="tag new">new — blocked on persistence</span></div>
+    <p><strong>What it is:</strong> two shelves — (1) <em>site-provided</em> "proven formats" you curate (Reddit story, listicle slideshow, talking-head UGC, gameplay split-screen, hook-stitch ad), and (2) <em>user-saved</em> templates ("Save this as a template"), exactly Submagic's preset model.</p>
+    <p><strong>What you already have:</strong> every ingredient a Format references — caption styles, hooks, effects, reframe modes, voices — already exists as parameters. The 5 UGC "styles" prove the instinct; they're just not persisted or reusable.</p>
+    <p><strong>What's net-new:</strong> the <code>Format</code> JSON schema, a library UI (grid of cards with preview + "Use" / "Save as template" / "Duplicate"), a curated seed set authored by you, and — the blocker — <strong>a database + identity to store user templates.</strong></p>
+    <div class="verdict"><b>Recommendation:</b> Define <code>Format</code> once; make "Save as template" available on every result card (Submagic's exact UX — snapshot the settings that produced this video). Seed 6–8 proven formats yourself so the library is never empty. This is the feature that makes the app feel like a product instead of a tool — but it cannot ship before Decision #1.</div>
+    <details><summary>Format schema + library mockup</summary>
+    <pre>Format = {
+  id, name, <span class="k">engine</span>: "clip" | "slideshow" | "reel" | "hookStitch",
+  <span class="k">captionStyle</span>: {...},  <span class="c">// from Subtitles.tsx</span>
+  <span class="k">hook</span>: { type: "text"|"clip", style, clipId? },
+  music, transitions, aspect, reframeMode,
+  <span class="k">owner</span>: userId | "system",   <span class="c">// system = proven format</span>
+  isPublic: bool
+}</pre>
+    <div class="mock">
+      <svg viewBox="0 0 820 250" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">
+        <rect width="820" height="250" fill="#fff" stroke="#e4e4e7"/>
+        <text x="20" y="28" font-size="13" font-weight="700" fill="#18181b">Format library</text>
+        <text x="20" y="52" font-size="11" font-weight="700" fill="#16691f">PROVEN FORMATS (by ClipZoo)</text>
+        <g>
+          <rect x="20" y="60" width="180" height="76" rx="9" fill="#0b0b0b"/><text x="34" y="86" font-size="11" fill="#fff" font-weight="700">Reddit story</text><text x="34" y="104" font-size="9" fill="#6EF882">slideshow · VO · karaoke</text><rect x="34" y="112" width="48" height="16" rx="8" fill="#6EF882"/><text x="58" y="124" font-size="9" text-anchor="middle" fill="#06250f">Use</text>
+          <rect x="212" y="60" width="180" height="76" rx="9" fill="#0b0b0b"/><text x="226" y="86" font-size="11" fill="#fff" font-weight="700">Hook-stitch ad</text><text x="226" y="104" font-size="9" fill="#6EF882">clip hook → demo</text><rect x="226" y="112" width="48" height="16" rx="8" fill="#6EF882"/><text x="250" y="124" font-size="9" text-anchor="middle" fill="#06250f">Use</text>
+          <rect x="404" y="60" width="180" height="76" rx="9" fill="#0b0b0b"/><text x="418" y="86" font-size="11" fill="#fff" font-weight="700">Talking-head UGC</text><text x="418" y="104" font-size="9" fill="#6EF882">actor · B-roll</text><rect x="418" y="112" width="48" height="16" rx="8" fill="#6EF882"/><text x="442" y="124" font-size="9" text-anchor="middle" fill="#06250f">Use</text>
+          <rect x="596" y="60" width="180" height="76" rx="9" fill="#0b0b0b"/><text x="610" y="86" font-size="11" fill="#fff" font-weight="700">Gameplay split</text><text x="610" y="104" font-size="9" fill="#6EF882">streamer reframe</text><rect x="610" y="112" width="48" height="16" rx="8" fill="#6EF882"/><text x="634" y="124" font-size="9" text-anchor="middle" fill="#06250f">Use</text>
+        </g>
+        <text x="20" y="166" font-size="11" font-weight="700" fill="#3f3f46">MY TEMPLATES</text>
+        <g>
+          <rect x="20" y="174" width="180" height="60" rx="9" fill="#fafafa" stroke="#e4e4e7"/><text x="34" y="200" font-size="11" fill="#18181b" font-weight="700">"My green captions"</text><text x="34" y="218" font-size="9" fill="#71717a">saved from a result ·  edit</text>
+          <rect x="212" y="174" width="180" height="60" rx="9" fill="#fafafa" stroke="#d4d4d8" stroke-dasharray="4 4"/><text x="302" y="208" font-size="20" fill="#a1a1aa" text-anchor="middle">+</text>
+        </g>
+      </svg>
+      <div class="mockcap">Two shelves: curated "proven formats" (always populated) + user-saved templates (needs a DB).</div>
+    </div>
+    </details>
+  </div>
+
+  <!-- FEATURE D -->
+  <div class="feat">
+    <div class="hdr"><h3>D · Pre-made MP4 hook-clip library (stitch in front + text overlay)</h3><span class="tag new">new — compositing exists</span></div>
+    <p><strong>What it is:</strong> a browsable library of short viral hook clips (girl crying, shocked flight attendant, jaw-drop reaction, "wait for it"…), each droppable in front of the user's video with a native text overlay (TikTok white caption, Snapchat-style, CapCut bold), then a hard cut to their demo.</p>
+    <p><strong>What you already have:</strong> the compositing/stitching primitives — FFmpeg concat + Remotion <code>&lt;Series&gt;</code>, and a working (animated) text-overlay renderer in <code>HookOverlay.tsx</code>. So "put text on a clip and concat it in front" is mostly assembling parts you own.</p>
+    <p><strong>What's net-new (3 pieces):</strong></p>
+    <ul>
+      <li><strong>The clip library itself</strong> — a curated, tagged set of hook MP4s + thumbnails (needs a DB + storage + the licensing decision), plus optional user upload (Icon's "building blocks" model) and optional AI-generated hooks (Veo/Kling, which you already call via fal.ai).</li>
+      <li><strong>Native text-overlay styles</strong> — today hooks are a Noto Serif card only. Add TikTok-default, Snapchat, CapCut-bold, typewriter. Note your <em>subtitle</em> engine already has 6 fonts + animations to crib from.</li>
+      <li><strong>The stitch-front assembler</strong> — pick hook clip → set overlay text/style/duration → concat before the user's reframed video → render.</li>
+    </ul>
+    <div class="verdict"><b>Recommendation:</b> Model a hook clip as a Format block (<code>hook:{type:"clip", clipId, overlay:{text,style}}</code>) so it composes with everything else. Ship overlay styles in Remotion (extend <code>HookOverlay.tsx</code>). <b>Decide sourcing first (Decision 4)</b> — a curated/licensed starter pack is the demo-able wedge; user-upload + AI-gen are fast follows.</div>
+    <details><summary>Hook-library + stitch-timeline mockup</summary>
+    <div class="mock">
+      <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">
+        <rect width="820" height="300" fill="#fff" stroke="#e4e4e7"/>
+        <text x="20" y="28" font-size="13" font-weight="700" fill="#18181b">Hook-clip library</text>
+        <!-- library grid -->
+        <g font-size="9" fill="#fff" text-anchor="middle">
+          <rect x="20" y="40" width="118" height="120" rx="8" fill="#0b0b0b"/><text x="79" y="150">Girl crying</text><rect x="30" y="50" width="40" height="14" rx="7" fill="#fff"/><text x="50" y="60" font-size="8" fill="#000">TikTok</text>
+          <rect x="148" y="40" width="118" height="120" rx="8" fill="#0b0b0b"/><text x="207" y="150">Shocked attendant</text>
+          <rect x="276" y="40" width="118" height="120" rx="8" fill="#0b0b0b"/><text x="335" y="150">Jaw drop</text>
+          <rect x="404" y="40" width="118" height="120" rx="8" fill="#0b0b0b"/><text x="463" y="150">"Wait for it"</text>
+          <rect x="532" y="40" width="118" height="120" rx="8" fill="#0b0b0b"/><text x="591" y="150">POV reaction</text>
+          <rect x="660" y="40" width="118" height="120" rx="8" fill="#f4f4f5" stroke="#d4d4d8" stroke-dasharray="4 4"/><text x="719" y="98" font-size="20" fill="#a1a1aa">+</text><text x="719" y="150" fill="#71717a">Upload</text>
+        </g>
+        <!-- overlay style chips -->
+        <text x="20" y="186" font-size="11" font-weight="700" fill="#3f3f46">OVERLAY STYLE</text>
+        <g font-size="10">
+          <rect x="20" y="194" width="92" height="22" rx="11" fill="#6EF882" opacity=".25"/><text x="66" y="209" text-anchor="middle" fill="#16691f">TikTok ✓</text>
+          <rect x="120" y="194" width="92" height="22" rx="11" fill="#f4f4f5" stroke="#e4e4e7"/><text x="166" y="209" text-anchor="middle" fill="#3f3f46">Snapchat</text>
+          <rect x="220" y="194" width="92" height="22" rx="11" fill="#f4f4f5" stroke="#e4e4e7"/><text x="266" y="209" text-anchor="middle" fill="#3f3f46">CapCut bold</text>
+          <rect x="320" y="194" width="92" height="22" rx="11" fill="#f4f4f5" stroke="#e4e4e7"/><text x="366" y="209" text-anchor="middle" fill="#3f3f46">Typewriter</text>
+        </g>
+        <!-- timeline -->
+        <text x="20" y="244" font-size="11" font-weight="700" fill="#3f3f46">TIMELINE</text>
+        <rect x="20" y="252" width="150" height="34" rx="6" fill="#fb7185" opacity=".85"/><text x="95" y="273" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">Hook clip · 3s</text>
+        <rect x="176" y="252" width="600" height="34" rx="6" fill="#18181b"/><text x="476" y="273" font-size="10" fill="#fff" text-anchor="middle">Your product demo (reframed)</text>
+      </svg>
+      <div class="mockcap">Pick a hook clip → choose overlay style → it's concatenated in front of the user's demo. Concat + overlay infra already exists.</div>
+    </div>
+    </details>
+  </div>
+
+  <h2>4 · How to build it — recommended sequence</h2>
+  <p>Ordered to ship something demo-able fast, defer the heavy lift (data layer) only as far as the first feature that truly needs it, and reuse the render engine throughout.</p>
+
+  <div class="phase">
+    <div class="when">Phase 0<small>~1 wk · unblocks all</small></div>
+    <div>
+      <h4 style="margin-top:0">Persistence + identity layer</h4>
+      <p>The prerequisite for templates, the hook library, and "what users keep." Recommend <strong>Supabase</strong> (Postgres + auth + object storage in one) — least new infra, gives you accounts, a <code>formats</code> table, a <code>hook_clips</code> table, and storage buckets to replace ad-hoc S3 listing. Keep S3 if you prefer; the point is a real DB + user IDs. <em>Smallest version:</em> one <code>formats</code> table + anonymous-but-persistent user id, expand later.</p>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="when">Phase 1<small>~1 wk · high wow, low cost</small></div>
+    <div>
+      <h4 style="margin-top:0">Slideshow engine (Feature A)</h4>
+      <p>New <code>Slideshow.tsx</code> Remotion comp + builder modal, reusing VO + captions. Ships independently of the DB (can start before Phase 0 finishes). Add the AI-slideshow mode (Gemini → slides + Flux images) as a follow-on. This is your fastest visible win.</p>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="when">Phase 2<small>~1–2 wk</small></div>
+    <div>
+      <h4 style="margin-top:0">Hook-clip library + stitch + native text styles (Feature D)</h4>
+      <p>Seed a curated/licensed starter pack of ~20 hook clips (Decision 4), extend <code>HookOverlay.tsx</code> with TikTok/Snapchat/CapCut styles, build the library picker + concat-front assembler. Add user-upload (Icon's building-blocks model) as a fast follow.</p>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="when">Phase 3<small>~1–2 wk</small></div>
+    <div>
+      <h4 style="margin-top:0">Format library + save-your-own templates (Feature C)</h4>
+      <p>Define the <code>Format</code> schema, add "Save as template" to every result card, build the two-shelf library UI, and seed 6–8 proven formats. Retrofit the existing engines (clip / slideshow / reel / hook-stitch) to emit & consume Formats.</p>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="when">Phase 4<small>ongoing</small></div>
+    <div>
+      <h4 style="margin-top:0">Generalize the reel engine + batch (Feature B)</h4>
+      <p>Refactor <code>saasshorts.py</code> into Format-driven composable stages; add a faceless-reel variant (falls out of the slideshow comp) and batch generation. Mostly productization of code you already have.</p>
+    </div>
+  </div>
+
+  <h2>5 · Decisions to lock</h2>
+  <p class="q-help">Pick one per block (or several where noted), add anything in Notes, then hit <em>Copy decisions as Markdown</em> and paste it back so I can turn this into an executable plan.</p>
+
+  <section class="decision" data-select="single">
+    <h3>1. Persistence &amp; identity (the gating call)</h3>
+    <p class="q-help">Templates, the hook library, and "what users save" all need a real data layer. What do we adopt?</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Supabase (Recommended)</span><span class="opt-desc">Postgres + auth + storage in one. Least new infra, real accounts, fastest path to saved templates.</span></button>
+      <button class="option"><span class="opt-title">SQLite + keep S3</span><span class="opt-desc">Lightweight, no accounts yet. Fine for single-tenant / personal use; harder to grow into multi-user SaaS.</span></button>
+      <button class="option"><span class="opt-title">Stay localStorage</span><span class="opt-desc">No backend work, but no cross-device, no shared library, no real "save." Blocks features C &amp; D. Not recommended.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>2. What ships first</h3>
+    <p class="q-help">Sequencing the visible wins. (My rec is Slideshow first — highest wow per effort since the engine exists.)</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Slideshow engine (Recommended)</span><span class="opt-desc">Fastest demo-able win; reuses render + VO + captions; can start before the DB lands.</span></button>
+      <button class="option"><span class="opt-title">Hook-clip library</span><span class="opt-desc">Most differentiated vs. clip tools, but needs the DB + a licensing decision first.</span></button>
+      <button class="option"><span class="opt-title">Format/template library</span><span class="opt-desc">Highest "feels like a product" lift, but depends on the DB and is most cross-cutting.</span></button>
+      <button class="option"><span class="opt-title">Generalize AI reel engine</span><span class="opt-desc">Mostly refactor of saasshorts.py; lower novelty since the pipeline already works.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>3. Slideshow engine implementation</h3>
+    <p class="q-help">How to render slideshows.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Remotion composition (Recommended)</span><span class="opt-desc">Reuses your render service; easy Ken Burns, transitions, captions; one new comp.</span></button>
+      <button class="option"><span class="opt-title">FFmpeg image2 + filters</span><span class="opt-desc">No new render dep, but transitions/captions are painful to author and maintain.</span></button>
+      <button class="option"><span class="opt-title">Third-party slideshow API</span><span class="opt-desc">Fastest to prototype, but adds cost + a dependency and fragments your render stack.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="multi">
+    <h3>4. Hook-clip sourcing (pick all you want to support)</h3>
+    <p class="q-help">Where the hook MP4s come from. Licensing is the real risk here — flag your appetite.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Curated/licensed starter pack (Recommended)</span><span class="opt-desc">~20 hand-picked, properly-licensed hook clips. The demo-able wedge; you control quality &amp; legal.</span></button>
+      <button class="option"><span class="opt-title">User upload ("building blocks")</span><span class="opt-desc">Icon's model — users bring their own hooks. Sidesteps licensing; needs storage + tagging.</span></button>
+      <button class="option"><span class="opt-title">AI-generated hooks (Veo/Kling)</span><span class="opt-desc">Generate hook clips on demand via fal.ai (already integrated). Infinite variety, per-gen cost, uncanny risk.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="multi">
+    <h3>5. Hook text-overlay styles to ship</h3>
+    <p class="q-help">Today hooks are a serif card only. Which native styles do we add? (Crib the subtitle engine's font handling.)</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">TikTok default (white)</span><span class="opt-desc">The baseline everyone expects.</span></button>
+      <button class="option"><span class="opt-title">Snapchat-style</span><span class="opt-desc">Black bar / classic Snap caption look.</span></button>
+      <button class="option"><span class="opt-title">CapCut bold</span><span class="opt-desc">Heavy outlined meme text.</span></button>
+      <button class="option"><span class="opt-title">Typewriter / animated</span><span class="opt-desc">Reuse HookOverlay animation work.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>6. Template model</h3>
+    <p class="q-help">One schema to rule them all, or per-feature presets?</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Unified Format JSON (Recommended)</span><span class="opt-desc">One schema parameterizes all engines; slideshows/reels/hooks all become Formats. Most reuse, least drift.</span></button>
+      <button class="option"><span class="opt-title">Per-feature presets</span><span class="opt-desc">Separate preset types per feature. Simpler to start, but duplicates UI and fragments the library.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>7. Product framing / monetization (informs priority)</h3>
+    <p class="q-help">Who is this for? It changes whether accounts &amp; saved libraries are urgent.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Multi-user SaaS (Recommended)</span><span class="opt-desc">Accounts, saved templates, paid tiers. Makes Phase 0 (DB/auth) clearly worth it.</span></button>
+      <button class="option"><span class="opt-title">Personal / single-operator tool</span><span class="opt-desc">You generate content at volume; SQLite is fine, accounts optional.</span></button>
+      <button class="option"><span class="opt-title">Open-source / self-host</span><span class="opt-desc">Keep it BYO-keys + localStorage-friendly; persistence stays optional.</span></button>
+    </div>
+  </section>
+
+  <h2>Notes</h2>
+  <p class="q-help">Anything the options don't cover — budget, timeline, licensing appetite, what "AI reel" means to you specifically, features I missed, or questions back to me.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy decisions as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span class="hint">Selections + notes are copied together.</span>
+  </div>
+  <pre id="out"></pre>
+
+  <p style="margin-top:40px;color:#52525b;font-size:12px;">Sources: <a href="https://crayo.ai/">Crayo</a> · <a href="https://www.submagic.co/">Submagic</a> · <a href="https://makeiticonic.app/">Icon</a> · <a href="https://www.arcads.ai/">Arcads</a> · <a href="https://www.creatify.ai/">Creatify</a> · <a href="https://www.revid.ai/">Revid</a> · MagicFit / AdHook. Codebase inventory from a full read of <code>main.py</code>, <code>app.py</code>, <code>saasshorts.py</code>, <code>hooks.py</code>, <code>editor.py</code>, <code>remotion/</code>, <code>render-service/</code>, and <code>dashboard/src/</code>.</p>
+</main>
+
+<script>
+  document.querySelectorAll('.decision').forEach(section=>{
+    const multi=section.dataset.select==='multi';
+    section.querySelectorAll('.option').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        if(!multi) section.querySelectorAll('.option').forEach(b=>b.classList.remove('selected'));
+        btn.classList.toggle('selected');
+      });
+    });
+  });
+  function buildMarkdown(){
+    let md='## Roadmap decisions\n';
+    document.querySelectorAll('.decision').forEach(section=>{
+      const q=section.querySelector('h3').textContent.trim();
+      const chosen=[...section.querySelectorAll('.option.selected')].map(b=>b.querySelector('.opt-title').textContent.trim());
+      md+=`\n### ${q}\n`;
+      md+=chosen.length?`- **Selected:** ${chosen.join(', ')}\n`:`- _(no selection yet)_\n`;
+    });
+    const notes=document.getElementById('notes').value.trim();
+    md+=`\n## Notes\n${notes||'_(none)_'}\n`;
+    return md;
+  }
+  const copyBtn=document.getElementById('copy'),out=document.getElementById('out');
+  copyBtn.addEventListener('click',async()=>{
+    const md=buildMarkdown();out.textContent=md;out.style.display='block';
+    try{await navigator.clipboard.writeText(md);copyBtn.textContent='Copied!';setTimeout(()=>copyBtn.textContent='Copy decisions as Markdown',1500);}
+    catch{copyBtn.textContent='Copy failed — select the text below';setTimeout(()=>copyBtn.textContent='Copy decisions as Markdown',2500);}
+  });
+  document.getElementById('clear').addEventListener('click',()=>{
+    document.querySelectorAll('.option.selected').forEach(b=>b.classList.remove('selected'));
+    document.getElementById('notes').value='';out.style.display='none';
+  });
+</script>
+</body>
+</html>

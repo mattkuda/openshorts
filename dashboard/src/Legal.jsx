@@ -7,8 +7,8 @@ const ISSUES_URL = 'https://github.com/mutonby/openshorts/issues';
 function Section({ title, children }) {
     return (
         <section className="mb-7">
-            <h2 className="text-lg font-bold text-white mb-2">{title}</h2>
-            <div className="text-zinc-300 leading-relaxed space-y-2 text-sm">{children}</div>
+            <h2 className="text-lg font-bold text-foreground mb-2">{title}</h2>
+            <div className="text-muted-foreground leading-relaxed space-y-2 text-sm">{children}</div>
         </section>
     );
 }
@@ -19,12 +19,12 @@ export default function Legal() {
     };
 
     return (
-        <div className="min-h-screen bg-bg text-white">
-            <header className="border-b border-white/5 sticky top-0 bg-bg/95 backdrop-blur z-10">
+        <div className="min-h-screen bg-bg text-foreground">
+            <header className="border-b border-border sticky top-0 bg-bg/95 backdrop-blur z-10">
                 <div className="max-w-3xl mx-auto px-6 py-4 flex items-center">
                     <button
                         onClick={handleBack}
-                        className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm"
+                        className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm"
                     >
                         <ArrowLeft size={16} /> Back
                     </button>
@@ -33,7 +33,7 @@ export default function Legal() {
 
             <main className="max-w-3xl mx-auto px-6 py-12">
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">Terms & Privacy</h1>
-                <p className="text-zinc-500 text-sm mb-10">Last updated: {LAST_UPDATED}</p>
+                <p className="text-muted-foreground text-sm mb-10">Last updated: {LAST_UPDATED}</p>
 
                 <Section title="The short version">
                     <p>
@@ -72,21 +72,21 @@ export default function Legal() {
                 <Section title="What we keep, and for how long">
                     <ul className="list-disc pl-6 space-y-1">
                         <li>
-                            <strong className="text-white">Uploaded videos and generated clips:</strong> deleted with
+                            <strong className="text-foreground">Uploaded videos and generated clips:</strong> deleted with
                             their job, typically within 1 hour. Not backed up off-server in our hosted deployment.
                         </li>
                         <li>
-                            <strong className="text-white">Attestation record (IP, user-agent, timestamp, source):</strong>{' '}
+                            <strong className="text-foreground">Attestation record (IP, user-agent, timestamp, source):</strong>{' '}
                             kept in memory with the job and discarded when the job is purged (≈1 hour). Used only to
                             evidence the ownership confirmation in case of a takedown or dispute.
                         </li>
                         <li>
-                            <strong className="text-white">Standard server access logs:</strong> retained up to 30 days
+                            <strong className="text-foreground">Standard server access logs:</strong> retained up to 30 days
                             for debugging and abuse prevention.
                         </li>
                         <li>
-                            <strong className="text-white">API keys (Gemini, ElevenLabs, Upload-Post):</strong> stored
-                            encrypted in your browser's <code className="text-zinc-200">localStorage</code>. They are
+                            <strong className="text-foreground">API keys (Gemini, ElevenLabs, Upload-Post):</strong> stored
+                            encrypted in your browser's <code className="text-foreground">localStorage</code>. They are
                             sent as request headers when a feature needs them, used to call the relevant third party,
                             and never written to our database or disk.
                         </li>
@@ -109,11 +109,11 @@ export default function Legal() {
                         port your personal data. Because we do not hold accounts and job data is purged within an hour,
                         most requests are auto-satisfied by the retention schedule. For anything else, file a request
                         via{' '}
-                        <a className="text-primary underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
+                        <a className="text-primary-strong underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
                             GitHub Issues
                         </a>
                         . You may also lodge a complaint with your local supervisory authority (in Spain: AEPD,{' '}
-                        <a className="text-primary underline" href="https://www.aepd.es" target="_blank" rel="noopener noreferrer">
+                        <a className="text-primary-strong underline" href="https://www.aepd.es" target="_blank" rel="noopener noreferrer">
                             aepd.es
                         </a>
                         ).
@@ -123,7 +123,7 @@ export default function Legal() {
                 <Section title="Copyright takedowns">
                     <p>
                         If you believe content processed through the Service infringes your copyright, open an issue at{' '}
-                        <a className="text-primary underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
+                        <a className="text-primary-strong underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
                             {ISSUES_URL}
                         </a>{' '}
                         with: identification of the work, identification of the allegedly infringing material (job ID,
@@ -146,7 +146,7 @@ export default function Legal() {
                         We may update this notice from time to time; the "Last updated" date above reflects the most
                         recent revision. Continued use after a change constitutes acceptance. For any other question,
                         please use{' '}
-                        <a className="text-primary underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
+                        <a className="text-primary-strong underline" href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
                             GitHub Issues
                         </a>
                         .

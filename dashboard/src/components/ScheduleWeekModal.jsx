@@ -162,11 +162,11 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-[#121214] border border-white/10 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="bg-card border border-border p-6 rounded-2xl w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <button
                     onClick={onClose}
                     disabled={scheduling}
-                    className="absolute top-4 right-4 text-zinc-500 hover:text-white disabled:opacity-50"
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                     <X size={20} />
                 </button>
@@ -174,11 +174,11 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
-                        <Calendar size={20} className="text-white" />
+                        <Calendar size={20} className="text-foreground" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-white">Programar Semana</h3>
-                        <p className="text-xs text-zinc-500">{clips?.length || 0} clips &middot; 1 por día</p>
+                        <h3 className="text-lg font-bold text-foreground">Programar Semana</h3>
+                        <p className="text-xs text-muted-foreground">{clips?.length || 0} clips &middot; 1 por día</p>
                     </div>
                 </div>
 
@@ -192,7 +192,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                 {/* Time + Timezone */}
                 <div className="mb-5 grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-xs font-bold text-zinc-400 mb-2 flex items-center gap-2">
+                        <label className="block text-xs font-bold text-muted-foreground mb-2 flex items-center gap-2">
                             <Clock size={14} className="text-purple-400" />
                             Hora
                         </label>
@@ -201,11 +201,11 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                             value={time}
                             onChange={(e) => setTime(e.target.value)}
                             disabled={scheduling}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-purple-500/50 [color-scheme:dark]"
+                            className="w-full bg-muted border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:border-purple-500/50 [color-scheme:dark]"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-zinc-400 mb-2 flex items-center gap-2">
+                        <label className="block text-xs font-bold text-muted-foreground mb-2 flex items-center gap-2">
                             <Globe size={14} className="text-indigo-400" />
                             Zona horaria
                         </label>
@@ -213,7 +213,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                             value={timezone}
                             onChange={(e) => setTimezone(e.target.value)}
                             disabled={scheduling}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+                            className="w-full bg-muted border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
                         >
                             {TIMEZONES.map(tz => (
                                 <option key={tz.value} value={tz.value}>{tz.label}</option>
@@ -224,16 +224,16 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
 
                 {/* Start day offset */}
                 <div className="mb-5 flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-400">Empezar desde</span>
+                    <span className="text-xs font-bold text-muted-foreground">Empezar desde</span>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setStartOffset(Math.max(1, startOffset - 1))}
                             disabled={startOffset <= 1 || scheduling}
-                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors"
+                            className="p-1.5 rounded-lg bg-muted hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                         >
                             <ChevronLeft size={16} />
                         </button>
-                        <span className="text-sm text-white font-medium min-w-[90px] text-center">
+                        <span className="text-sm text-foreground font-medium min-w-[90px] text-center">
                             {(() => {
                                 const d = new Date();
                                 d.setDate(d.getDate() + startOffset);
@@ -243,7 +243,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                         <button
                             onClick={() => setStartOffset(startOffset + 1)}
                             disabled={scheduling}
-                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors"
+                            className="p-1.5 rounded-lg bg-muted hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
                         >
                             <ChevronRight size={16} />
                         </button>
@@ -253,37 +253,37 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                 {/* Calendar grid */}
                 <div className="mb-5 space-y-2">
                     {schedule.map(({ clip, index, date }) => (
-                        <div key={index} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+                        <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded-xl border border-border hover:border-border transition-colors">
                             <div className="w-14 shrink-0 text-center">
                                 <div className="text-[10px] font-bold text-purple-400 uppercase">{getDayLabel(date)}</div>
-                                <div className="text-lg font-bold text-white leading-tight">{date.getDate()}</div>
-                                <div className="text-[10px] text-zinc-500">{MONTHS[date.getMonth()]}</div>
+                                <div className="text-lg font-bold text-foreground leading-tight">{date.getDate()}</div>
+                                <div className="text-[10px] text-muted-foreground">{MONTHS[date.getMonth()]}</div>
                             </div>
 
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs font-bold text-white truncate">
+                                <div className="text-xs font-bold text-foreground truncate">
                                     Clip {index + 1}
                                 </div>
-                                <div className="text-[10px] text-zinc-500 truncate">
+                                <div className="text-[10px] text-muted-foreground truncate">
                                     {clip.video_title_for_youtube_short || 'Viral Short'}
                                 </div>
-                                <div className="text-[10px] text-zinc-600 mt-0.5">
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
                                     {time}h &middot; {TIMEZONES.find(t => t.value === timezone)?.label || timezone}
                                 </div>
                             </div>
 
                             <div className="shrink-0">
                                 {progress.results[index]?.success === true && (
-                                    <CheckCircle size={18} className="text-green-400" />
+                                    <CheckCircle size={18} className="text-green-700" />
                                 )}
                                 {progress.results[index]?.success === false && (
-                                    <AlertCircle size={18} className="text-red-400" />
+                                    <AlertCircle size={18} className="text-red-600" />
                                 )}
                                 {scheduling && progress.current === index && (
                                     <Loader2 size={18} className="text-purple-400 animate-spin" />
                                 )}
                                 {!scheduling && progress.results[index] === undefined && (
-                                    <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />
+                                    <div className="w-4 h-4 rounded-full border-2 border-border" />
                                 )}
                             </div>
                         </div>
@@ -292,26 +292,26 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
 
                 {/* Platforms */}
                 <div className="mb-5">
-                    <label className="block text-xs font-bold text-zinc-400 mb-2">Plataformas</label>
+                    <label className="block text-xs font-bold text-muted-foreground mb-2">Plataformas</label>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setPlatforms(p => ({ ...p, tiktok: !p.tiktok }))}
                             disabled={scheduling}
-                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.tiktok ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-white/5 border-white/5 text-zinc-500'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.tiktok ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-muted border-border text-muted-foreground'}`}
                         >
                             <Video size={14} /> TikTok
                         </button>
                         <button
                             onClick={() => setPlatforms(p => ({ ...p, instagram: !p.instagram }))}
                             disabled={scheduling}
-                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.instagram ? 'bg-pink-500/10 border-pink-500/30 text-pink-400' : 'bg-white/5 border-white/5 text-zinc-500'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.instagram ? 'bg-pink-500/10 border-pink-500/30 text-pink-400' : 'bg-muted border-border text-muted-foreground'}`}
                         >
                             <Instagram size={14} /> Instagram
                         </button>
                         <button
                             onClick={() => setPlatforms(p => ({ ...p, youtube: !p.youtube }))}
                             disabled={scheduling}
-                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.youtube ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-white/5 border-white/5 text-zinc-500'}`}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-lg text-xs font-bold border transition-all ${platforms.youtube ? 'bg-red-500/10 border-red-500/30 text-red-600' : 'bg-muted border-border text-muted-foreground'}`}
                         >
                             <Youtube size={14} /> YouTube
                         </button>
@@ -321,11 +321,11 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                 {/* Progress bar */}
                 {(scheduling || done) && (
                     <div className="mb-5">
-                        <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
                             <span>{scheduling ? 'Programando...' : 'Completado'}</span>
                             <span>{progress.current}/{progress.total}</span>
                         </div>
-                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${done && failCount === 0 ? 'bg-green-500' : done && failCount > 0 ? 'bg-yellow-500' : 'bg-purple-500'}`}
                                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
@@ -334,9 +334,9 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                         {done && (
                             <div className="mt-3 text-xs text-center">
                                 {failCount === 0 ? (
-                                    <span className="text-green-400">Todos los clips programados correctamente</span>
+                                    <span className="text-green-700">Todos los clips programados correctamente</span>
                                 ) : (
-                                    <span className="text-yellow-400">{successCount} programados, {failCount} fallidos</span>
+                                    <span className="text-yellow-600">{successCount} programados, {failCount} fallidos</span>
                                 )}
                             </div>
                         )}
@@ -348,7 +348,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                     <button
                         onClick={onClose}
                         disabled={scheduling}
-                        className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-xl font-medium transition-colors disabled:opacity-50"
+                        className="flex-1 py-3 bg-muted hover:bg-muted text-muted-foreground rounded-xl font-medium transition-colors disabled:opacity-50"
                     >
                         {done ? 'Cerrar' : 'Cancelar'}
                     </button>
@@ -356,7 +356,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                         <button
                             onClick={handleScheduleAll}
                             disabled={scheduling || !uploadPostKey || selectedPlatforms.length === 0}
-                            className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-foreground rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {scheduling ? (
                                 <>
@@ -375,7 +375,7 @@ export default function ScheduleWeekModal({ isOpen, onClose, clips, jobId, uploa
                             href="https://app.upload-post.com/calendar"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 no-underline"
+                            className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-foreground rounded-xl font-bold transition-all flex items-center justify-center gap-2 no-underline"
                         >
                             <ExternalLink size={16} />
                             Ver Calendario

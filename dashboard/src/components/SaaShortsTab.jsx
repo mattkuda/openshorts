@@ -386,16 +386,16 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
-                <Zap size={20} className="text-white" />
+                <Zap size={20} className="text-foreground" />
               </div>
               AI Shorts
             </h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Generate viral UGC videos for any product or business
             </p>
           </div>
           {step > 0 && (
-            <button onClick={handleReset} className="text-sm text-zinc-400 hover:text-white flex items-center gap-1 transition-colors">
+            <button onClick={handleReset} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
               <RefreshCw size={14} /> Start over
             </button>
           )}
@@ -405,16 +405,16 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
         <div className="flex items-center gap-2 mb-8">
           {['Setup', 'Analysis', 'Configure', 'Generate', 'Result'].map((label, i) => (
             <React.Fragment key={i}>
-              {i > 0 && <div className={`flex-1 h-px ${i <= step ? 'bg-violet-500' : 'bg-white/10'}`} />}
+              {i > 0 && <div className={`flex-1 h-px ${i <= step ? 'bg-violet-500' : 'bg-muted'}`} />}
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                 i === step ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' :
                 i < step ? 'bg-violet-500/10 text-violet-400' :
-                'bg-white/5 text-zinc-600'
+                'bg-muted text-muted-foreground'
               }`}>
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  i < step ? 'bg-violet-500 text-white' :
+                  i < step ? 'bg-violet-500 text-foreground' :
                   i === step ? 'bg-violet-500/30 text-violet-300' :
-                  'bg-white/10 text-zinc-600'
+                  'bg-muted text-muted-foreground'
                 }`}>
                   {i < step ? <Check size={10} /> : i + 1}
                 </span>
@@ -430,44 +430,44 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
             <div className="glass-panel p-8 space-y-6">
               {/* Video Mode Selector */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-3">Video Mode</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-3">Video Mode</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setVideoMode('lowcost')}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       videoMode === 'lowcost'
                         ? 'border-green-500/50 bg-green-500/10 ring-1 ring-green-500/30'
-                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                        : 'border-border bg-muted hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-semibold ${videoMode === 'lowcost' ? 'text-green-300' : 'text-zinc-300'}`}>Low Cost</span>
-                      <span className="text-xs font-mono text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">~$0.80</span>
+                      <span className={`text-sm font-semibold ${videoMode === 'lowcost' ? 'text-green-700' : 'text-muted-foreground'}`}>Low Cost</span>
+                      <span className="text-xs font-mono text-green-700 bg-green-500/10 px-2 py-0.5 rounded-full">~$0.80</span>
                     </div>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">Hailuo 2.3 img2video + VEED Lipsync. Good movement + lip-sync. Recommended.</p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">Hailuo 2.3 img2video + VEED Lipsync. Good movement + lip-sync. Recommended.</p>
                   </button>
                   <button
                     onClick={() => setVideoMode('premium')}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       videoMode === 'premium'
                         ? 'border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30'
-                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                        : 'border-border bg-muted hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-semibold ${videoMode === 'premium' ? 'text-violet-300' : 'text-zinc-300'}`}>Premium</span>
+                      <span className={`text-sm font-semibold ${videoMode === 'premium' ? 'text-violet-300' : 'text-muted-foreground'}`}>Premium</span>
                       <span className="text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">~$2.00</span>
                     </div>
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">Kling Avatar v2 Standard. Full integrated movement. Best quality.</p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">Kling Avatar v2 Standard. Full integrated movement. Best quality.</p>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Website URL <span className="text-zinc-600">(optional)</span></label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Website URL <span className="text-muted-foreground">(optional)</span></label>
                 <div className="flex gap-3">
                   <div className="relative flex-1">
-                    <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="url"
                       value={url}
@@ -478,12 +478,12 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                     />
                   </div>
                 </div>
-                <p className="text-[10px] text-zinc-600 mt-1">If provided, we'll scrape and research your site automatically</p>
+                <p className="text-[10px] text-muted-foreground mt-1">If provided, we'll scrape and research your site automatically</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  {url.trim() ? 'Extra context' : 'Describe your product/business'} <span className="text-zinc-600">{url.trim() ? '(optional)' : '(required if no URL)'}</span>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
+                  {url.trim() ? 'Extra context' : 'Describe your product/business'} <span className="text-muted-foreground">{url.trim() ? '(optional)' : '(required if no URL)'}</span>
                 </label>
                 <textarea
                   value={description}
@@ -495,7 +495,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-3">Language</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-3">Language</label>
                 <div className="flex gap-2 mb-6">
                   {[
                     { id: 'en', label: 'English', flag: '🇺🇸' },
@@ -507,7 +507,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                       className={`flex-1 p-3 rounded-xl border text-center transition-all ${
                         language === l.id
                           ? 'border-violet-500/50 bg-violet-500/10 text-violet-300'
-                          : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10'
+                          : 'border-border bg-muted text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       <span className="text-lg">{l.flag}</span>
@@ -516,7 +516,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   ))}
                 </div>
 
-                <label className="block text-sm font-medium text-zinc-300 mb-3">Actor</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-3">Actor</label>
                 <div className="flex gap-2 mb-6">
                   {[
                     { id: 'female', label: 'Woman', icon: '👩' },
@@ -528,7 +528,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                       className={`flex-1 p-3 rounded-xl border text-center transition-all ${
                         actorGender === g.id
                           ? 'border-violet-500/50 bg-violet-500/10 text-violet-300'
-                          : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10'
+                          : 'border-border bg-muted text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       <span className="text-lg">{g.icon}</span>
@@ -537,7 +537,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   ))}
                 </div>
 
-                <label className="block text-sm font-medium text-zinc-300 mb-3">Video Style</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-3">Video Style</label>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {STYLE_OPTIONS.map((s) => (
                     <button
@@ -546,18 +546,18 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                       className={`p-3 rounded-xl border text-left transition-all ${
                         style === s.id
                           ? 'border-violet-500/50 bg-violet-500/10 text-violet-300'
-                          : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10'
+                          : 'border-border bg-muted text-muted-foreground hover:bg-muted'
                       }`}
                     >
                       <div className="text-xs font-medium">{s.label}</div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">{s.desc}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{s.desc}</div>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Number of Scripts</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Number of Scripts</label>
                 <div className="flex gap-2">
                   {[1, 2, 3, 5].map((n) => (
                     <button
@@ -566,7 +566,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         numScripts === n
                           ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                          : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10'
+                          : 'bg-muted text-muted-foreground border border-border hover:bg-muted'
                       }`}
                     >
                       {n}
@@ -576,7 +576,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
               </div>
 
               {analyzeError && (
-                <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                   <AlertCircle size={14} />
                   {analyzeError}
                 </div>
@@ -605,18 +605,18 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="glass-panel p-4">
                 <Target size={16} className="text-violet-400 mb-2" />
-                <h3 className="text-sm font-medium text-zinc-300">Deep Research</h3>
-                <p className="text-xs text-zinc-500 mt-1">AI analyzes your product via URL scraping + web research, or generates directly from your description.</p>
+                <h3 className="text-sm font-medium text-muted-foreground">Deep Research</h3>
+                <p className="text-xs text-muted-foreground mt-1">AI analyzes your product via URL scraping + web research, or generates directly from your description.</p>
               </div>
               <div className="glass-panel p-4">
                 <MessageSquare size={16} className="text-violet-400 mb-2" />
-                <h3 className="text-sm font-medium text-zinc-300">Pain Point Scripts</h3>
-                <p className="text-xs text-zinc-500 mt-1">Generates hook-problem-solution scripts targeting your audience&apos;s real pain points.</p>
+                <h3 className="text-sm font-medium text-muted-foreground">Pain Point Scripts</h3>
+                <p className="text-xs text-muted-foreground mt-1">Generates hook-problem-solution scripts targeting your audience&apos;s real pain points.</p>
               </div>
               <div className="glass-panel p-4">
                 <Film size={16} className="text-violet-400 mb-2" />
-                <h3 className="text-sm font-medium text-zinc-300">AI Actor Videos</h3>
-                <p className="text-xs text-zinc-500 mt-1">Realistic AI-generated actors with lip-sync, b-roll, and viral subtitles. From ~$0.50/video.</p>
+                <h3 className="text-sm font-medium text-muted-foreground">AI Actor Videos</h3>
+                <p className="text-xs text-muted-foreground mt-1">Realistic AI-generated actors with lip-sync, b-roll, and viral subtitles. From ~$0.50/video.</p>
               </div>
             </div>
           </div>
@@ -634,9 +634,9 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 </h2>
                 <div className="flex items-center gap-2">
                   {fromCache && (
-                    <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1">
+                    <span className="text-[10px] bg-amber-500/10 text-amber-700 px-2 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1">
                       Cached
-                      <button onClick={() => { setStep(0); setFromCache(false); }} className="hover:text-white ml-1" title="Re-analyze">
+                      <button onClick={() => { setStep(0); setFromCache(false); }} className="hover:text-foreground ml-1" title="Re-analyze">
                         <RefreshCw size={9} />
                       </button>
                     </span>
@@ -646,11 +646,11 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   </span>
                 </div>
               </div>
-              <p className="text-sm text-zinc-400 mb-4">{analysis.one_liner}</p>
+              <p className="text-sm text-muted-foreground mb-4">{analysis.one_liner}</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Pain Points</h3>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pain Points</h3>
                   <div className="space-y-1.5">
                     {(analysis.pain_points || []).map((pp, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm">
@@ -658,7 +658,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                           pp.intensity === 'high' ? 'bg-red-400' : pp.intensity === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
                         }`} />
                         <div>
-                          <span className="text-zinc-300">{pp.pain}</span>
+                          <span className="text-muted-foreground">{pp.pain}</span>
                           {pp.source && pp.source !== 'website' && (
                             <span className="ml-1.5 text-[9px] bg-blue-500/10 text-blue-400 px-1 py-0.5 rounded">{pp.source}</span>
                           )}
@@ -668,10 +668,10 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Emotional Hooks</h3>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Emotional Hooks</h3>
                   <div className="space-y-1.5">
                     {(analysis.emotional_hooks || []).map((h, i) => (
-                      <div key={i} className="text-sm text-zinc-300 flex items-start gap-2">
+                      <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                         <TrendingUp size={12} className="text-violet-400 mt-1 shrink-0" />
                         {h}
                       </div>
@@ -684,7 +684,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
             {/* Web Research Results */}
             {webResearch && (
               <div className="glass-panel p-6">
-                <h3 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                   <Globe size={14} className="text-blue-400" />
                   Web Research (Google Search)
                   {webResearch.grounding_sources && (
@@ -697,17 +697,17 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 {/* Real user reviews */}
                 {webResearch.real_reviews && webResearch.real_reviews.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Real User Reviews</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Real User Reviews</h4>
                     <div className="space-y-2">
                       {webResearch.real_reviews.slice(0, 5).map((review, i) => (
-                        <div key={i} className="text-xs bg-white/5 rounded-lg p-2.5 border border-white/5">
-                          <p className="text-zinc-300 italic">&quot;{review.quote}&quot;</p>
+                        <div key={i} className="text-xs bg-muted rounded-lg p-2.5 border border-border">
+                          <p className="text-muted-foreground italic">&quot;{review.quote}&quot;</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-zinc-600">{review.source}</span>
+                            <span className="text-muted-foreground">{review.source}</span>
                             <span className={`px-1 py-0.5 rounded text-[9px] ${
-                              review.sentiment === 'positive' ? 'bg-green-500/10 text-green-400' :
-                              review.sentiment === 'negative' ? 'bg-red-500/10 text-red-400' :
-                              'bg-zinc-500/10 text-zinc-400'
+                              review.sentiment === 'positive' ? 'bg-green-500/10 text-green-700' :
+                              review.sentiment === 'negative' ? 'bg-red-500/10 text-red-600' :
+                              'bg-muted text-muted-foreground'
                             }`}>{review.sentiment}</span>
                           </div>
                         </div>
@@ -719,10 +719,10 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 {/* Competitors */}
                 {webResearch.competitors && webResearch.competitors.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Competitors</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Competitors</h4>
                     <div className="flex flex-wrap gap-2">
                       {webResearch.competitors.map((c, i) => (
-                        <span key={i} className="text-xs bg-white/5 px-2 py-1 rounded-lg text-zinc-400 border border-white/5" title={c.comparison}>
+                        <span key={i} className="text-xs bg-muted px-2 py-1 rounded-lg text-muted-foreground border border-border" title={c.comparison}>
                           {c.name}
                         </span>
                       ))}
@@ -733,7 +733,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 {/* Sources */}
                 {webResearch.grounding_sources && webResearch.grounding_sources.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Sources</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Sources</h4>
                     <div className="flex flex-wrap gap-1.5">
                       {webResearch.grounding_sources.slice(0, 8).map((src, i) => (
                         <a
@@ -756,9 +756,9 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
             {/* Scripts */}
             <div>
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Sparkles size={18} className="text-yellow-400" />
+                <Sparkles size={18} className="text-yellow-600" />
                 Generated Scripts
-                <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-auto">{scripts.length} scripts</span>
+                <span className="text-xs bg-muted px-2 py-0.5 rounded-full ml-auto">{scripts.length} scripts</span>
               </h2>
 
               <div className="grid grid-cols-1 gap-4">
@@ -769,19 +769,19 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                     className={`glass-panel p-5 cursor-pointer transition-all ${
                       selectedScript === i
                         ? 'border-violet-500/50 bg-violet-500/5 ring-1 ring-violet-500/20'
-                        : 'hover:bg-white/5'
+                        : 'hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-                          selectedScript === i ? 'bg-violet-500 text-white' : 'bg-white/10 text-zinc-400'
+                          selectedScript === i ? 'bg-violet-500 text-foreground' : 'bg-muted text-muted-foreground'
                         }`}>
                           {i + 1}
                         </span>
                         <div>
-                          <h3 className="text-sm font-semibold text-zinc-200">{script.title}</h3>
-                          <span className="text-[10px] text-zinc-500">{script.duration_seconds}s &middot; {script.style} &middot; {script.target_platform}</span>
+                          <h3 className="text-sm font-semibold text-foreground">{script.title}</h3>
+                          <span className="text-[10px] text-muted-foreground">{script.duration_seconds}s &middot; {script.style} &middot; {script.target_platform}</span>
                         </div>
                       </div>
                       {selectedScript === i && (
@@ -810,25 +810,25 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                       {(script.segments || []).map((seg, j) => (
                         <div key={j} className="flex gap-3 text-xs">
                           <span className={`shrink-0 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider ${
-                            seg.type === 'hook' ? 'bg-red-500/20 text-red-300' :
-                            seg.type === 'problem' ? 'bg-yellow-500/20 text-yellow-300' :
-                            seg.type === 'solution' ? 'bg-green-500/20 text-green-300' :
+                            seg.type === 'hook' ? 'bg-red-500/20 text-red-600' :
+                            seg.type === 'problem' ? 'bg-yellow-500/20 text-yellow-600' :
+                            seg.type === 'solution' ? 'bg-green-500/20 text-green-700' :
                             'bg-blue-500/20 text-blue-300'
                           }`}>
                             {seg.type}
                           </span>
-                          <span className="text-zinc-400 leading-relaxed">{seg.narration}</span>
+                          <span className="text-muted-foreground leading-relaxed">{seg.narration}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Hook text & hashtags */}
-                    <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] bg-red-500/10 text-red-300 px-2 py-0.5 rounded-full">
+                    <div className="mt-3 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] bg-red-500/10 text-red-600 px-2 py-0.5 rounded-full">
                         Hook: &quot;{script.hook_text}&quot;
                       </span>
                       {(script.hashtags || []).slice(0, 4).map((tag, j) => (
-                        <span key={j} className="text-[10px] text-zinc-500">{tag}</span>
+                        <span key={j} className="text-[10px] text-muted-foreground">{tag}</span>
                       ))}
                     </div>
                   </div>
@@ -852,13 +852,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
           <div className="animate-[fadeIn_0.3s_ease-out] space-y-6">
             <div className="glass-panel p-6 space-y-5">
               <h2 className="text-lg font-semibold">Configure Video</h2>
-              <p className="text-sm text-zinc-500">
-                Script: <strong className="text-zinc-300">{scripts[selectedScript].title}</strong>
+              <p className="text-sm text-muted-foreground">
+                Script: <strong className="text-muted-foreground">{scripts[selectedScript].title}</strong>
               </p>
 
               {/* Voice Selection */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                   <Volume2 size={14} /> Voice {language === 'es' ? '(Spanish)' : '(English)'}
                 </label>
                 {(() => {
@@ -895,19 +895,19 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                             className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
                               selectedVoice === v.voice_id
                                 ? 'border-violet-500/50 bg-violet-500/10 text-violet-300'
-                                : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10'
+                                : 'border-border bg-muted text-muted-foreground hover:bg-muted'
                             }`}
                           >
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate">{v.name}</div>
-                              <div className="text-[10px] text-zinc-500">
+                              <div className="text-[10px] text-muted-foreground">
                                 {v.labels?.accent || ''} {v.labels?.gender || ''} {v.category ? `· ${v.category}` : ''}
                               </div>
                             </div>
                             {v.preview_url && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); new Audio(v.preview_url).play(); }}
-                                className="shrink-0 w-7 h-7 rounded-full bg-white/10 hover:bg-violet-500/30 flex items-center justify-center transition-colors"
+                                className="shrink-0 w-7 h-7 rounded-full bg-muted hover:bg-violet-500/30 flex items-center justify-center transition-colors"
                                 title="Preview voice"
                               >
                                 <Volume2 size={12} />
@@ -948,7 +948,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                     </select>
                   );
                 })()}
-                <p className="text-[10px] text-zinc-600 mt-1">
+                <p className="text-[10px] text-muted-foreground mt-1">
                   {language === 'es'
                     ? `Voces ${actorGender === 'female' ? 'femeninas' : 'masculinas'} · Todas hablan español con modelo multilingual · Click altavoz para preview`
                     : `${actorGender === 'female' ? 'Female' : 'Male'} voices · Click speaker to preview`}
@@ -957,27 +957,27 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
 
               {/* Actor Selection: Gallery + Generate New */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                   <User size={14} /> AI Actor — Choose Your Actor
                 </label>
 
                 {/* Existing Gallery from S3 */}
                 {actorGallery.length > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs text-zinc-400 mb-2">Previously generated actors (click to select):</p>
+                    <p className="text-xs text-muted-foreground mb-2">Previously generated actors (click to select):</p>
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto pr-1">
                       {actorGallery.map((img, i) => (
                         <button
                           key={img.url}
                           onClick={() => setSelectedActor(img.url)}
                           className={`relative rounded-lg overflow-hidden border-2 transition-all aspect-[3/4] ${
-                            selectedActor === img.url ? 'border-violet-500 ring-2 ring-violet-500/30 scale-[1.02]' : 'border-white/10 hover:border-white/30'
+                            selectedActor === img.url ? 'border-violet-500 ring-2 ring-violet-500/30 scale-[1.02]' : 'border-border hover:border-muted-foreground/40'
                           }`}
                         >
                           <img src={img.url} alt={`Actor ${i+1}`} className="w-full h-full object-cover" />
                           {selectedActor === img.url && (
                             <div className="absolute top-1 right-1 w-5 h-5 bg-violet-500 rounded-full flex items-center justify-center shadow-lg">
-                              <Check size={10} className="text-white" />
+                              <Check size={10} className="text-foreground" />
                             </div>
                           )}
                         </button>
@@ -986,13 +986,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   </div>
                 )}
                 {loadingGallery && (
-                  <p className="text-xs text-zinc-500 mb-3 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Loading actor gallery...</p>
+                  <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Loading actor gallery...</p>
                 )}
 
                 {/* Upload Custom Actor */}
                 <div className="mb-4">
                   <div className="flex items-center gap-3">
-                    <label className="flex-1 flex items-center justify-center gap-2 text-sm bg-white/5 text-zinc-400 px-4 py-3 rounded-lg border border-dashed border-white/20 hover:bg-white/10 hover:border-white/30 transition-colors cursor-pointer">
+                    <label className="flex-1 flex items-center justify-center gap-2 text-sm bg-muted text-muted-foreground px-4 py-3 rounded-lg border border-dashed border-border hover:bg-muted hover:border-muted-foreground/40 transition-colors cursor-pointer">
                       <Upload size={14} />
                       <span>Upload your own photo</span>
                       <input
@@ -1036,18 +1036,18 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                         className={`relative w-16 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${
                           selectedActor === uploadedActorPreview.serverUrl
                             ? 'border-violet-500 ring-2 ring-violet-500/30'
-                            : 'border-white/20 hover:border-white/40'
+                            : 'border-border hover:border-muted-foreground/40'
                         }`}
                       >
                         <img src={uploadedActorPreview.localPreview} alt="Uploaded" className="w-full h-full object-cover" />
                         {selectedActor === uploadedActorPreview.serverUrl && (
                           <div className="absolute top-1 right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
-                            <Check size={8} className="text-white" />
+                            <Check size={8} className="text-foreground" />
                           </div>
                         )}
                         {!uploadedActorPreview.serverUrl && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <Loader2 size={12} className="animate-spin text-white" />
+                          <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                            <Loader2 size={12} className="animate-spin text-foreground" />
                           </div>
                         )}
                       </button>
@@ -1056,7 +1056,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 </div>
 
                 {/* Generate New Actors */}
-                <p className="text-xs text-zinc-500 mb-2">{actorGallery.length > 0 ? 'Or generate new actors:' : 'Or describe your actor:'}</p>
+                <p className="text-xs text-muted-foreground mb-2">{actorGallery.length > 0 ? 'Or generate new actors:' : 'Or describe your actor:'}</p>
                 <textarea
                   value={actorDescription}
                   onChange={(e) => { setActorDescription(e.target.value); setActorOptions([]); }}
@@ -1100,24 +1100,24 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 {/* Newly Generated Actor Options */}
                 {actorOptions.length > 0 && (
                   <div className="mt-3">
-                    <p className="text-xs text-zinc-400 mb-2">New actors (select one):</p>
+                    <p className="text-xs text-muted-foreground mb-2">New actors (select one):</p>
                     <div className="grid grid-cols-3 gap-3">
                       {actorOptions.map((imgUrl, i) => (
                         <button
                           key={imgUrl}
                           onClick={() => setSelectedActor(imgUrl)}
                           className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-[9/16] ${
-                            selectedActor === imgUrl ? 'border-violet-500 ring-2 ring-violet-500/30 scale-[1.02]' : 'border-white/10 hover:border-white/30'
+                            selectedActor === imgUrl ? 'border-violet-500 ring-2 ring-violet-500/30 scale-[1.02]' : 'border-border hover:border-muted-foreground/40'
                           }`}
                         >
                           <img src={imgUrl} alt={`New ${i+1}`} className="w-full h-full object-cover" />
                           {selectedActor === imgUrl && (
                             <div className="absolute top-2 right-2 w-6 h-6 bg-violet-500 rounded-full flex items-center justify-center shadow-lg">
-                              <Check size={12} className="text-white" />
+                              <Check size={12} className="text-foreground" />
                             </div>
                           )}
                           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                            <span className="text-[10px] text-white/80">New {i+1}</span>
+                            <span className="text-[10px] text-foreground/80">New {i+1}</span>
                           </div>
                         </button>
                       ))}
@@ -1126,13 +1126,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 )}
 
                 {!selectedActor && (actorOptions.length > 0 || actorGallery.length > 0) && (
-                  <p className="text-xs text-amber-400 mt-2 flex items-center gap-1"><AlertCircle size={12} /> Select an actor to continue</p>
+                  <p className="text-xs text-amber-700 mt-2 flex items-center gap-1"><AlertCircle size={12} /> Select an actor to continue</p>
                 )}
               </div>
 
               {/* Narration Edit */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                   <MessageSquare size={14} /> Narration Script
                 </label>
                 <textarea
@@ -1141,16 +1141,16 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   rows={5}
                   className="input-field resize-none font-mono text-xs"
                 />
-                <p className="text-[10px] text-zinc-600 mt-1">{editedNarration.length} chars &middot; ~{Math.round(editedNarration.split(' ').length / 2.5)}s speech</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{editedNarration.length} chars &middot; ~{Math.round(editedNarration.split(' ').length / 2.5)}s speech</p>
               </div>
 
               {/* Cost Estimate */}
-              <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+              <div className="p-3 bg-muted rounded-lg border border-border">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Estimated cost</span>
-                  <span className="text-green-400 font-semibold">~${videoMode === 'lowcost' ? '0.65' : '2.50'}</span>
+                  <span className="text-muted-foreground">Estimated cost</span>
+                  <span className="text-green-700 font-semibold">~${videoMode === 'lowcost' ? '0.65' : '2.50'}</span>
                 </div>
-                <div className="text-[10px] text-zinc-600 mt-1">
+                <div className="text-[10px] text-muted-foreground mt-1">
                   {videoMode === 'lowcost'
                     ? 'Flux image ($0.05) + ElevenLabs voice ($0.10) + Hailuo 2.3 img2video ($0.19) + VEED Lipsync ($0.20) + Flux b-roll ($0.10)'
                     : 'Flux image ($0.05) + ElevenLabs voice ($0.10) + Kling avatar ($1.69) + Kling b-roll ($0.70)'
@@ -1160,7 +1160,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
 
               {/* Missing keys warning */}
               {(!falKey || !elevenLabsKey) && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2 text-sm text-amber-400">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2 text-sm text-amber-700">
                   <AlertCircle size={14} />
                   {!falKey && 'fal.ai API key missing. '}{!elevenLabsKey && 'ElevenLabs API key missing. '}
                   Set them in Settings.
@@ -1195,13 +1195,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
             <div className="glass-panel p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Film size={18} className={genStatus === 'processing' ? 'text-violet-400 animate-pulse' : genStatus === 'completed' ? 'text-green-400' : 'text-red-400'} />
+                  <Film size={18} className={genStatus === 'processing' ? 'text-violet-400 animate-pulse' : genStatus === 'completed' ? 'text-green-700' : 'text-red-600'} />
                   Video Generation
                 </h2>
                 <span className={`text-xs px-2 py-1 rounded-full border ${
                   genStatus === 'processing' ? 'bg-violet-500/10 border-violet-500/20 text-violet-300' :
-                  genStatus === 'completed' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
-                  'bg-red-500/10 border-red-500/20 text-red-400'
+                  genStatus === 'completed' ? 'bg-green-500/10 border-green-500/20 text-green-700' :
+                  'bg-red-500/10 border-red-500/20 text-red-600'
                 }`}>
                   {genStatus.toUpperCase()}
                 </span>
@@ -1230,13 +1230,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   return (
                     <div key={i} className="flex items-center gap-3 text-sm">
                       {stepDone ? (
-                        <Check size={14} className="text-green-400" />
+                        <Check size={14} className="text-green-700" />
                       ) : stepActive ? (
                         <Loader2 size={14} className="text-violet-400 animate-spin" />
                       ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-white/20" />
+                        <div className="w-3.5 h-3.5 rounded-full border border-border" />
                       )}
-                      <span className={stepDone ? 'text-zinc-400' : stepActive ? 'text-white' : 'text-zinc-600'}>
+                      <span className={stepDone ? 'text-muted-foreground' : stepActive ? 'text-foreground' : 'text-muted-foreground'}>
                         {label}
                       </span>
                     </div>
@@ -1245,19 +1245,19 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
               </div>
 
               {/* Logs Terminal */}
-              <div className="bg-[#0c0c0e] rounded-xl border border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between bg-white/5">
-                  <span className="text-xs font-mono text-zinc-400 flex items-center gap-2">
+              <div className="bg-muted rounded-xl border border-border overflow-hidden">
+                <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted">
+                  <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
                     <Terminal size={12} /> Generation Logs
                   </span>
-                  <button onClick={() => setLogsExpanded(!logsExpanded)} className="text-zinc-500 hover:text-white transition-colors">
+                  <button onClick={() => setLogsExpanded(!logsExpanded)} className="text-muted-foreground hover:text-foreground transition-colors">
                     <ChevronDown size={14} className={logsExpanded ? '' : 'rotate-180'} />
                   </button>
                 </div>
                 {logsExpanded && (
                   <div className="p-4 max-h-64 overflow-y-auto font-mono text-xs space-y-1 custom-scrollbar">
                     {genLogs.map((log, i) => (
-                      <div key={i} className={`${log.toLowerCase().includes('error') ? 'text-red-400' : log.includes('✅') ? 'text-green-400' : 'text-zinc-400'}`}>
+                      <div key={i} className={`${log.toLowerCase().includes('error') ? 'text-red-600' : log.includes('✅') ? 'text-green-700' : 'text-muted-foreground'}`}>
                         {log}
                       </div>
                     ))}
@@ -1272,8 +1272,8 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
               {genStatus === 'failed' && (
                 <div className="mt-4 p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3">
                   <div className="flex items-center gap-2">
-                    <AlertCircle size={16} className="text-red-400 shrink-0" />
-                    <span className="text-sm text-red-300">Generation failed. You can retry or go back to change settings.</span>
+                    <AlertCircle size={16} className="text-red-600 shrink-0" />
+                    <span className="text-sm text-red-600">Generation failed. You can retry or go back to change settings.</span>
                   </div>
                   <div className="flex gap-3">
                     <button
@@ -1301,7 +1301,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
           <div className="animate-[fadeIn_0.3s_ease-out] space-y-6">
             <div className="glass-panel p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Sparkles className="text-yellow-400" size={18} />
+                <Sparkles className="text-yellow-600" size={18} />
                 Your SaaS Short is Ready!
               </h2>
 
@@ -1319,23 +1319,23 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 {/* Details */}
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-zinc-300 mb-1">{genResult.script?.title}</h3>
-                    <p className="text-xs text-zinc-500">{genResult.duration?.toFixed(1)}s &middot; 9:16 vertical</p>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-1">{genResult.script?.title}</h3>
+                    <p className="text-xs text-muted-foreground">{genResult.duration?.toFixed(1)}s &middot; 9:16 vertical</p>
                   </div>
 
                   {/* Cost breakdown */}
                   {genResult.cost_estimate && (
-                    <div className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-1">
-                      <div className="text-xs font-semibold text-zinc-300 mb-2">Cost Breakdown</div>
+                    <div className="p-3 bg-muted rounded-lg border border-border space-y-1">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2">Cost Breakdown</div>
                       {Object.entries(genResult.cost_estimate).filter(([k]) => k !== 'total').map(([k, v]) => (
                         <div key={k} className="flex justify-between text-xs">
-                          <span className="text-zinc-500">{k.replace(/_/g, ' ')}</span>
-                          <span className="text-zinc-400">${v}</span>
+                          <span className="text-muted-foreground">{k.replace(/_/g, ' ')}</span>
+                          <span className="text-muted-foreground">${v}</span>
                         </div>
                       ))}
-                      <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-1 mt-1">
-                        <span className="text-zinc-300">Total</span>
-                        <span className="text-green-400">${genResult.cost_estimate.total}</span>
+                      <div className="flex justify-between text-sm font-semibold border-t border-border pt-1 mt-1">
+                        <span className="text-muted-foreground">Total</span>
+                        <span className="text-green-700">${genResult.cost_estimate.total}</span>
                       </div>
                     </div>
                   )}
@@ -1344,16 +1344,16 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   {genResult.script?.caption && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-zinc-400">Caption</span>
+                        <span className="text-xs font-medium text-muted-foreground">Caption</span>
                         <button
                           onClick={() => handleCopy(genResult.script.caption, 'caption')}
-                          className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"
+                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                         >
                           {copied === 'caption' ? <Check size={10} /> : <Copy size={10} />}
                           {copied === 'caption' ? 'Copied' : 'Copy'}
                         </button>
                       </div>
-                      <p className="text-xs text-zinc-400 bg-white/5 p-2 rounded-lg">{genResult.script.caption}</p>
+                      <p className="text-xs text-muted-foreground bg-muted p-2 rounded-lg">{genResult.script.caption}</p>
                     </div>
                   )}
 
@@ -1361,10 +1361,10 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   {genResult.script?.hashtags && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-zinc-400">Hashtags</span>
+                        <span className="text-xs font-medium text-muted-foreground">Hashtags</span>
                         <button
                           onClick={() => handleCopy(genResult.script.hashtags.join(' '), 'hashtags')}
-                          className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"
+                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                         >
                           {copied === 'hashtags' ? <Check size={10} /> : <Copy size={10} />}
                           {copied === 'hashtags' ? 'Copied' : 'Copy'}
@@ -1396,13 +1396,13 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                   </div>
 
                   {/* Publish to Social Media */}
-                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-3 mt-2">
-                    <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
+                  <div className="p-4 bg-muted rounded-xl border border-border space-y-3 mt-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                       <Share2 size={14} /> Publish to Social Media
                     </h3>
 
                     {!uploadPostKey ? (
-                      <p className="text-xs text-zinc-500">Set your Upload-Post API key in Settings to enable publishing.</p>
+                      <p className="text-xs text-muted-foreground">Set your Upload-Post API key in Settings to enable publishing.</p>
                     ) : (
                       <>
                         {/* Platform checkboxes */}
@@ -1412,12 +1412,12 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                             { id: 'instagram', label: 'Instagram', icon: '📸' },
                             { id: 'youtube', label: 'YouTube', icon: '▶️' },
                           ].map((p) => (
-                            <label key={p.id} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                            <label key={p.id} className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={publishPlatforms[p.id]}
                                 onChange={(e) => setPublishPlatforms({ ...publishPlatforms, [p.id]: e.target.checked })}
-                                className="w-3.5 h-3.5 rounded border-zinc-600 bg-black/50 text-violet-500 focus:ring-violet-500"
+                                className="w-3.5 h-3.5 rounded border-border bg-muted text-violet-500 focus:ring-violet-500"
                               />
                               <span>{p.icon}</span> {p.label}
                             </label>
@@ -1426,12 +1426,12 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
 
                         {/* Schedule toggle */}
                         <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                             <input
                               type="checkbox"
                               checked={isScheduling}
                               onChange={(e) => setIsScheduling(e.target.checked)}
-                              className="w-3.5 h-3.5 rounded border-zinc-600 bg-black/50 text-violet-500 focus:ring-violet-500"
+                              className="w-3.5 h-3.5 rounded border-border bg-muted text-violet-500 focus:ring-violet-500"
                             />
                             <Calendar size={12} /> Schedule
                           </label>
@@ -1494,7 +1494,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                         </button>
 
                         {publishResult && (
-                          <p className={`text-xs ${publishResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                          <p className={`text-xs ${publishResult.ok ? 'text-green-700' : 'text-red-600'}`}>
                             {publishResult.msg}
                           </p>
                         )}

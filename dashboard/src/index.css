@@ -4,21 +4,55 @@
 @tailwind utilities;
 
 @layer base {
+  /* ---- Design tokens (light is the default theme). See STYLE_GUIDE.md ---- */
+  :root {
+    /* Surfaces form a 3-step hierarchy: sidebar is the GRAYEST, the main canvas is
+       lighter, and cards are white so they lift off the canvas. */
+    --background: 150 18% 98%;       /* main content canvas — near-white */
+    --surface: 150 12% 94%;          /* sidebar / side panels — light gray (grayer than canvas) */
+    --card: 0 0% 100%;               /* cards, modals, inputs — white */
+    --muted: 150 12% 91%;            /* wells, hover surfaces (darker than sidebar so hover reads) */
+    --muted-foreground: 155 12% 36%; /* secondary text */
+    --foreground: 215 28% 12%;       /* primary text — near-black */
+    --border: 150 14% 87%;           /* borders & dividers */
+    --primary: 130 85% 70%;          /* mint brand — saturated spring-mint (~#6EF882) */
+    --primary-hover: 132 70% 58%;    /* primary button hover (deeper) */
+    --primary-foreground: 140 80% 10%; /* deep green text/icons ON mint */
+    --primary-strong: 138 68% 29%;   /* mint-as-text / links / active nav on light */
+    --ring: 132 72% 54%;             /* focus ring */
+  }
+
+  /* Dark theme scaffold — add `class="dark"` on <html> to flip. */
+  .dark {
+    --background: 215 28% 9%;
+    --surface: 215 24% 13%;
+    --card: 215 24% 12%;
+    --muted: 215 20% 18%;
+    --muted-foreground: 215 12% 65%;
+    --foreground: 150 20% 96%;
+    --border: 215 18% 22%;
+    --primary: 130 80% 65%;
+    --primary-hover: 132 70% 58%;
+    --primary-foreground: 140 80% 9%;
+    --primary-strong: 135 65% 60%;
+    --ring: 132 72% 50%;
+  }
+
   body {
-    @apply bg-background text-white antialiased;
+    @apply bg-background text-foreground antialiased;
   }
 }
 
 .glass-panel {
-  @apply bg-surface/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl;
+  @apply bg-card/70 backdrop-blur-xl border border-border rounded-2xl shadow-lg shadow-black/5;
 }
 
 .input-field {
-  @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-sm placeholder:text-zinc-500;
+  @apply w-full bg-card border border-border rounded-xl px-4 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-ring transition-all text-sm text-foreground placeholder:text-muted-foreground;
 }
 
 .btn-primary {
-  @apply bg-primary hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20;
+  @apply bg-primary hover:bg-primary-hover text-primary-foreground px-6 py-3 rounded-xl font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
 }
 
 /* Custom Scrollbar */
@@ -32,12 +66,12 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(20, 28, 36, 0.15);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(20, 28, 36, 0.28);
 }
 
 /* Custom Animations */

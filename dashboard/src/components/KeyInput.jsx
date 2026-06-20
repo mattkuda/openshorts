@@ -18,7 +18,7 @@ export default function KeyInput({ onKeySet, savedKey }) {
     };
 
     return (
-        <div className="bg-surface border border-white/5 rounded-2xl p-6 mb-8 animate-[fadeIn_0.5s_ease-out]">
+        <div className="bg-surface border border-border rounded-2xl p-6 mb-8 animate-[fadeIn_0.5s_ease-out]">
             <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-accent/20 rounded-lg text-accent">
                     <Key size={20} />
@@ -40,7 +40,7 @@ export default function KeyInput({ onKeySet, savedKey }) {
                     />
                     <button
                         onClick={() => setIsVisible(!isVisible)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                         {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -49,21 +49,21 @@ export default function KeyInput({ onKeySet, savedKey }) {
                     onClick={handleSave}
                     disabled={!key || isSaved}
                     className={`px-6 rounded-xl font-medium transition-all flex items-center gap-2 ${isSaved
-                        ? 'bg-green-500/20 text-green-400 cursor-default'
-                        : 'bg-primary hover:bg-blue-600 text-white shadow-lg shadow-primary/20'
+                        ? 'bg-green-500/20 text-green-700 cursor-default'
+                        : 'bg-primary hover:bg-blue-600 text-foreground shadow-lg shadow-primary/20'
                         }`}
                 >
                     {isSaved ? <><Check size={18} /> Ready</> : 'Set Key'}
                 </button>
             </div>
-            <p className="mt-3 text-xs text-zinc-500">
+            <p className="mt-3 text-xs text-muted-foreground">
                 Your key is stored locally in your browser for convenience.
                 <br />
                 <a
                     href="https://aistudio.google.com/app/apikey"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline mt-1 inline-block"
+                    className="text-primary-strong hover:underline mt-1 inline-block"
                 >
                     Get your free Gemini API Key here →
                 </a>

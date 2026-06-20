@@ -100,3 +100,12 @@ Async job queue with semaphore-based concurrency control. Configure via `MAX_CON
 - **Frontend:** React 18, Vite 4, Tailwind CSS 3.4
 - **External APIs:** Google Gemini, ElevenLabs Dubbing, Upload-Post
 - **Infrastructure:** Docker + Docker Compose, AWS S3
+
+## Frontend Styling
+
+All dashboard UI follows the design system in @STYLE_GUIDE.md — **read it before adding or
+changing any frontend component**. Key rules: light theme by default with a semantic CSS-variable
+token system (saturated mint primary `#6EF882`), and card / button / nav / modal conventions. Never hardcode
+colors (`text-white`, `text-zinc-*`, `bg-white/x`, hex values) — use the semantic token classes
+(`text-foreground`, `text-muted-foreground`, `bg-card`, `bg-muted`, `border-border`, `bg-primary`,
+`text-primary-strong`). Tokens live in `dashboard/src/index.css` + `dashboard/tailwind.config.js`.
