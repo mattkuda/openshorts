@@ -430,7 +430,7 @@ function App() {
     const user = { name: 'Matt Kuda', email: 'mattkuda@gmail.com', initials: 'MK' };
 
     return (
-      <div className={`group/sidebar ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-border flex flex-col h-full shrink-0 overflow-x-hidden transition-[width] duration-200 ease-out`}>
+      <div className={`group/sidebar ${sidebarCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-border flex flex-col h-full shrink-0 overflow-x-hidden transition-[width] duration-300 ease-out`}>
         {/* Header: collapsed shows the logo (→ toggle on hover); expanded shows brand + toggle */}
         <div className="h-16 flex items-center border-b border-border shrink-0 px-3">
           {sidebarCollapsed ? (
@@ -548,7 +548,9 @@ function App() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/30">
-      <Sidebar />
+      {/* Render inline (not <Sidebar/>) so the element persists across re-renders
+          and the w-64 ↔ w-16 width change actually transitions instead of remounting. */}
+      {Sidebar()}
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Background Gradients */}
