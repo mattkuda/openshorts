@@ -437,16 +437,16 @@ function App() {
             <button
               onClick={toggleSidebar}
               title="Expand sidebar"
-              className="relative w-9 h-9 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 overflow-hidden"
+              className="relative w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shrink-0 overflow-hidden"
             >
-              <img src="/logo-clipzoo.png" alt="ClipZoo" className="w-full h-full object-contain transition-opacity group-hover/sidebar:opacity-0" />
-              <PanelLeft size={18} className="absolute text-foreground opacity-0 transition-opacity group-hover/sidebar:opacity-100" />
+              <img src="/logo-clipzoo-white.png" alt="ClipZoo" className="w-full h-full object-contain transition-opacity group-hover/sidebar:opacity-0" />
+              <PanelLeft size={18} className="absolute text-background opacity-0 transition-opacity group-hover/sidebar:opacity-100" />
             </button>
           ) : (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-card border border-border rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                  <img src="/logo-clipzoo.png" alt="ClipZoo" className="w-full h-full object-contain" />
+                <div className="w-9 h-9 bg-foreground rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                  <img src="/logo-clipzoo-white.png" alt="ClipZoo" className="w-full h-full object-contain" />
                 </div>
                 <span className="font-bold text-lg text-foreground tracking-tight whitespace-nowrap">ClipZoo</span>
               </div>
