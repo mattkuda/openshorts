@@ -2276,3 +2276,511 @@ async def saasshorts_voices(
         ],
         "source": "defaults",
     }
+
+
+# =====================================================================
+# ClipZoo UGC endpoints — templates, hook+demo composer, slideshows,
+# library, brand profile, scheduling (Upload-Post scheduled_date).
+# =====================================================================
+from db import init_db, get_session, BrandProfile, Creation, ScheduledPost
+from templates import get_templates, get_template, suggest_hooks, autofill_slots
+from composer import compose_hook_demo
+from slideshow import render_slideshow
+
+# .env.local: gitignored local key fallbacks (beats .env for same-named vars).
+load_dotenv(".env.local", override=True)
+
+init_db()
+
+CREATIONS_DIR = "creations"   # durable — NOT under OUTPUT_DIR (cleanup purges that hourly)
+MOCKS_DIR = "mocks"
+os.makedirs(CREATIONS_DIR, exist_ok=True)
+os.makedirs(MOCKS_DIR, exist_ok=True)
+app.mount("/creations", StaticFiles(directory=CREATIONS_DIR), name="creations")
+app.mount("/mocks", StaticFiles(directory=MOCKS_DIR), name="mocks")
+
+
+@app.get("/api/config/keys")
+async def api_config_keys():
+    """Local-dev convenience: keys from .env.local, served to the self-hosted
+    frontend as FALLBACKS (Settings UI / localStorage always wins client-side).
+    Values transit localhost only — do not expose this app on a shared host."""
+    return {"keys": {
+        "gemini": os.getenv("GEMINI_API_KEY", ""),
+        "upload_post": os.getenv("UPLOAD_POST_API_KEY", ""),
+        "elevenlabs": os.getenv("ELEVENLABS_API_KEY", ""),
+        "fal": os.getenv("FAL_API_KEY", ""),
+    }}
+
+
+def _brand_dict():
+    with get_session() as s:
+        row = s.query(BrandProfile).first()
+        return row.to_dict() if row else None
+
+
+def _save_creation(kind, title, template_key, slots, video_path="", image_paths=None):
+    with get_session() as s:
+        row = Creation(
+            kind=kind, title=title[:300], template_key=template_key,
+            slots_json=json.dumps(slots or {}), video_path=video_path,
+            image_paths_json=json.dumps(image_paths or []),
+        )
+        s.add(row)
+        s.commit()
+        return row.to_dict()
+
+
+# ---- Templates -------------------------------------------------------
+
+@app.get("/api/templates")
+async def api_templates():
+    return {"templates": get_templates()}
+
+
+class HookSuggestRequest(BaseModel):
+    product_desc: str
+    niche: Optional[str] = ""
+    mock: Optional[bool] = False
+
+
+@app.post("/api/hooks/suggest")
+async def api_hooks_suggest(req: HookSuggestRequest, x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    try:
+        hooks = await asyncio.to_thread(suggest_hooks, x_gemini_key, req.product_desc, req.niche or "", 8, bool(req.mock))
+        return {"hooks": hooks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---- Hook + Demo composer (job-based) --------------------------------
+
+def _run_compose_job(job_id, demo_path, hook_text, style, cta_text, use_mock, title,
+                     avatar_image_path=None, avatar_video_path=None,
+                     text_style="box", text_position="center"):
+    log = lambda msg: jobs.get(job_id, {}).get('logs', []).append(msg)
+    try:
+        jobs[job_id]['status'] = 'processing'
+        out_name = f"hookdemo_{job_id}.mp4"
+        out_path = os.path.join(CREATIONS_DIR, out_name)
+        compose_hook_demo(demo_path, hook_text, out_path, style=style,
+                          cta_text=cta_text, use_mock_demo=use_mock,
+                          avatar_image_path=avatar_image_path,
+                          avatar_video_path=avatar_video_path,
+                          text_style=text_style, text_position=text_position, log=log)
+        creation = _save_creation(
+            kind="hook_demo", title=title or hook_text, template_key="hook_demo",
+            slots={"hook_text": hook_text, "style": style, "cta_text": cta_text,
+                   "avatar_image": avatar_image_path or "", "text_style": text_style,
+                   "text_position": text_position},
+            video_path=f"/creations/{out_name}",
+        )
+        jobs[job_id]['result'] = {"video_url": f"/creations/{out_name}", "creation": creation}
+        jobs[job_id]['status'] = 'completed'
+    except Exception as e:
+        log(f"Error: {e}")
+        jobs[job_id]['status'] = 'failed'
+    finally:
+        for p in (demo_path, avatar_video_path):
+            if p and p.startswith(UPLOAD_DIR) and os.path.exists(p):
+                os.remove(p)
+
+
+@app.post("/api/compose/hook-demo")
+async def api_compose_hook_demo(
+    background_tasks: BackgroundTasks,
+    hook_text: str = Form(...),
+    style: str = Form("preroll"),
+    cta_text: str = Form(""),
+    title: str = Form(""),
+    use_mock: str = Form("false"),
+    avatar_image: str = Form(""),          # web path, e.g. /creations/avatars/look_x.png
+    use_mock_avatar_video: str = Form("false"),  # debug: mocks/mock-reaction.mp4 as avatar clip
+    text_style: str = Form("box"),         # box | outline
+    text_position: str = Form("center"),   # top | center | bottom
+    demo: Optional[UploadFile] = File(None),
+    avatar_video: Optional[UploadFile] = File(None),
+):
+    mock = use_mock.lower() == "true"
+    demo_path = ""
+    if not mock:
+        if demo is None:
+            raise HTTPException(status_code=400, detail="Upload demo footage or set use_mock=true")
+        demo_path = os.path.join(UPLOAD_DIR, f"demo_{uuid.uuid4().hex}_{demo.filename}")
+        with open(demo_path, "wb") as f:
+            shutil.copyfileobj(demo.file, f)
+
+    avatar_image_path = None
+    if avatar_image.startswith("/creations/avatars/"):
+        candidate = os.path.join("creations", "avatars", os.path.basename(avatar_image))
+        if os.path.exists(candidate):
+            avatar_image_path = candidate
+
+    avatar_video_path = None
+    if avatar_video is not None:
+        avatar_video_path = os.path.join(UPLOAD_DIR, f"avatar_{uuid.uuid4().hex}_{avatar_video.filename}")
+        with open(avatar_video_path, "wb") as f:
+            shutil.copyfileobj(avatar_video.file, f)
+    elif use_mock_avatar_video.lower() == "true":
+        avatar_video_path = os.path.join(MOCKS_DIR, "mock-reaction.mp4")
+
+    job_id = uuid.uuid4().hex[:12]
+    jobs[job_id] = {'status': 'queued', 'logs': [f"Compose job {job_id} queued."], 'result': None}
+    background_tasks.add_task(_run_compose_job, job_id, demo_path, hook_text, style, cta_text, mock, title,
+                              avatar_image_path, avatar_video_path, text_style, text_position)
+    return {"job_id": job_id, "status": "queued"}
+
+
+# ---- Slideshows ------------------------------------------------------
+
+class SlideshowAutofillRequest(BaseModel):
+    template_key: str
+    niche: str
+    mock: Optional[bool] = False
+
+
+@app.post("/api/slideshow/autofill")
+async def api_slideshow_autofill(req: SlideshowAutofillRequest, x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    if get_template(req.template_key) is None:
+        raise HTTPException(status_code=404, detail="Unknown template")
+    try:
+        slots = await asyncio.to_thread(autofill_slots, x_gemini_key, req.template_key, req.niche, _brand_dict(), bool(req.mock))
+        return {"slots": slots}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SlideshowRenderRequest(BaseModel):
+    template_key: str
+    slots: dict
+    title: Optional[str] = ""
+    character_image: Optional[str] = ""   # web path, e.g. /creations/avatars/look_x.png
+
+
+@app.post("/api/slideshow/render")
+async def api_slideshow_render(req: SlideshowRenderRequest):
+    template = get_template(req.template_key)
+    if template is None or template["kind"] != "slideshow":
+        raise HTTPException(status_code=404, detail="Unknown slideshow template")
+    base = f"{req.template_key}_{uuid.uuid4().hex[:10]}"
+    char_img = None
+    if (req.character_image or "").startswith("/creations/avatars/"):
+        candidate = os.path.join("creations", "avatars", os.path.basename(req.character_image))
+        if os.path.exists(candidate):
+            char_img = candidate
+    try:
+        pngs, mp4 = await asyncio.to_thread(render_slideshow, req.template_key, req.slots, CREATIONS_DIR, base, char_img)
+        image_urls = [f"/creations/{os.path.basename(p)}" for p in pngs]
+        video_url = f"/creations/{os.path.basename(mp4)}"
+        creation = _save_creation(
+            kind=req.template_key, title=req.title or req.slots.get("title", ""),
+            template_key=req.template_key, slots=req.slots,
+            video_path=video_url, image_paths=image_urls,
+        )
+        return {"images": image_urls, "video_url": video_url, "creation": creation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---- Library ---------------------------------------------------------
+
+@app.get("/api/library")
+async def api_library():
+    with get_session() as s:
+        rows = s.query(Creation).order_by(Creation.created_at.desc()).limit(200).all()
+        return {"creations": [r.to_dict() for r in rows]}
+
+
+@app.delete("/api/library/{creation_id}")
+async def api_library_delete(creation_id: str):
+    with get_session() as s:
+        row = s.get(Creation, creation_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Not found")
+        for web_path in [row.video_path] + json.loads(row.image_paths_json or "[]"):
+            if web_path.startswith("/creations/"):
+                fp = os.path.join(CREATIONS_DIR, os.path.basename(web_path))
+                if os.path.exists(fp):
+                    os.remove(fp)
+        s.delete(row)
+        s.commit()
+    return {"ok": True}
+
+
+# ---- Brand profile ---------------------------------------------------
+
+class BrandRequest(BaseModel):
+    name: str
+    tagline: Optional[str] = ""
+    app_store_url: Optional[str] = ""
+    website_url: Optional[str] = ""
+    cta_text: Optional[str] = ""
+    niche: Optional[str] = ""
+
+
+@app.get("/api/brand")
+async def api_brand_get():
+    return {"brand": _brand_dict()}
+
+
+@app.post("/api/brand")
+async def api_brand_set(req: BrandRequest):
+    with get_session() as s:
+        row = s.query(BrandProfile).first()
+        if row is None:
+            row = BrandProfile()
+            s.add(row)
+        row.name = req.name
+        row.tagline = req.tagline or ""
+        row.app_store_url = req.app_store_url or ""
+        row.website_url = req.website_url or ""
+        row.cta_text = req.cta_text or ""
+        row.niche = req.niche or ""
+        s.commit()
+        return {"brand": row.to_dict()}
+
+
+# ---- Scheduling (persistent, via Upload-Post scheduled_date) ---------
+
+class ScheduleRequest(BaseModel):
+    creation_id: str
+    platforms: List[str]
+    scheduled_at: str            # ISO-8601, future
+    timezone: Optional[str] = "UTC"
+    title: Optional[str] = None
+    api_key: Optional[str] = None   # Upload-Post key (omit with mock=true)
+    user_id: Optional[str] = None
+    mock: Optional[bool] = False
+
+
+@app.get("/api/schedule")
+async def api_schedule_list():
+    with get_session() as s:
+        rows = s.query(ScheduledPost).order_by(ScheduledPost.scheduled_at.asc()).limit(300).all()
+        return {"scheduled": [r.to_dict() for r in rows]}
+
+
+@app.post("/api/schedule")
+async def api_schedule_create(req: ScheduleRequest):
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        creation_dict = creation.to_dict()
+
+    final_title = req.title or creation_dict["title"] or "ClipZoo post"
+    upload_ref = "mock"
+
+    if not req.mock:
+        if not (req.api_key and req.user_id):
+            raise HTTPException(status_code=400, detail="api_key and user_id required (or set mock=true)")
+        if not creation_dict["video_path"].startswith("/creations/"):
+            raise HTTPException(status_code=400, detail="Creation has no schedulable video")
+        file_path = os.path.join(CREATIONS_DIR, os.path.basename(creation_dict["video_path"]))
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Video file missing")
+
+        data_payload = {
+            "user": req.user_id,
+            "title": final_title,
+            "platform[]": req.platforms,
+            "async_upload": "true",
+            "scheduled_date": req.scheduled_at,
+            "timezone": req.timezone or "UTC",
+        }
+        if "tiktok" in req.platforms:
+            data_payload["tiktok_title"] = final_title
+        if "instagram" in req.platforms:
+            data_payload["instagram_title"] = final_title
+            data_payload["media_type"] = "REELS"
+        if "youtube" in req.platforms:
+            data_payload["youtube_title"] = final_title
+            data_payload["privacyStatus"] = "public"
+
+        with open(file_path, "rb") as f:
+            files = {"video": (os.path.basename(file_path), f.read(), "video/mp4")}
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post("https://api.upload-post.com/api/upload",
+                                   headers={"Authorization": f"Apikey {req.api_key}"},
+                                   data=data_payload, files=files)
+        if response.status_code not in (200, 201, 202):
+            raise HTTPException(status_code=response.status_code, detail=f"Upload-Post error: {response.text}")
+        upload_ref = response.text[:2000]
+
+    with get_session() as s:
+        row = ScheduledPost(
+            creation_id=req.creation_id, title=final_title,
+            platforms_json=json.dumps(req.platforms),
+            scheduled_at=req.scheduled_at, timezone_name=req.timezone or "UTC",
+            upload_post_ref=upload_ref, status="scheduled",
+        )
+        s.add(row)
+        c = s.get(Creation, req.creation_id)
+        if c:
+            c.status = "scheduled"
+        s.commit()
+        return {"scheduled": row.to_dict()}
+
+
+@app.delete("/api/schedule/{post_id}")
+async def api_schedule_cancel(post_id: str):
+    with get_session() as s:
+        row = s.get(ScheduledPost, post_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Not found")
+        row.status = "canceled"
+        s.commit()
+    return {"ok": True}
+
+
+# =====================================================================
+# ClipZoo Characters — reusable AI personas (ReelFarm-style):
+# identity → Gemini portrait → consistent "looks" via reference image.
+# =====================================================================
+from db import Character, CharacterLook
+from characters import (generate_portrait, generate_look, random_scene,
+                        ATTRIBUTE_SCHEMA, build_portrait_prompt)
+
+
+def _character_dict(session, char):
+    looks = [l.to_dict() for l in session.query(CharacterLook)
+             .filter(CharacterLook.character_id == char.id)
+             .order_by(CharacterLook.created_at.desc()).all()]
+    return char.to_dict(looks=looks)
+
+
+@app.get("/api/characters/schema")
+async def api_characters_schema():
+    return {"schema": ATTRIBUTE_SCHEMA, "random_scene": random_scene()}
+
+
+@app.get("/api/characters")
+async def api_characters_list():
+    with get_session() as s:
+        chars = s.query(Character).order_by(Character.created_at.desc()).all()
+        return {"characters": [_character_dict(s, c) for c in chars]}
+
+
+class CharacterCreateRequest(BaseModel):
+    name: str
+    attributes: dict
+    mock: Optional[bool] = False
+
+
+@app.post("/api/characters")
+async def api_characters_create(req: CharacterCreateRequest, x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    out_name = f"portrait_{uuid.uuid4().hex[:10]}.png"
+    try:
+        portrait = await asyncio.to_thread(generate_portrait, x_gemini_key, req.attributes, out_name, bool(req.mock))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Portrait generation failed: {e}")
+    with get_session() as s:
+        char = Character(name=req.name or "New character",
+                         attributes_json=json.dumps(req.attributes or {}),
+                         portrait_path=portrait)
+        s.add(char)
+        s.commit()
+        return {"character": _character_dict(s, char)}
+
+
+class CharacterUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    attributes: Optional[dict] = None
+    regenerate_portrait: Optional[bool] = False
+    mock: Optional[bool] = False
+
+
+@app.patch("/api/characters/{char_id}")
+async def api_characters_update(char_id: str, req: CharacterUpdateRequest, x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    with get_session() as s:
+        char = s.get(Character, char_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        if req.name is not None:
+            char.name = req.name
+        if req.attributes is not None:
+            char.attributes_json = json.dumps(req.attributes)
+        s.commit()
+        attributes = json.loads(char.attributes_json or "{}")
+
+    if req.regenerate_portrait:
+        if not req.mock and not x_gemini_key:
+            raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+        out_name = f"portrait_{uuid.uuid4().hex[:10]}.png"
+        try:
+            portrait = await asyncio.to_thread(generate_portrait, x_gemini_key, attributes, out_name, bool(req.mock))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Portrait generation failed: {e}")
+        with get_session() as s:
+            char = s.get(Character, char_id)
+            char.portrait_path = portrait
+            s.commit()
+
+    with get_session() as s:
+        return {"character": _character_dict(s, s.get(Character, char_id))}
+
+
+@app.delete("/api/characters/{char_id}")
+async def api_characters_delete(char_id: str):
+    with get_session() as s:
+        char = s.get(Character, char_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        looks = s.query(CharacterLook).filter(CharacterLook.character_id == char_id).all()
+        for web_path in [char.portrait_path] + [l.image_path for l in looks]:
+            if web_path and web_path.startswith("/creations/avatars/"):
+                fp = os.path.join("creations", "avatars", os.path.basename(web_path))
+                if os.path.exists(fp):
+                    os.remove(fp)
+        for l in looks:
+            s.delete(l)
+        s.delete(char)
+        s.commit()
+    return {"ok": True}
+
+
+class LookRequest(BaseModel):
+    prompt: str
+    mock: Optional[bool] = False
+
+
+@app.post("/api/characters/{char_id}/looks")
+async def api_characters_add_look(char_id: str, req: LookRequest, x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    with get_session() as s:
+        char = s.get(Character, char_id)
+        if not char:
+            raise HTTPException(status_code=404, detail="Character not found")
+        portrait_path = char.portrait_path
+    out_name = f"look_{char_id[:8]}_{uuid.uuid4().hex[:8]}.png"
+    try:
+        image_path = await asyncio.to_thread(generate_look, x_gemini_key, portrait_path, req.prompt, out_name, bool(req.mock))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Look generation failed: {e}")
+    with get_session() as s:
+        look = CharacterLook(character_id=char_id, prompt=req.prompt[:500], image_path=image_path)
+        s.add(look)
+        s.commit()
+        return {"look": look.to_dict()}
+
+
+@app.delete("/api/characters/{char_id}/looks/{look_id}")
+async def api_characters_delete_look(char_id: str, look_id: str):
+    with get_session() as s:
+        look = s.get(CharacterLook, look_id)
+        if not look or look.character_id != char_id:
+            raise HTTPException(status_code=404, detail="Look not found")
+        if look.image_path.startswith("/creations/avatars/"):
+            fp = os.path.join("creations", "avatars", os.path.basename(look.image_path))
+            if os.path.exists(fp):
+                os.remove(fp)
+        s.delete(look)
+        s.commit()
+    return {"ok": True}

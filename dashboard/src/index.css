@@ -6,36 +6,37 @@
 @layer base {
   /* ---- Design tokens (light is the default theme). See STYLE_GUIDE.md ---- */
   :root {
-    /* Surfaces form a 3-step hierarchy: sidebar is the GRAYEST, the main canvas is
+    /* ChatGPT-light-style neutrals: PURE grays (no green tint), calm and content-first.
+       Surfaces form a 3-step hierarchy: sidebar is the GRAYEST, the main canvas is
        lighter, and cards are white so they lift off the canvas. */
-    --background: 150 18% 98%;       /* main content canvas — near-white */
-    --surface: 150 12% 94%;          /* sidebar / side panels — light gray (grayer than canvas) */
+    --background: 0 0% 99%;          /* main content canvas — near-white */
+    --surface: 0 0% 96.5%;           /* sidebar / side panels — light gray (grayer than canvas) */
     --card: 0 0% 100%;               /* cards, modals, inputs — white */
-    --muted: 150 12% 91%;            /* wells, hover surfaces (darker than sidebar so hover reads) */
-    --muted-foreground: 155 12% 36%; /* secondary text */
-    --foreground: 215 28% 12%;       /* primary text — near-black */
-    --border: 150 14% 87%;           /* borders & dividers */
-    --primary: 130 85% 70%;          /* mint brand — saturated spring-mint (~#6EF882) */
-    --primary-hover: 132 70% 58%;    /* primary button hover (deeper) */
-    --primary-foreground: 140 80% 10%; /* deep green text/icons ON mint */
-    --primary-strong: 138 68% 29%;   /* mint-as-text / links / active nav on light */
-    --ring: 132 72% 54%;             /* focus ring */
+    --muted: 0 0% 93.5%;             /* wells, hover surfaces (darker than sidebar so hover reads) */
+    --muted-foreground: 0 0% 42%;    /* secondary text */
+    --foreground: 0 0% 8%;           /* primary text — near-black (#141414) */
+    --border: 0 0% 89%;              /* borders & dividers */
+    --primary: 107 34% 55%;          /* brand leaf green (~#6DB364) */
+    --primary-hover: 107 36% 47%;    /* primary button hover (deeper) */
+    --primary-foreground: 110 45% 10%; /* deep green text/icons ON green (white fails AA on #6DB364) */
+    --primary-strong: 110 42% 30%;   /* green-as-text / links / active nav on light (AA on white) */
+    --ring: 107 34% 48%;             /* focus ring */
   }
 
   /* Dark theme scaffold — add `class="dark"` on <html> to flip. */
   .dark {
-    --background: 215 28% 9%;
-    --surface: 215 24% 13%;
-    --card: 215 24% 12%;
-    --muted: 215 20% 18%;
-    --muted-foreground: 215 12% 65%;
-    --foreground: 150 20% 96%;
-    --border: 215 18% 22%;
-    --primary: 130 80% 65%;
-    --primary-hover: 132 70% 58%;
-    --primary-foreground: 140 80% 9%;
-    --primary-strong: 135 65% 60%;
-    --ring: 132 72% 50%;
+    --background: 0 0% 7%;
+    --surface: 0 0% 11%;
+    --card: 0 0% 10%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 64%;
+    --foreground: 0 0% 96%;
+    --border: 0 0% 20%;
+    --primary: 107 34% 55%;
+    --primary-hover: 107 36% 62%;
+    --primary-foreground: 110 45% 10%;
+    --primary-strong: 107 40% 62%;
+    --ring: 107 34% 52%;
   }
 
   body {

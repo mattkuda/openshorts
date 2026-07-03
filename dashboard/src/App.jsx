@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown } from 'lucide-react';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
@@ -11,6 +11,11 @@ import ThumbnailStudio from './components/ThumbnailStudio';
 import SaaShortsTab from './components/SaaShortsTab';
 import UGCGallery from './components/UGCGallery';
 import ScheduleWeekModal from './components/ScheduleWeekModal';
+import CreateTab from './components/CreateTab';
+import CharactersTab from './components/CharactersTab';
+import LibraryTab from './components/LibraryTab';
+import CalendarTab from './components/CalendarTab';
+import BrandProfileSettings from './components/BrandProfileSettings';
 import { getApiUrl } from './config';
 
 // Enhanced "Encryption" using XOR + Base64 with a Salt
@@ -166,7 +171,11 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [logsVisible, setLogsVisible] = useState(true);
   const [processingMedia, setProcessingMedia] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, settings
+  const [activeTab, setActiveTab] = useState('create'); // create, library, calendar, saasshorts, ugc-gallery, settings (+ deferred tabs)
+  const [brand, setBrand] = useState(null); // founder's app profile (pre-fills templates)
+  // Keys served from the backend's .env.local — used only as fallbacks when the
+  // Settings UI (localStorage) is empty, and never persisted to localStorage.
+  const [envKeys, setEnvKeys] = useState({ gemini: '', upload_post: '', elevenlabs: '', fal: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('aishorts_sidebar_collapsed') === '1');
   const toggleSidebar = () => setSidebarCollapsed((prev) => {
     const next = !prev;
@@ -253,38 +262,64 @@ function App() {
     }
   }, [jobId, status, results, activeTab]);
 
+  // Persistence guards: values that came from .env.local (envKeys) are NOT written
+  // to localStorage, so removing them from the file actually removes them.
   useEffect(() => {
     // Encrypt Gemini Key too for consistency if desired, but user asked specifically about Social integration not saving well.
     // For now keeping gemini plain for compatibility unless requested.
-    if (apiKey) localStorage.setItem('gemini_key', apiKey);
-  }, [apiKey]);
+    if (apiKey && apiKey !== envKeys.gemini) localStorage.setItem('gemini_key', apiKey);
+  }, [apiKey, envKeys.gemini]);
 
   useEffect(() => {
-    if (uploadPostKey) {
+    if (uploadPostKey && uploadPostKey !== envKeys.upload_post) {
       localStorage.setItem('uploadPostKey_v3', encrypt(uploadPostKey));
     }
     if (uploadUserId) {
       localStorage.setItem('uploadUserId', uploadUserId);
     }
-  }, [uploadPostKey, uploadUserId]);
+  }, [uploadPostKey, uploadUserId, envKeys.upload_post]);
 
   useEffect(() => {
-    if (elevenLabsKey) {
+    if (elevenLabsKey && elevenLabsKey !== envKeys.elevenlabs) {
       localStorage.setItem('elevenLabsKey_v1', encrypt(elevenLabsKey));
     }
-  }, [elevenLabsKey]);
+  }, [elevenLabsKey, envKeys.elevenlabs]);
 
   useEffect(() => {
-    if (falKey) {
+    if (falKey && falKey !== envKeys.fal) {
       localStorage.setItem('falKey_v1', encrypt(falKey));
     }
-  }, [falKey]);
+  }, [falKey, envKeys.fal]);
 
   useEffect(() => {
     if (uploadPostKey && userProfiles.length === 0) {
       fetchUserProfiles();
     }
   }, [uploadPostKey]);
+
+  // Load the brand profile (Evex etc.) once — templates pre-fill from it.
+  useEffect(() => {
+    fetch(getApiUrl('/api/brand'))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.brand) setBrand(d.brand); })
+      .catch(() => { /* backend not up yet — settings will still work */ });
+  }, []);
+
+  // .env.local fallbacks: fill any key the user hasn't set in Settings.
+  // Settings UI wins because non-empty state is never overwritten here.
+  useEffect(() => {
+    fetch(getApiUrl('/api/config/keys'))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.keys) return;
+        setEnvKeys(d.keys);
+        if (d.keys.gemini) setApiKey((prev) => prev || d.keys.gemini);
+        if (d.keys.upload_post) setUploadPostKey((prev) => prev || d.keys.upload_post);
+        if (d.keys.elevenlabs) setElevenLabsKey((prev) => prev || d.keys.elevenlabs);
+        if (d.keys.fal) setFalKey((prev) => prev || d.keys.fal);
+      })
+      .catch(() => { /* backend not up — fall back to Settings-entered keys */ });
+  }, []);
 
   useEffect(() => {
     let interval;
@@ -411,12 +446,18 @@ function App() {
   // --- UI Components ---
 
   const Sidebar = () => {
+    // Enabled = actually built out for the "generate your UGC marketing" flow.
+    // Disabled = deferred / out of scope for now (kept visible so the roadmap reads).
     const navItems = [
-      { id: 'dashboard', label: 'Clip Generator', icon: LayoutDashboard },
-      { id: 'saasshorts', label: 'AI Shorts', icon: Sparkles },
-      { id: 'ai-agent', label: 'AI Agent', icon: Bot },
+      { id: 'create', label: 'Create', icon: Clapperboard },
+      { id: 'characters', label: 'Characters', icon: Users },
+      { id: 'library', label: 'Library', icon: Library },
+      { id: 'calendar', label: 'Calendar', icon: Calendar },
+      { id: 'saasshorts', label: 'AI Actor Ads', icon: Sparkles },
       { id: 'ugc-gallery', label: 'UGC Gallery', icon: LayoutGrid },
-      { id: 'thumbnails', label: 'YouTube Studio', icon: Image },
+      { id: 'dashboard', label: 'Clip Generator', icon: LayoutDashboard, disabled: true },
+      { id: 'ai-agent', label: 'AI Agent', icon: Bot, disabled: true },
+      { id: 'thumbnails', label: 'YouTube Studio', icon: Image, disabled: true },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
 
@@ -462,8 +503,27 @@ function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-1">
-          {navItems.map(({ id, label, icon: Icon }) => {
+          {navItems.map(({ id, label, icon: Icon, disabled }) => {
             const active = activeTab === id;
+            if (disabled) {
+              return (
+                <div
+                  key={id}
+                  aria-disabled="true"
+                  title="Deferred — not part of the current focus"
+                  className="group relative w-full flex items-center gap-3 px-3 h-10 rounded-xl text-foreground/40 cursor-not-allowed select-none"
+                >
+                  <Icon size={20} className="shrink-0" />
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="font-medium text-sm whitespace-nowrap">{label}</span>
+                      <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted border border-border px-1.5 py-0.5 rounded-full">Soon</span>
+                    </>
+                  )}
+                  {sidebarCollapsed && tip(`${label} (soon)`)}
+                </div>
+              );
+            }
             return (
               <button
                 key={id}
@@ -607,10 +667,10 @@ function App() {
                 <span className="font-semibold">Required API keys missing.</span>{' '}
                 <span className="text-amber-700">
                   {!apiKey && !uploadPostKey
-                    ? 'Set your Gemini and Upload-Post API keys to use OpenShorts.'
+                    ? 'Set your Gemini and Upload-Post API keys to use ClipZoo.'
                     : !apiKey
-                      ? 'Set your Gemini API key to use OpenShorts.'
-                      : 'Set your Upload-Post API key to use OpenShorts.'}
+                      ? 'Set your Gemini API key to use ClipZoo.'
+                      : 'Set your Upload-Post API key to use ClipZoo.'}
                 </span>
               </div>
             </div>
@@ -650,6 +710,8 @@ function App() {
                 </div>
               </div>
               <KeyInput onKeySet={setApiKey} savedKey={apiKey} />
+
+              <BrandProfileSettings brand={brand} onSaved={setBrand} />
 
               <div className={`glass-panel p-6 mt-8 ${!uploadPostKey ? 'border-amber-500/30 ring-1 ring-amber-500/20' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
@@ -800,6 +862,33 @@ function App() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* View: Create — the "generate your UGC marketing" home */}
+          {activeTab === 'create' && (
+            <CreateTab
+              geminiApiKey={apiKey}
+              uploadPostKey={uploadPostKey}
+              uploadUserId={uploadUserId}
+              debug={debug}
+              brand={brand}
+              onOpenTab={setActiveTab}
+            />
+          )}
+
+          {/* View: Characters */}
+          {activeTab === 'characters' && (
+            <CharactersTab geminiApiKey={apiKey} debug={debug} />
+          )}
+
+          {/* View: Library */}
+          {activeTab === 'library' && (
+            <LibraryTab uploadPostKey={uploadPostKey} uploadUserId={uploadUserId} debug={debug} />
+          )}
+
+          {/* View: Calendar */}
+          {activeTab === 'calendar' && (
+            <CalendarTab />
           )}
 
           {/* View: SaaS Shorts */}
@@ -1096,7 +1185,7 @@ function App() {
                   : 'Upload-Post API Key Required'}
             </h2>
             <p className="text-sm text-muted-foreground">
-              OpenShorts needs both a <strong className="text-foreground">Gemini</strong> API key and an <strong className="text-foreground">Upload-Post</strong> API key. Both have free tiers.
+              ClipZoo needs both a <strong className="text-foreground">Gemini</strong> API key and an <strong className="text-foreground">Upload-Post</strong> API key. Both have free tiers.
             </p>
 
             {/* Gemini block */}

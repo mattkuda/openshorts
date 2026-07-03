@@ -42,3 +42,4 @@ docs/
 | File | What it is |
 |---|---|
 | [`naming-ideas.md`](./naming-ideas.md) | Running list of app name candidates, the founder-starred shortlist, and web-verified top picks. |
+| [`api-keys.md`](./api-keys.md) | Every API key ClipZoo uses, with step-by-step generation links (Gemini, Upload-Post, ElevenLabs, fal.ai, Supabase, S3). |

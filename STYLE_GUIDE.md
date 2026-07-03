@@ -14,8 +14,8 @@ compose plain elements with Tailwind utility classes.
 
 - **Light, calm, content-first.** The video and the user's content are the subject; the UI
   is a quiet, low-contrast frame around it. Lots of white, soft borders, restrained shadows.
-- **Mint is the brand, used sparingly.** Mint signals "primary / active / brand." If
-  everything is mint, nothing is. Most of the UI is neutral; mint marks the one thing that
+- **Green is the brand, used sparingly.** Green signals "primary / active / brand." If
+  everything is green, nothing is. Most of the UI is neutral (pure grays, ChatGPT-light style); green marks the one thing that
   matters on a screen (primary action, active nav item).
 - **Tokens, not raw colors.** Never hardcode `text-zinc-400`, `bg-white/5`, or hex values in
   components. Use the semantic tokens below. This is what makes the theme consistent and a
@@ -45,27 +45,26 @@ white card on a white surface — it disappears.
 | `text-foreground` | near-black | primary text, headings, body |
 | `text-muted-foreground` | mid gray | secondary text, captions, placeholders, inactive icons |
 | `border-border` | light divider | all borders and dividers |
-| `bg-primary` | **mint `#6EF882`** (saturated spring-mint) | primary button bg, active/brand fills |
-| `text-primary-foreground` | deep green | text/icons **on** a mint (`bg-primary`) surface |
-| `bg-primary-hover` | deeper mint | primary button `:hover` |
-| `text-primary-strong` | readable mint-green | mint **as text** — links, active nav labels/icons |
-| `ring-ring` | mint focus | focus rings |
+| `bg-primary` | **leaf green `#6DB364`** (muted brand green) | primary button bg, active/brand fills |
+| `text-primary-foreground` | deep green | text/icons **on** a green (`bg-primary`) surface |
+| `bg-primary-hover` | deeper green | primary button `:hover` |
+| `text-primary-strong` | readable deep green | green **as text** — links, active nav labels/icons |
+| `ring-ring` | green focus | focus rings |
 
 **The single most important color rule:**
 
-> `#6EF882` is a light, saturated mint. It is **never** a text color on white and **never** carries
-> white text. Mint-on-white text fails contrast.
+> `#6DB364` is a mid-lightness leaf green. It is **never** a body-text color on white and **never**
+> carries white text (white on `#6DB364` is ~2.5:1 — fails AA). Green-on-white text fails contrast too.
 >
-> - Mint as a **fill** (button, badge, active pill) → pair with **dark** text
+> - Green as a **fill** (button, badge, active pill) → pair with **dark** text
 >   (`text-primary-foreground` or `text-foreground`).
-> - Mint as **text/icon** on white → use **`text-primary-strong`**, never `text-primary`.
+> - Green as **text/icon** on white → use **`text-primary-strong`**, never `text-primary`.
 
 Target **WCAG AA** (4.5:1 body, 3:1 large text / UI). When in doubt, darken.
 
 ### Adding or changing a token
 Change the value in **one place**: the `:root` block in `index.css` (and its `.dark`
-counterpart). Don't add new hardcoded colors to components — add a token. The mint is a
-placeholder and will change; that change should be a single edit to `--primary*`.
+counterpart). Don't add new hardcoded colors to components — add a token. The brand green (`#6DB364`, sampled from the logo) lives only in `--primary*` — any future change is a single edit there.
 
 ---
 
@@ -122,13 +121,13 @@ card directly inside a card — switch the inner grouping to `bg-muted` wells or
 - *Inset well* (a sub-region inside a card): `bg-muted border border-border rounded-lg p-3`.
 
 ### Buttons
-- **Primary** (one per view — the main action): mint fill, dark text.
+- **Primary** (one per view — the main action): green fill, dark text.
   `bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl px-5 py-2.5 font-medium transition-colors` — or use the `.btn-primary` class in `index.css`.
 - **Secondary** (supporting action): `bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5`.
 - **Ghost** (tertiary / icon buttons / toolbar): `text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg`.
 - **Destructive** (delete/irreversible): `bg-red-500 hover:bg-red-600 text-white`. Status
   colors (red/amber/green) stay on the standard Tailwind palette — they read fine on light
-  and shouldn't be mint.
+  and shouldn't be brand green.
 
 One primary per screen. If you have two "primary-looking" buttons, one of them is secondary.
 
@@ -136,7 +135,7 @@ One primary per screen. If you have two "primary-looking" buttons, one of them i
 Use the `.input-field` class (defined in `index.css`):
 `bg-card border border-border rounded-xl … focus:border-primary focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground`.
 Labels: `text-xs font-bold uppercase tracking-wider text-muted-foreground`. Focus is always
-the mint ring — don't introduce per-input blue/violet focus colors.
+the green ring — don't introduce per-input blue/violet focus colors.
 
 ### Badges / pills
 Small status/tag chips: `text-xs font-medium px-2 py-0.5 rounded-full`.
@@ -164,7 +163,7 @@ in `localStorage` (`aishorts_sidebar_collapsed`); toggle is the `PanelLeft` icon
   not muted gray. Inactive nav is the one place we go darker than `text-muted-foreground`, so
   the items read clearly against the gray sidebar (don't drop nav labels to `muted-foreground`).
 - Collapsed: hide labels, center icons, show a hover tooltip (the `tip()` helper — no Radix).
-- All nav active states are **unified to mint** — no per-tab category colors.
+- All nav active states are **unified to the brand green** — no per-tab category colors.
 
 ### Modals & overlays
 - Backdrop: `fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm` (a dark scrim is correct
@@ -195,11 +194,11 @@ Every interactive element needs visible states:
 - Use semantic token classes (`text-foreground`, `bg-muted`, `border-border`, `bg-primary`).
 - Keep one primary action per screen.
 - Reach for `bg-muted` wells instead of nested cards.
-- Use `text-primary-strong` whenever mint needs to be *readable text*.
+- Use `text-primary-strong` whenever green needs to be *readable text*.
 
 **Don't**
 - Hardcode `text-white`, `text-zinc-*`, `bg-white/x`, `border-white/x`, or hex colors in
   components. (These were the dark-theme idiom; they're gone.)
-- Put `text-primary` (raw mint) on a white background.
-- Add per-component accent colors (violet/blue/emerald) for brand emphasis — that's mint's job.
+- Put `text-primary` (raw green) on a white background.
+- Add per-component accent colors (violet/blue/emerald) for brand emphasis — that's the brand green's job.
 - Stack heavy dark shadows/glows; light depth is borders + small shadows.

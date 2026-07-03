@@ -34,7 +34,7 @@ export default function DebugMenu({ debug, setDebug }) {
                         <Toggle checked={debug.mockAuth} onChange={(v) => setDebug({ mockAuth: v })}
                             label="Mock auth" hint="Treat API keys as set — hides the missing-keys warnings." />
                         <Toggle checked={debug.mockAI} onChange={(v) => setDebug({ mockAI: v })}
-                            label="Mock AI responses" hint="Use canned AI output instead of calling Gemini." />
+                            label="Mock AI + mock videos" hint="Canned AI output, and the server uses mocks/mock-ai-generation.mp4 as demo footage — verify text overlays without burning credits." />
                         <Toggle checked={debug.mockProcessing} onChange={(v) => setDebug({ mockProcessing: v })}
                             label="Mock processing" hint="Skip the backend; return a fake completed job." />
                     </div>

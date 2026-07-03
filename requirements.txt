@@ -10,6 +10,9 @@ python-dotenv==1.2.2
 mediapipe==0.10.14
 boto3==1.43.4
 
+sqlalchemy==2.0.41
+psycopg2-binary==2.9.10
+
 fastapi==0.136.1
 uvicorn==0.46.0
 python-multipart==0.0.27

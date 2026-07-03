@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ClipZoo — Strategy &amp; Roadmap</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #a1a1aa;
+    --heading: #fff;
+    --line: rgba(255,255,255,0.1);
+    --surface: #0a0a0a;
+    --accent: #fff;
+    --mint: #6EF882;
+    --comment: #7ee787;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 21px; font-weight: 700; margin: 56px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  h3 { color: var(--heading); font-size: 16px; font-weight: 600; margin: 28px 0 6px; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 680px; }
+  strong { color: #d4d4d8; }
+  h1 strong, h2 strong, h3 strong { color: inherit; }
+  a { color: var(--comment); }
+
+  .tldr {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--mint);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-top: 28px;
+  }
+  .tldr p:last-child { margin-bottom: 0; }
+
+  .pill {
+    display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.07); color: var(--fg); margin-right: 6px; margin-top: 6px;
+    border: 1px solid var(--line);
+  }
+  .pill.green { color: var(--mint); border-color: rgba(110,248,130,0.35); }
+  .pill.red { color: #f87171; border-color: rgba(248,113,113,0.35); }
+  .pill.amber { color: #fbbf24; border-color: rgba(251,191,36,0.35); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; vertical-align: top; }
+  th { font-weight: 600; color: rgba(255,255,255,0.55); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td strong { color: var(--heading); }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; line-height: 1.55;
+    margin: 12px 0;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; color: #d4d4d8; }
+  pre code { background: transparent; padding: 0; }
+  .cmt { color: var(--comment); }
+
+  details {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0;
+    background: var(--surface);
+  }
+  details[open] { padding-bottom: 16px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--heading); }
+
+  .mock {
+    background: #F7F8F7;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    padding: 18px;
+    margin: 16px 0 8px;
+  }
+  .mock svg { width: 100%; height: auto; display: block; }
+  .mock-cap { font-size: 12.5px; color: rgba(255,255,255,0.45); margin: 6px 2px 20px; }
+
+  .phase-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .phase-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 30px; height: 30px; border-radius: 8px; font-weight: 800; font-size: 15px;
+    background: var(--mint); color: #05300f; padding: 0 8px;
+  }
+
+  ul, ol { margin: 8px 0 16px; padding-left: 22px; }
+  li { margin: 5px 0; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  }
+  .card h4 { margin: 0 0 6px; color: var(--heading); font-size: 14px; }
+  .card p { font-size: 13.5px; margin-bottom: 0; }
+
+  /* decisions */
+  .q-help { font-size: 14px; margin: 2px 0 14px; }
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .option {
+    text-align: left; font: inherit; color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .option:hover { border-color: rgba(255,255,255,0.35); }
+  .option.selected { border-color: var(--mint); background: rgba(110,248,130,0.06); box-shadow: 0 0 0 1px var(--mint) inset; }
+  .opt-title { color: var(--heading); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .opt-title::before {
+    content: ""; width: 14px; height: 14px; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 999px; flex: 0 0 auto; transition: background 120ms ease, border-color 120ms ease;
+  }
+  .decision[data-select="multi"] .opt-title::before { border-radius: 4px; }
+  .option.selected .opt-title::before { background: var(--mint); border-color: var(--mint); box-shadow: inset 0 0 0 3px #000; }
+  .opt-desc { font-size: 13px; }
+  .rec { font-size: 11px; font-weight: 700; color: var(--mint); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  textarea {
+    width: 100%; min-height: 120px; resize: vertical; font: inherit; color: var(--heading);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-top: 4px;
+  }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(110,248,130,0.5); }
+
+  .bar {
+    position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px;
+    background: linear-gradient(to top, #000 70%, rgba(0,0,0,0));
+    display: flex; gap: 12px; align-items: center;
+  }
+  button.action {
+    font: inherit; font-weight: 700; background: var(--mint); color: #05300f;
+    border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--heading); border: 1px solid var(--line); font: inherit; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  pre#out { display: none; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ClipZoo — Strategy &amp; Roadmap</h1>
+  <p class="lede">Where to take the app, grounded in three inputs: the 10-competitor research, an audit of what ClipZoo's code can actually do today, and fresh research on the TikTok/IG/YouTube posting-API question. The strategy is simple: <strong>build the machine that markets Evex, and sell that machine to founders like you.</strong></p>
+  <p><span class="pill">July 2026</span><span class="pill">Customer #0: Evex</span><span class="pill green">Positioning: "Generate your UGC marketing"</span></p>
+
+  <div class="tldr">
+    <p><strong>TL;DR.</strong> Don't build a general-purpose AI video platform — that race is lost to HeyGen/CapCut. Niche down to <strong>"UGC marketing for app founders"</strong>: a founder drops in their app demo footage + app store link, and ClipZoo generates post-ready TikToks in <em>proven formats</em> (hook + demo, listicle slideshows, before/after). Your instinct to start with "generate" and defer "automate" is right — and the good news from the API research is that when you do want scheduling, <strong>Upload-Post (already integrated) supports a <code>scheduled_date</code> param today</strong>; you never need to touch TikTok's brutal native API. The roadmap: <strong>P1 Hook+Demo composer → P2 Format templates (listicle slideshows) → P3 Content library (first database) → P4 Calendar + scheduling.</strong> Every phase is validated by one metric: does it get Evex posts out faster?</p>
+    <p><span class="pill">P1: ~1–2 wks</span><span class="pill">P2: ~2–3 wks</span><span class="pill">P3: ~1–2 wks</span><span class="pill">P4: ~1–2 wks</span></p>
+  </div>
+
+  <h2>1 · The strategic call</h2>
+  <p>You said you're a little lost. Here's the compass: <strong>you are the customer.</strong> You have a real, painful, recurring job — marketing Evex — and no tool serves it well. That's not a limitation; per the competitor research it's exactly the wedge:</p>
+  <ul>
+    <li><strong>ReelFarm</strong> (closest to this vision) proves the demand for hook+demo videos and slideshows — but it's a TikTok-only "content farm" with browse-only inspiration, weak editing, and no campaign concept.</li>
+    <li><strong>Arcads</strong> ($110+/mo) generates great talking heads but is a <em>"generator, not an editor"</em> — users export to CapCut to add hooks, captions, CTAs. In-app editing is a confirmed gap.</li>
+    <li><strong>HeyGen / Higgsfield / CapCut</strong> are horizontal giants. Don't compete on avatar realism or editing depth. Borrow their patterns (one-character-many-looks, tap-to-edit text) when needed.</li>
+  </ul>
+  <p>So the positioning line, for now: <strong>"ClipZoo — generate your UGC marketing."</strong> Not "automate" — automation implies scheduling, accounts, and trust you don't have infrastructure for yet. Generation is the value; automation is the retention feature you add once generation works (P4).</p>
+
+  <div class="grid2">
+    <div class="card"><h4>Who it's for (v1)</h4><p>Indie founders &amp; small teams marketing a B2C app. They have demo footage and an app store listing; they don't have time, editing skills, or a UGC budget. Literally you + Evex.</p></div>
+    <div class="card"><h4>The promise</h4><p>Drop in your app demo → get a week of post-ready, proven-format vertical content in under 15 minutes. Editable text everywhere, no CapCut round-trip.</p></div>
+    <div class="card"><h4>The moat direction</h4><p>Formats-as-templates + your saved brand/products + (later) performance feedback. Competitors generate <em>clips</em>; ClipZoo learns your <em>app</em> and produces <em>campaigns</em>.</p></div>
+    <div class="card"><h4>The dogfood metric</h4><p>Evex ships ≥3 ClipZoo-made posts/week, each produced in &lt;15 min. If a phase doesn't move that metric, cut it.</p></div>
+  </div>
+
+  <h2>2 · What ClipZoo already has (more than you think)</h2>
+  <p>The code audit found real assets to build on — and confirmed exactly what's missing:</p>
+  <table>
+    <tr><th>Asset</th><th>Status</th><th>Notes</th></tr>
+    <tr><td><strong>Full UGC pipeline</strong> (<code>saasshorts.py</code>)</td><td><span class="pill green">exists</span></td><td>Web research → script (5 styles incl. comparison!) → AI actor (Flux) → voice (ElevenLabs) → talking head (Kling) → B-roll → composite. This is your Arcads-equivalent, already built.</td></tr>
+    <tr><td><strong>Hook text rendering</strong> (<code>hooks.py</code>)</td><td><span class="pill amber">partial</span></td><td>Renders styled hook text — but as an <em>overlay on top</em> of video. Your ask (hook card <em>stitched before</em> the demo) doesn't exist yet. Small delta: same renderer + FFmpeg concat.</td></tr>
+    <tr><td><strong>Social posting w/ scheduling param</strong></td><td><span class="pill amber">partial</span></td><td><code>/api/social/post</code> already passes <code>scheduled_date</code> + timezone to Upload-Post. There's even a ScheduleWeekModal UI. What's missing is <em>persistence</em> — nothing remembers what was scheduled.</td></tr>
+    <tr><td>Clip detection, subtitles, dubbing, effects, thumbnail studio</td><td><span class="pill green">exists</span></td><td>The original long-video→shorts pipeline. Keep; it becomes "Repurpose" alongside the new "Create" flows.</td></tr>
+    <tr><td><strong>Slideshow / carousel generation</strong></td><td><span class="pill red">missing</span></td><td>Nothing exists. This is P2's core build.</td></tr>
+    <tr><td><strong>Templates / saved formats</strong></td><td><span class="pill red">missing</span></td><td>No template concept anywhere. P2–P3.</td></tr>
+    <tr><td><strong>Database</strong></td><td><span class="pill red">missing</span></td><td>Everything is in-memory jobs + localStorage + optional S3. Fine for P1–P2; a blocker for library/calendar (P3–P4).</td></tr>
+  </table>
+
+  <h2>3 · Your TikTok scheduling question — answered</h2>
+  <p>You asked how hard TikTok API access + scheduling is. Short version: <strong>natively, brutal; through your existing Upload-Post integration, nearly free.</strong></p>
+  <table>
+    <tr><th>Path</th><th>Reality (researched July 2026)</th><th>Verdict</th></tr>
+    <tr><td><strong>Native TikTok Content Posting API</strong></td><td>Manual audit (2–6 weeks, rejections common). Until approved: every post forced <code>SELF_ONLY</code> (private), max 5 authorized users/24h. Even after approval, <strong>no native scheduling</strong> — you'd run your own cron.</td><td><span class="pill red">avoid</span></td></tr>
+    <tr><td><strong>Upload-Post (already integrated)</strong></td><td>Posts through <em>their</em> audited app — no audit for you. Supports <code>scheduled_date</code> (ISO-8601, up to 365 days out) across TikTok/IG/YT. From ~$16/mo.</td><td><span class="pill green">use this</span></td></tr>
+    <tr><td><strong>Blotato (fallback)</strong></td><td>Explicitly confirms customers skip TikTok's audit entirely. $29/mo. Swap in only if Upload-Post's TikTok posts don't go live publicly.</td><td><span class="pill">plan B</span></td></tr>
+    <tr><td>Instagram native</td><td>Business accounts only, 2–4 wk app review, ~100 posts/day, no native scheduling.</td><td><span class="pill red">avoid for now</span></td></tr>
+    <tr><td>YouTube native</td><td>Actually friendly: ~100 uploads/day free, native <code>publishAt</code> scheduling. Viable to build natively later if you want off aggregators.</td><td><span class="pill amber">later maybe</span></td></tr>
+  </table>
+  <p><strong>Implication for the roadmap:</strong> scheduling is not a research problem or an API-access problem. It's a persistence problem (ClipZoo forgets everything after 1 hour). That's why the calendar lands in P4, <em>after</em> P3 gives you a database.</p>
+
+  <h2>4 · The roadmap</h2>
+
+  <h3 class="phase-head"><span class="phase-num">P1</span> Hook + Demo composer <span class="pill">~1–2 weeks</span><span class="pill green">your clearest need</span></h3>
+  <p>The ReelFarm-style format you explicitly want: a bold, editable hook card that plays <em>before</em> (or over the first seconds of) your app demo footage, with captions and a CTA end-card. This is one new pipeline function plus one focused screen.</p>
+  <div class="mock">
+    <svg viewBox="0 0 820 330" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Inter, sans-serif">
+      <rect width="820" height="330" fill="#F7F8F7"/>
+      <!-- left: composer -->
+      <rect x="20" y="20" width="500" height="290" rx="12" fill="#fff" stroke="#E4E7E4"/>
+      <text x="40" y="52" font-size="15" font-weight="700" fill="#17181A">Hook + Demo</text>
+      <text x="40" y="80" font-size="10" font-weight="700" fill="#8A8F8A" letter-spacing="1">HOOK TEXT</text>
+      <rect x="40" y="90" width="460" height="44" rx="10" fill="#fff" stroke="#CFE9D2"/>
+      <text x="54" y="117" font-size="13" fill="#17181A">POV: you finally found a fitness app that plans for you 🤯</text>
+      <text x="40" y="160" font-size="10" font-weight="700" fill="#8A8F8A" letter-spacing="1">HOOK STYLE</text>
+      <rect x="40" y="170" width="105" height="34" rx="8" fill="#E9FDEB" stroke="#6EF882"/>
+      <text x="60" y="192" font-size="12" font-weight="600" fill="#0B7A2A">Pre-roll card</text>
+      <rect x="153" y="170" width="105" height="34" rx="8" fill="#fff" stroke="#E4E7E4"/>
+      <text x="170" y="192" font-size="12" fill="#8A8F8A">Overlay 0–3s</text>
+      <rect x="266" y="170" width="105" height="34" rx="8" fill="#fff" stroke="#E4E7E4"/>
+      <text x="290" y="192" font-size="12" fill="#8A8F8A">Greenscreen</text>
+      <text x="40" y="234" font-size="10" font-weight="700" fill="#8A8F8A" letter-spacing="1">DEMO FOOTAGE</text>
+      <rect x="40" y="244" width="220" height="46" rx="10" fill="#F2F4F2" stroke="#E4E7E4"/>
+      <text x="56" y="272" font-size="12" fill="#17181A">evex-demo-workout.mp4</text>
+      <rect x="270" y="244" width="150" height="46" rx="10" fill="#F2F4F2" stroke="#E4E7E4"/>
+      <text x="286" y="266" font-size="11" fill="#17181A">CTA end-card ✓</text>
+      <text x="286" y="281" font-size="10" fill="#8A8F8A">"Get Evex free"</text>
+      <rect x="428" y="244" width="72" height="46" rx="10" fill="#6EF882"/>
+      <text x="443" y="272" font-size="13" font-weight="700" fill="#05300f">Generate</text>
+      <!-- right: phone preview -->
+      <rect x="560" y="20" width="164" height="290" rx="18" fill="#000"/>
+      <rect x="568" y="28" width="148" height="274" rx="12" fill="#17181A"/>
+      <rect x="580" y="70" width="124" height="90" rx="8" fill="#fff"/>
+      <text x="592" y="100" font-size="12" font-weight="800" fill="#000">POV: you finally</text>
+      <text x="592" y="116" font-size="12" font-weight="800" fill="#000">found a fitness app</text>
+      <text x="592" y="132" font-size="12" font-weight="800" fill="#000">that plans for you</text>
+      <rect x="580" y="180" width="124" height="20" rx="4" fill="#6EF882" opacity="0.9"/>
+      <text x="600" y="194" font-size="10" font-weight="700" fill="#05300f">then your demo plays</text>
+      <text x="742" y="60" font-size="11" fill="#8A8F8A">9:16 live</text>
+      <text x="742" y="76" font-size="11" fill="#8A8F8A">preview</text>
+    </svg>
+  </div>
+  <p class="mock-cap">P1 composer: type the hook, pick the style, attach demo footage, generate. The hook text stays editable after generation — the anti-Arcads move.</p>
+  <ul>
+    <li><strong>Build:</strong> extend <code>hooks.py</code> to render a full-frame 9:16 hook card (reuse its PIL text renderer); new pipeline fn: hook card (2–3s) + demo clip + optional CTA end-card via FFmpeg concat; new <code>POST /api/compose/hook-demo</code>; new "Create" screen in the dashboard.</li>
+    <li><strong>Borrow:</strong> Gemini hook suggestions seeded from the app's store listing (reuse <code>saasshorts.py</code> research step) — ReelFarm's Hook Generator, but grounded in <em>your</em> product.</li>
+    <li><strong>Success:</strong> a real Evex post produced end-to-end in &lt;15 min, no CapCut.</li>
+  </ul>
+
+  <h3 class="phase-head"><span class="phase-num">P2</span> Format templates: listicle slideshows <span class="pill">~2–3 weeks</span></h3>
+  <p>Your "best fitness apps → Whoop, Aura, then Evex" idea is a <em>format template</em>: a fill-in-the-blanks structure that renders to a slideshow. Start with exactly two templates — <strong>Listicle / Good-Better-Best</strong> and <strong>Hook+Demo (from P1, saved as a template)</strong>. Before/after and greenscreen memes wait. This is how you avoid boiling the ocean: templates are data, so adding format #3 later is cheap.</p>
+  <div class="mock">
+    <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Inter, sans-serif">
+      <rect width="820" height="300" fill="#F7F8F7"/>
+      <rect x="20" y="20" width="430" height="260" rx="12" fill="#fff" stroke="#E4E7E4"/>
+      <text x="40" y="50" font-size="15" font-weight="700" fill="#17181A">Listicle slideshow</text>
+      <text x="200" y="50" font-size="11" fill="#8A8F8A">template: good-better-best</text>
+      <text x="40" y="78" font-size="10" font-weight="700" fill="#8A8F8A" letter-spacing="1">TITLE SLIDE</text>
+      <rect x="40" y="86" width="390" height="36" rx="8" fill="#fff" stroke="#CFE9D2"/>
+      <text x="52" y="109" font-size="12" fill="#17181A">5 fitness apps that actually work in 2026 🏃</text>
+      <text x="40" y="146" font-size="10" font-weight="700" fill="#8A8F8A" letter-spacing="1">ITEMS (LAST = YOURS)</text>
+      <rect x="40" y="154" width="390" height="26" rx="6" fill="#F2F4F2"/><text x="52" y="171" font-size="11" fill="#17181A">1 · Strava — the social one</text>
+      <rect x="40" y="184" width="390" height="26" rx="6" fill="#F2F4F2"/><text x="52" y="201" font-size="11" fill="#17181A">2 · Whoop — the data one</text>
+      <rect x="40" y="214" width="390" height="26" rx="6" fill="#E9FDEB" stroke="#6EF882"/><text x="52" y="231" font-size="11" font-weight="700" fill="#0B7A2A">3 · Evex — the one that plans it FOR you ⭐</text>
+      <rect x="352" y="248" width="78" height="24" rx="6" fill="#6EF882"/><text x="366" y="264" font-size="11" font-weight="700" fill="#05300f">Render</text>
+      <!-- three slide previews -->
+      <g>
+        <rect x="480" y="30" width="100" height="178" rx="10" fill="#17181A"/>
+        <rect x="488" y="60" width="84" height="60" rx="6" fill="#fff"/>
+        <text x="494" y="80" font-size="8.5" font-weight="800" fill="#000">5 fitness apps</text>
+        <text x="494" y="92" font-size="8.5" font-weight="800" fill="#000">that actually</text>
+        <text x="494" y="104" font-size="8.5" font-weight="800" fill="#000">work in 2026</text>
+        <text x="500" y="230" font-size="10" fill="#8A8F8A">slide 1</text>
+      </g>
+      <g>
+        <rect x="592" y="30" width="100" height="178" rx="10" fill="#26282B"/>
+        <rect x="600" y="50" width="84" height="50" rx="6" fill="#F2F4F2"/>
+        <text x="606" y="70" font-size="9" font-weight="700" fill="#000">2 · Whoop</text>
+        <text x="606" y="84" font-size="7.5" fill="#444">the data one</text>
+        <rect x="600" y="108" width="84" height="60" rx="6" fill="#3A3D40"/>
+        <text x="618" y="142" font-size="8" fill="#aaa">app image</text>
+        <text x="612" y="230" font-size="10" fill="#8A8F8A">slide 3</text>
+      </g>
+      <g>
+        <rect x="704" y="30" width="100" height="178" rx="10" fill="#0B7A2A"/>
+        <rect x="712" y="50" width="84" height="56" rx="6" fill="#fff"/>
+        <text x="718" y="70" font-size="9" font-weight="800" fill="#000">3 · Evex ⭐</text>
+        <text x="718" y="84" font-size="7.5" fill="#444">plans it FOR you</text>
+        <rect x="712" y="140" width="84" height="24" rx="6" fill="#6EF882"/>
+        <text x="722" y="156" font-size="8.5" font-weight="800" fill="#05300f">Get Evex free</text>
+        <text x="724" y="230" font-size="10" fill="#8A8F8A">slide 5 · CTA</text>
+      </g>
+    </svg>
+  </g>
+  </div>
+  <p class="mock-cap">P2: fill in the list, your app is always the payoff slide. Every text box remains editable after render — the wedge no core competitor offers.</p>
+  <ul>
+    <li><strong>Build:</strong> slide renderer (PIL/Pillow, 1080×1920 — reuse hook-card renderer from P1); template = JSON schema (slots: title, items[], cta); Gemini fills slots from a niche prompt ("best running apps") with your app injected as the winner; export both <strong>image set</strong> (TikTok photo carousels get outsized reach) and <strong>MP4 slideshow</strong> (IG/YT).</li>
+    <li><strong>Borrow:</strong> ReelFarm's listicle hook patterns; its Pinterest image-sourcing idea can wait — start with solid colored/branded backgrounds + your app screenshots.</li>
+    <li><strong>Success:</strong> generate the "best fitness apps" post you described, publish it for Evex, in &lt;10 min.</li>
+  </ul>
+
+  <h3 class="phase-head"><span class="phase-num">P3</span> Content library + first database <span class="pill">~1–2 weeks</span><span class="pill amber">infra unlock</span></h3>
+  <p>Today ClipZoo forgets everything after an hour. Before scheduling can exist, generated content and saved templates need to survive a restart. Smallest possible step: <strong>SQLite + SQLAlchemy</strong> (single file, zero ops, Docker-volume friendly) with three tables — <code>assets</code> (uploaded demo footage, brand info), <code>creations</code> (generated posts + their editable template JSON), <code>templates</code> (saved formats/hook styles). S3 keeps holding the media bytes; the DB holds metadata and state.</p>
+  <ul>
+    <li>"My content" screen: every generated post, its status (draft / published / scheduled), re-open → re-edit text → re-render.</li>
+    <li>Saved brand profile for Evex: name, app store link, screenshots, default CTA — so every template pre-fills.</li>
+    <li>This also unblocks reusable characters later (HeyGen's one-character-many-looks) — a character is just another saved asset.</li>
+  </ul>
+
+  <h3 class="phase-head"><span class="phase-num">P4</span> Calendar + scheduling <span class="pill">~1–2 weeks</span><span class="pill green">cheap thanks to Upload-Post</span></h3>
+  <p>Now the automation you wanted — and it's mostly UI, because Upload-Post does the hard part. Persist a <code>scheduled_posts</code> table; on schedule, call the <em>existing</em> <code>/api/social/post</code> with its <em>existing</em> <code>scheduled_date</code> param; render a Buffer-style week/month calendar (the restraint pattern from the Buffer research: two views, drag to reschedule, per-platform color chips).</p>
+  <div class="mock">
+    <svg viewBox="0 0 820 240" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Inter, sans-serif">
+      <rect width="820" height="240" fill="#F7F8F7"/>
+      <rect x="20" y="16" width="780" height="208" rx="12" fill="#fff" stroke="#E4E7E4"/>
+      <text x="40" y="46" font-size="15" font-weight="700" fill="#17181A">Calendar</text>
+      <rect x="130" y="30" width="52" height="24" rx="6" fill="#E9FDEB" stroke="#6EF882"/><text x="141" y="46" font-size="11" font-weight="600" fill="#0B7A2A">Week</text>
+      <rect x="188" y="30" width="56" height="24" rx="6" fill="#fff" stroke="#E4E7E4"/><text x="199" y="46" font-size="11" fill="#8A8F8A">Month</text>
+      <text x="690" y="46" font-size="11" fill="#8A8F8A">Jul 6 – 12</text>
+      <g font-size="10" fill="#8A8F8A">
+        <text x="60" y="76">MON</text><text x="168" y="76">TUE</text><text x="276" y="76">WED</text><text x="384" y="76">THU</text><text x="492" y="76">FRI</text><text x="600" y="76">SAT</text><text x="708" y="76">SUN</text>
+      </g>
+      <g>
+        <line x1="148" y1="60" x2="148" y2="216" stroke="#F0F1F0"/><line x1="256" y1="60" x2="256" y2="216" stroke="#F0F1F0"/><line x1="364" y1="60" x2="364" y2="216" stroke="#F0F1F0"/><line x1="472" y1="60" x2="472" y2="216" stroke="#F0F1F0"/><line x1="580" y1="60" x2="580" y2="216" stroke="#F0F1F0"/><line x1="688" y1="60" x2="688" y2="216" stroke="#F0F1F0"/>
+      </g>
+      <rect x="46" y="88" width="94" height="44" rx="8" fill="#E9FDEB" stroke="#6EF882"/>
+      <text x="54" y="104" font-size="9.5" font-weight="700" fill="#0B7A2A">Hook+Demo</text>
+      <text x="54" y="117" font-size="8.5" fill="#0B7A2A">TikTok · 9:00a</text>
+      <rect x="262" y="88" width="94" height="44" rx="8" fill="#EEF2FF" stroke="#C7D2FE"/>
+      <text x="270" y="104" font-size="9.5" font-weight="700" fill="#4338CA">Listicle: 5 apps</text>
+      <text x="270" y="117" font-size="8.5" fill="#4338CA">IG Reels · 12:30p</text>
+      <rect x="478" y="140" width="94" height="44" rx="8" fill="#FEF3C7" stroke="#FDE68A"/>
+      <text x="486" y="156" font-size="9.5" font-weight="700" fill="#92400E">Before/After</text>
+      <text x="486" y="169" font-size="8.5" fill="#92400E">YT Shorts · 5:00p</text>
+      <rect x="694" y="88" width="94" height="44" rx="8" fill="#fff" stroke="#E4E7E4" stroke-dasharray="4 3"/>
+      <text x="712" y="114" font-size="10" fill="#8A8F8A">+ empty slot</text>
+    </svg>
+  </div>
+  <p class="mock-cap">P4: Buffer-style restraint — a week view, platform-tinted cards, empty-slot affordance. All posting flows through Upload-Post's already-integrated API.</p>
+
+  <h3>Explicitly out of scope (for now)</h3>
+  <table>
+    <tr><th>Cut</th><th>Why</th></tr>
+    <tr><td>Paste-a-viral-link cloner</td><td>Table stakes per Revid/Genviral research, but legally gray and not your bottleneck. Revisit post-P4.</td></tr>
+    <tr><td>Custom avatars / character looks system</td><td><code>saasshorts.py</code> already gives you talking heads. Deep character consistency (HeyGen-style) only matters once formats are proven.</td></tr>
+    <tr><td>Higgsfield-grade motion/cinematics</td><td>You said it yourself — not the start. UGC wins on hooks, not production value.</td></tr>
+    <tr><td>Native TikTok/IG API integrations</td><td>Audit hell (Section 3). Upload-Post carries this.</td></tr>
+    <tr><td>Analytics dashboard</td><td>Needs posting volume first. P5+ candidate: pull view counts back to rank which <em>templates</em> perform — that's the future data moat.</td></tr>
+  </table>
+
+  <h2>5 · File-level plan</h2>
+  <details>
+    <summary>P1 — Hook + Demo composer</summary>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>hooks.py</code></td><td>Add <code>render_hook_card()</code> — full-frame 1080×1920 card (reuse PIL text renderer); style options (bg color, font scale).</td></tr>
+      <tr><td><code>composer.py</code> (new)</td><td><code>compose_hook_demo(hook_card, demo_path, cta_card) → mp4</code> via FFmpeg concat filter; normalizes demo to 9:16 using existing reframe utils from <code>main.py</code>.</td></tr>
+      <tr><td><code>app.py</code></td><td>New <code>POST /api/compose/hook-demo</code>; reuse job-queue pattern; new <code>POST /api/hooks/suggest</code> (Gemini, seeded by app-store URL via <code>saasshorts.py</code> research fn).</td></tr>
+      <tr><td><code>dashboard/src/components/CreateHookDemo.jsx</code> (new)</td><td>Composer screen per mockup; live 9:16 preview; follows STYLE_GUIDE tokens.</td></tr>
+      <tr><td><code>dashboard/src/App.jsx</code></td><td>New "Create" nav item (sidebar), route to composer.</td></tr>
+    </table>
+  </details>
+  <details>
+    <summary>P2 — Format templates + slideshow renderer</summary>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>slideshow.py</code> (new)</td><td>Slide renderer (PIL, 1080×1920): title / item / CTA layouts; export image set + MP4 (FFmpeg <code>-loop 1</code> concat, 2.5s/slide, music bed optional).</td></tr>
+      <tr><td><code>templates.py</code> (new)</td><td>Template registry: JSON schemas for <code>listicle_gbb</code> and <code>hook_demo</code>; Gemini slot-filler (<code>fill_template(template, niche, product)</code>).</td></tr>
+      <tr><td><code>app.py</code></td><td><code>GET /api/templates</code>, <code>POST /api/slideshow/generate</code>, <code>POST /api/slideshow/render</code> (accepts edited slot JSON — the re-edit loop).</td></tr>
+      <tr><td><code>dashboard/src/components/TemplateGallery.jsx</code>, <code>SlideshowEditor.jsx</code> (new)</td><td>Pick template → editable slot fields → per-slide preview → render.</td></tr>
+    </table>
+  </details>
+  <details>
+    <summary>P3 — Library + SQLite</summary>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>db.py</code> (new)</td><td>SQLAlchemy + SQLite (<code>data/clipzoo.db</code>, volume-mounted): <code>assets</code>, <code>creations</code>, <code>templates</code>, <code>brand_profiles</code>.</td></tr>
+      <tr><td><code>app.py</code></td><td>Persist creations on job completion (alongside existing S3 hook); CRUD endpoints <code>/api/library/*</code>, <code>/api/brand</code>.</td></tr>
+      <tr><td><code>docker-compose.yml</code></td><td>Volume for <code>data/</code>.</td></tr>
+      <tr><td><code>dashboard/src/components/Library.jsx</code> (new)</td><td>Grid of creations w/ status pills (draft/published/scheduled); reopen → editor.</td></tr>
+    </table>
+  </details>
+  <details>
+    <summary>P4 — Calendar + scheduling</summary>
+    <table>
+      <tr><th>File</th><th>Change</th></tr>
+      <tr><td><code>db.py</code></td><td>Add <code>scheduled_posts</code> (creation_id, platform, scheduled_at, tz, upload_post_ref, status).</td></tr>
+      <tr><td><code>app.py</code></td><td><code>POST /api/schedule</code> → writes row + calls existing <code>/api/social/post</code> with <code>scheduled_date</code>; <code>GET /api/schedule?from&amp;to</code> for calendar; status sync from Upload-Post.</td></tr>
+      <tr><td><code>dashboard/src/components/Calendar.jsx</code> (new)</td><td>Week/Month views per mockup; wire ScheduleWeekModal into persistence.</td></tr>
+    </table>
+  </details>
+
+  <h2>6 · Verification per phase</h2>
+  <ol>
+    <li><strong>P1:</strong> produce and publish one real Evex hook+demo TikTok end-to-end; time it (&lt;15 min); confirm hook text is re-editable post-generation.</li>
+    <li><strong>P2:</strong> generate the exact "best fitness apps (Strava / Whoop / Aura / Evex)" listicle; export both photo-carousel and MP4; publish one.</li>
+    <li><strong>P3:</strong> restart the Docker stack; all creations and templates survive; reopen and re-render an old creation.</li>
+    <li><strong>P4:</strong> schedule 3 posts across 2 platforms for future times via the calendar; verify they go live via Upload-Post; verify TikTok post is <em>public</em> (this is the Blotato-fallback tripwire).</li>
+  </ol>
+
+  <h2>7 · Decisions — pick &amp; send back</h2>
+  <p class="q-help">Select an option in each block (my recommendation is marked), add notes, then hit <em>Copy decisions as Markdown</em> and paste it back to me — I'll turn the chosen path into task files under <code>docs/tasks/todo/</code>.</p>
+
+  <section class="decision" data-select="single">
+    <h3>1. Positioning for the ClipZoo brand</h3>
+    <p class="q-help">What the landing page / sidebar tagline says this product is.</p>
+    <div class="options">
+      <button class="option">
+        <span class="rec">Recommended</span>
+        <span class="opt-title">"Generate your UGC marketing" — for app founders</span>
+        <span class="opt-desc">Niche on B2C app founders (you). Formats know about app demos, store links, CTAs. Sharpest wedge; smallest surface.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">"Generate your UGC marketing" — any product</span>
+        <span class="opt-desc">Same generation-first framing but no app-founder niche. Broader appeal, blurrier templates, more ReelFarm overlap.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">"Automate your UGC marketing"</span>
+        <span class="opt-desc">Lead with automation from day one. Requires P3+P4 before the promise is true — riskier sequencing.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>2. Phase 1 scope</h3>
+    <p class="q-help">What ships first.</p>
+    <div class="options">
+      <button class="option">
+        <span class="rec">Recommended</span>
+        <span class="opt-title">Hook+Demo composer only</span>
+        <span class="opt-desc">One format, shipped and dogfooded in ~1–2 weeks. Slideshows follow immediately as P2.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Hook+Demo + listicle slideshows together</span>
+        <span class="opt-desc">Bigger first release (~3–4 weeks before you post anything). More complete, slower feedback.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="multi">
+    <h3>3. Format templates to build in P2 (pick all that apply)</h3>
+    <p class="q-help">Hook+Demo from P1 becomes a saved template automatically.</p>
+    <div class="options">
+      <button class="option">
+        <span class="rec">Recommended</span>
+        <span class="opt-title">Listicle / good-better-best slideshow</span>
+        <span class="opt-desc">Your "best fitness apps → Evex" format. Proven on TikTok, easy to render.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Before / after</span>
+        <span class="opt-desc">Strong for fitness specifically. Simple 2-panel template — cheap to add if P2 goes fast.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Greenscreen meme (talking over screenshot)</span>
+        <span class="opt-desc">ReelFarm's third format. Needs avatar/webcam footage; heavier.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">AI talking-head ad (surface saasshorts.py as a template)</span>
+        <span class="opt-desc">Repackage the existing pipeline as a first-class format instead of a separate tab.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>4. Persistence layer (P3)</h3>
+    <p class="q-help">First database for library + calendar.</p>
+    <div class="options">
+      <button class="option">
+        <span class="rec">Recommended</span>
+        <span class="opt-title">SQLite + SQLAlchemy</span>
+        <span class="opt-desc">Zero ops, single file, fits the Docker setup. Migrate to Postgres only when multi-user demands it.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Postgres (Supabase) now</span>
+        <span class="opt-desc">Future-proof for auth/multi-user, but adds hosted infra before a single external user exists.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Stay stateless longer</span>
+        <span class="opt-desc">Skip P3, lean on S3 + localStorage. Defers cost but blocks the calendar and re-editing.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>5. Scheduling provider (P4)</h3>
+    <div class="options">
+      <button class="option">
+        <span class="rec">Recommended</span>
+        <span class="opt-title">Upload-Post scheduled_date (already integrated)</span>
+        <span class="opt-desc">~$16/mo, zero new integration, TikTok audit handled by them. Blotato ($29/mo) as tripwire fallback if TikTok posts don't go public.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Blotato from the start</span>
+        <span class="opt-desc">Most explicit about bypassing TikTok's audit, but requires replacing a working integration.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Hybrid: native YouTube + aggregator for TikTok/IG</span>
+        <span class="opt-desc">YouTube's API is genuinely friendly (free, native publishAt). More code, less vendor risk.</span>
+      </button>
+    </div>
+  </section>
+
+  <h2>Notes</h2>
+  <p class="q-help">Anything the options don't cover — Evex context, format ideas, gut reactions.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy decisions as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span class="hint">Selections + notes are copied together.</span>
+  </div>
+
+  <pre id="out"></pre>
+</main>
+
+<script>
+  document.querySelectorAll('.decision').forEach(section => {
+    const multi = section.dataset.select === 'multi';
+    section.querySelectorAll('.option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!multi) section.querySelectorAll('.option').forEach(b => b.classList.remove('selected'));
+        btn.classList.toggle('selected');
+      });
+    });
+  });
+
+  function buildMarkdown() {
+    let md = '## Decisions — ClipZoo roadmap\n';
+    document.querySelectorAll('.decision').forEach(section => {
+      const q = section.querySelector('h3').textContent.trim();
+      const chosen = [...section.querySelectorAll('.option.selected')]
+        .map(b => b.querySelector('.opt-title').textContent.trim());
+      md += `\n### ${q}\n`;
+      md += chosen.length ? `- **Selected:** ${chosen.join(', ')}\n` : `- _(no selection yet)_\n`;
+    });
+    const notes = document.getElementById('notes').value.trim();
+    md += `\n## Notes\n${notes || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+
+  copyBtn.addEventListener('click', async () => {
+    const md = buildMarkdown();
+    out.textContent = md;
+    out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 2500);
+    }
+  });
+
+  document.getElementById('clear').addEventListener('click', () => {
+    document.querySelectorAll('.option.selected').forEach(b => b.classList.remove('selected'));
+    document.getElementById('notes').value = '';
+    out.style.display = 'none';
+  });
+</script>
+</body>
+</html>

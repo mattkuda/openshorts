@@ -68,6 +68,7 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
   const [selectedActor, setSelectedActor] = useState(null);
   const [generatingActors, setGeneratingActors] = useState(false);
   const [actorGallery, setActorGallery] = useState([]);
+  const [savedCharacters, setSavedCharacters] = useState([]); // ClipZoo characters — reusable identities
   const [loadingGallery, setLoadingGallery] = useState(false);
   const [uploadedActorPreview, setUploadedActorPreview] = useState(null); // {localPreview, serverUrl}
   const [productPhoto, setProductPhoto] = useState(null); // {preview, serverUrl}
@@ -97,6 +98,14 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
       setActorDescription(scripts[0].actor_description || '');
       setEditedNarration(scripts[0].full_narration || '');
     }
+  }, []);
+
+  // Fetch saved ClipZoo characters on mount (reusable identities → actor picker)
+  useEffect(() => {
+    fetch(getApiUrl('/api/characters'))
+      .then((r) => r.json())
+      .then((d) => setSavedCharacters(d.characters || []))
+      .catch(() => { /* characters optional */ });
   }, []);
 
   // Fetch actor gallery on mount
@@ -960,6 +969,38 @@ export default function SaaShortsTab({ geminiApiKey, elevenLabsKey, falKey, uplo
                 <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                   <User size={14} /> AI Actor — Choose Your Actor
                 </label>
+
+                {/* Saved ClipZoo characters — consistent identity across all formats */}
+                {savedCharacters.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-muted-foreground mb-2">My characters (click to use as the actor):</p>
+                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+                      {savedCharacters.flatMap((c) => [
+                        { key: `${c.id}-p`, img: c.portrait_path, label: c.name },
+                        ...c.looks.map((l) => ({ key: l.id, img: l.image_path, label: `${c.name} — ${l.prompt}` })),
+                      ]).map((opt) => {
+                        const charUrl = getApiUrl(opt.img);
+                        return (
+                          <button
+                            key={opt.key}
+                            onClick={() => setSelectedActor(charUrl)}
+                            title={opt.label}
+                            className={`relative shrink-0 w-16 aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedActor === charUrl ? 'border-primary ring-2 ring-primary/30 scale-[1.02]' : 'border-border hover:border-primary/60'
+                            }`}
+                          >
+                            <img src={charUrl} alt={opt.label} className="w-full h-full object-cover" />
+                            {selectedActor === charUrl && (
+                              <div className="absolute top-1 right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                                <Check size={10} className="text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Existing Gallery from S3 */}
                 {actorGallery.length > 0 && (

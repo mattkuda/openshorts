@@ -106,3 +106,38 @@ Distribution is a first-class part of the product (unlike OpenShorts V1): ReelFa
 - [Bestfreeaitools — ReelFarm AI Platform Overview (2026)](https://bestfreeaitools.io/ai-tools/reelfarm-ai-review/) — accessed June 2026
 - [AI Agent Store — ReelFarm](https://aiagentstore.ai/ai-agent/reelfarm) — accessed June 2026
 - [MOGE — ReelFarm product page](https://moge.ai/product/reelfarm) — accessed June 2026
+
+---
+
+## UX teardown — live dashboard inspection (July 2026)
+
+First-hand notes from inspecting reel.farm/dashboard (logged-in session), used as the
+blueprint for ClipZoo's Characters + Hook+Demo avatar features:
+
+**Create UGC ads (`/dashboard/ugc`)** — strict 3-step vertical form:
+1. **Hook** — carousel of ~30 pre-written hooks with arrows (e.g. "um my nutritionist
+   friend just told me that food tracking apps are literally WASTING our time wtf").
+2. **AI avatar** — 3×10 grid of selfie-style avatar *video* thumbnails, ~8 pages (~240
+   defaults), tabs: **Default / My UGC / Uploads**.
+3. **Demos** — "None" + "+" thumbnails to attach product demo videos.
+Right side: live 9:16 preview — the selected avatar clip plays with the hook text burned
+on top (white text, black outline, ~3 wrapped lines), with **three text-position toggles**
+(top/center/bottom) and a **Sound** picker. Generate gated by subscription.
+Below: "My Videos" gallery grid with pagination.
+
+**AI Characters (`/dashboard/characters`)** — the "one character, many looks" system:
+- Left panel: character list + **New Character**.
+- **Edit Character**: attribute-based identity editor — Identity (gender cards, age-range
+  chips), Ethnicity, Skin Details, Face Shape, Face Details, Hair, Eyes & Brows,
+  Nose & Ears, Body, Style & Accessories, Marks & Features — plus **Randomize**,
+  "Import Prompt", "Copy Attributes JSON", portrait preview with "Re-render Preview",
+  name field, Save Changes.
+- **Character detail**: gallery of generated images + bottom prompt bar — *"Describe a
+  scene, pose, outfit… or click Randomize"* with a **Random** button and a model selector
+  showing **Nano Banana Pro** (Google's Gemini image family) — their look generation is
+  Gemini-based image editing with the character as reference.
+
+**What ClipZoo copied (shipped 2026-07-02):** attribute chips → Gemini portrait →
+per-character looks via reference-image prompting; avatar step (None / My characters /
+Upload) in Hook+Demo; outlined text style + position toggles; characters reusable across
+hook demos, slideshows, and AI actor ads.
