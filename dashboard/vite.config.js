@@ -30,6 +30,14 @@ export default defineConfig({
         target: 'http://backend:8000',
         changeOrigin: true,
       },
+      '/default-avatars': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      },
+      '/sounds': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+      },
       '/gallery': {
         target: 'http://backend:8000',
         changeOrigin: true,

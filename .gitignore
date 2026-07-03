@@ -47,3 +47,4 @@ data/
 # Keep the debug mock videos (needed for mock mode on fresh clones)
 !mocks/*.mp4
 .env.local
+sounds/uploads/

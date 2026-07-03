@@ -114,7 +114,7 @@ def _text_y(position, box_h):
 
 def _overlay_text(video_path, text_png, y, out_path):
     _run(['ffmpeg', '-y', '-i', video_path, '-i', text_png,
-          '-filter_complex', f"[0:v][1:v]overlay=(W-w)/2:{y}",
+          '-filter_complex', f"[0:v][1:v]overlay=(W-w)/2:{y},setsar=1",
           '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '22', out_path])
     return out_path
 
@@ -127,7 +127,7 @@ def _kenburns_segment(img_path, seconds, out_path):
           '-t', str(seconds),
           '-vf', (f"scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
                   f"zoompan=z='min(zoom+0.0009,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-                  f":d={frames}:s={W}x{H}:fps=30,format=yuv420p"),
+                  f":d={frames}:s={W}x{H}:fps=30,format=yuv420p,setsar=1"),
           '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
           '-c:a', 'aac', '-b:a', '128k', '-shortest', out_path])
     return out_path
@@ -138,16 +138,26 @@ def _card_to_segment(img_path, seconds, out_path):
     _run(['ffmpeg', '-y', '-loop', '1', '-i', img_path,
           '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
           '-t', str(seconds),
-          '-vf', f'scale={W}:{H},format=yuv420p',
+          '-vf', f'scale={W}:{H},format=yuv420p,setsar=1',
           '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
           '-c:a', 'aac', '-b:a', '128k', '-shortest', out_path])
+    return out_path
+
+
+def mix_background_music(video_path, music_path, out_path, music_volume=0.35):
+    """Loop background music under the video's audio (ReelFarm's Sound feature)."""
+    _run(['ffmpeg', '-y', '-i', video_path, '-stream_loop', '-1', '-i', music_path,
+          '-filter_complex',
+          f"[1:a]volume={music_volume}[m];[0:a][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]",
+          '-map', '0:v', '-map', '[a]',
+          '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-shortest', out_path])
     return out_path
 
 
 def _normalize_demo(video_path, out_path):
     """Any input → 1080x1920 h264/aac (center-crop fill), so concat is safe."""
     _run(['ffmpeg', '-y', '-i', video_path,
-          '-vf', f'scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},format=yuv420p',
+          '-vf', f'scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},format=yuv420p,setsar=1',
           '-r', '30',
           '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
           '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', out_path])
@@ -157,7 +167,8 @@ def _normalize_demo(video_path, out_path):
 def compose_hook_demo(demo_path, hook_text, output_path, style="preroll",
                       cta_text="", use_mock_demo=False,
                       avatar_image_path=None, avatar_video_path=None,
-                      text_style="box", text_position="center", log=print):
+                      text_style="box", text_position="center",
+                      sound_path=None, log=print):
     """Assemble the final clip. ReelFarm-style structure: hook segment (avatar
     image w/ push-in, avatar video, or card) → demo → optional CTA card.
     Returns output_path."""
@@ -213,8 +224,12 @@ def compose_hook_demo(demo_path, hook_text, output_path, style="preroll",
             cta_seg = _card_to_segment(cta_img, CTA_SECONDS, tmp("cta.mp4")); temps.append(cta_seg)
             segments.append(cta_seg)
 
+        # Assemble (to a pre-mix temp when music is requested)
+        assembled = tmp("assembled.mp4") if (sound_path and os.path.exists(sound_path)) else output_path
+        if assembled != output_path:
+            temps.append(assembled)
         if len(segments) == 1:
-            _run(['ffmpeg', '-y', '-i', segments[0], '-c', 'copy', output_path])
+            _run(['ffmpeg', '-y', '-i', segments[0], '-c', 'copy', assembled])
         else:
             log(f"🔗 Concatenating {len(segments)} segments…")
             inputs = []
@@ -225,7 +240,11 @@ def compose_hook_demo(demo_path, hook_text, output_path, style="preroll",
             _run(['ffmpeg', '-y', *inputs, '-filter_complex', filt,
                   '-map', '[v]', '-map', '[a]',
                   '-c:v', 'libx264', '-preset', 'fast', '-crf', '22',
-                  '-c:a', 'aac', '-b:a', '128k', output_path])
+                  '-c:a', 'aac', '-b:a', '128k', assembled])
+
+        if assembled != output_path:
+            log("🎵 Mixing background music…")
+            mix_background_music(assembled, sound_path, output_path)
 
         log(f"✅ Hook+Demo composed → {output_path}")
         return output_path

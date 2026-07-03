@@ -2299,6 +2299,43 @@ os.makedirs(MOCKS_DIR, exist_ok=True)
 app.mount("/creations", StaticFiles(directory=CREATIONS_DIR), name="creations")
 app.mount("/mocks", StaticFiles(directory=MOCKS_DIR), name="mocks")
 
+DEFAULT_AVATARS_DIR = "default_avatars"
+SOUNDS_DIR = "sounds"
+os.makedirs(DEFAULT_AVATARS_DIR, exist_ok=True)
+os.makedirs(os.path.join(SOUNDS_DIR, "uploads"), exist_ok=True)
+app.mount("/default-avatars", StaticFiles(directory=DEFAULT_AVATARS_DIR), name="default_avatars")
+app.mount("/sounds", StaticFiles(directory=SOUNDS_DIR), name="sounds")
+
+
+@app.get("/api/avatars/defaults")
+async def api_default_avatars():
+    files = sorted(f for f in os.listdir(DEFAULT_AVATARS_DIR) if f.lower().endswith((".jpg", ".png", ".webp")))
+    return {"avatars": [f"/default-avatars/{f}" for f in files]}
+
+
+@app.get("/api/sounds")
+async def api_sounds_list():
+    def scan(folder, web_prefix):
+        if not os.path.isdir(folder):
+            return []
+        return [{"name": os.path.splitext(f)[0].replace("_", " "), "url": f"{web_prefix}/{f}"}
+                for f in sorted(os.listdir(folder)) if f.lower().endswith((".mp3", ".m4a", ".wav", ".aac"))]
+    return {
+        "templates": scan(SOUNDS_DIR, "/sounds"),
+        "uploads": scan(os.path.join(SOUNDS_DIR, "uploads"), "/sounds/uploads"),
+    }
+
+
+@app.post("/api/sounds/upload")
+async def api_sounds_upload(file: UploadFile = File(...)):
+    if not (file.filename or "").lower().endswith((".mp3", ".m4a", ".wav", ".aac")):
+        raise HTTPException(status_code=400, detail="Audio files only (.mp3/.m4a/.wav/.aac)")
+    safe = os.path.basename(file.filename).replace(" ", "_")
+    path = os.path.join(SOUNDS_DIR, "uploads", safe)
+    with open(path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"url": f"/sounds/uploads/{safe}", "name": os.path.splitext(safe)[0].replace("_", " ")}
+
 
 @app.get("/api/config/keys")
 async def api_config_keys():
@@ -2359,7 +2396,7 @@ async def api_hooks_suggest(req: HookSuggestRequest, x_gemini_key: Optional[str]
 
 def _run_compose_job(job_id, demo_path, hook_text, style, cta_text, use_mock, title,
                      avatar_image_path=None, avatar_video_path=None,
-                     text_style="box", text_position="center"):
+                     text_style="box", text_position="center", sound_path=None):
     log = lambda msg: jobs.get(job_id, {}).get('logs', []).append(msg)
     try:
         jobs[job_id]['status'] = 'processing'
@@ -2369,7 +2406,8 @@ def _run_compose_job(job_id, demo_path, hook_text, style, cta_text, use_mock, ti
                           cta_text=cta_text, use_mock_demo=use_mock,
                           avatar_image_path=avatar_image_path,
                           avatar_video_path=avatar_video_path,
-                          text_style=text_style, text_position=text_position, log=log)
+                          text_style=text_style, text_position=text_position,
+                          sound_path=sound_path, log=log)
         creation = _save_creation(
             kind="hook_demo", title=title or hook_text, template_key="hook_demo",
             slots={"hook_text": hook_text, "style": style, "cta_text": cta_text,
@@ -2400,6 +2438,7 @@ async def api_compose_hook_demo(
     use_mock_avatar_video: str = Form("false"),  # debug: mocks/mock-reaction.mp4 as avatar clip
     text_style: str = Form("box"),         # box | outline
     text_position: str = Form("center"),   # top | center | bottom
+    sound: str = Form(""),                 # web path under /sounds
     demo: Optional[UploadFile] = File(None),
     avatar_video: Optional[UploadFile] = File(None),
 ):
@@ -2417,6 +2456,10 @@ async def api_compose_hook_demo(
         candidate = os.path.join("creations", "avatars", os.path.basename(avatar_image))
         if os.path.exists(candidate):
             avatar_image_path = candidate
+    elif avatar_image.startswith("/default-avatars/"):
+        candidate = os.path.join(DEFAULT_AVATARS_DIR, os.path.basename(avatar_image))
+        if os.path.exists(candidate):
+            avatar_image_path = candidate
 
     avatar_video_path = None
     if avatar_video is not None:
@@ -2426,10 +2469,16 @@ async def api_compose_hook_demo(
     elif use_mock_avatar_video.lower() == "true":
         avatar_video_path = os.path.join(MOCKS_DIR, "mock-reaction.mp4")
 
+    sound_path = None
+    if sound.startswith("/sounds/"):
+        candidate = os.path.join(SOUNDS_DIR, os.path.relpath(sound, "/sounds"))
+        if os.path.exists(candidate):
+            sound_path = candidate
+
     job_id = uuid.uuid4().hex[:12]
     jobs[job_id] = {'status': 'queued', 'logs': [f"Compose job {job_id} queued."], 'result': None}
     background_tasks.add_task(_run_compose_job, job_id, demo_path, hook_text, style, cta_text, mock, title,
-                              avatar_image_path, avatar_video_path, text_style, text_position)
+                              avatar_image_path, avatar_video_path, text_style, text_position, sound_path)
     return {"job_id": job_id, "status": "queued"}
 
 
