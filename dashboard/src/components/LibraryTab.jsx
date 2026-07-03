@@ -7,6 +7,7 @@ const KIND_LABELS = {
     listicle: 'Listicle',
     before_after: 'Before / After',
     ai_talking_head: 'AI Ad',
+    auto_slideshow: 'Slideshow',
 };
 
 const STATUS_STYLES = {

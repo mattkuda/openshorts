@@ -164,6 +164,7 @@ async def lifespan(app: FastAPI):
     # Start worker and cleanup
     worker_task = asyncio.create_task(process_queue())
     cleanup_task = asyncio.create_task(cleanup_jobs())
+    scheduler_task = asyncio.create_task(_automation_scheduler())  # defined at module end
     yield
     # Cleanup (optional: cancel worker)
 
@@ -2833,3 +2834,369 @@ async def api_characters_delete_look(char_id: str, look_id: str):
         s.delete(look)
         s.commit()
     return {"ok": True}
+
+
+# =====================================================================
+# ClipZoo Slideshow Automations — recurring TikTok photo carousels:
+# image collections (preset photo packs) + automation recipes
+# (topic/tone/hooks/per-slide directions) + a scheduler loop.
+# =====================================================================
+from db import ImageCollection, CollectionImage, SlideshowAutomation
+
+COLLECTIONS_DIR = os.path.join(CREATIONS_DIR, "collections")
+os.makedirs(COLLECTIONS_DIR, exist_ok=True)
+
+
+def _collection_dict(session, coll):
+    images = [i.to_dict() for i in session.query(CollectionImage)
+              .filter(CollectionImage.collection_id == coll.id)
+              .order_by(CollectionImage.created_at.asc()).all()]
+    return coll.to_dict(images=images)
+
+
+@app.get("/api/collections")
+async def api_collections_list():
+    with get_session() as s:
+        colls = s.query(ImageCollection).order_by(ImageCollection.created_at.desc()).all()
+        return {"collections": [_collection_dict(s, c) for c in colls]}
+
+
+class CollectionCreateRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/collections")
+async def api_collections_create(req: CollectionCreateRequest):
+    with get_session() as s:
+        coll = ImageCollection(name=(req.name or "New collection")[:120])
+        s.add(coll)
+        s.commit()
+        return {"collection": _collection_dict(s, coll)}
+
+
+@app.post("/api/collections/{cid}/images")
+async def api_collections_upload(cid: str, files: List[UploadFile] = File(...)):
+    with get_session() as s:
+        if not s.get(ImageCollection, cid):
+            raise HTTPException(status_code=404, detail="Collection not found")
+    coll_dir = os.path.join(COLLECTIONS_DIR, cid)
+    os.makedirs(coll_dir, exist_ok=True)
+    added = []
+    with get_session() as s:
+        for f in files:
+            if not (f.filename or "").lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
+            safe = os.path.basename(f.filename).replace(" ", "_")
+            name = f"{uuid.uuid4().hex[:10]}_{safe}"
+            with open(os.path.join(coll_dir, name), "wb") as out:
+                shutil.copyfileobj(f.file, out)
+            row = CollectionImage(collection_id=cid, image_path=f"/creations/collections/{cid}/{name}")
+            s.add(row)
+            added.append(row)
+        s.commit()
+        coll = s.get(ImageCollection, cid)
+        return {"collection": _collection_dict(s, coll), "added": [r.to_dict() for r in added]}
+
+
+@app.delete("/api/collections/{cid}")
+async def api_collections_delete(cid: str):
+    with get_session() as s:
+        coll = s.get(ImageCollection, cid)
+        if not coll:
+            raise HTTPException(status_code=404, detail="Collection not found")
+        images = s.query(CollectionImage).filter(CollectionImage.collection_id == cid).all()
+        for img in images:
+            fp = os.path.join(COLLECTIONS_DIR, cid, os.path.basename(img.image_path))
+            if os.path.exists(fp):
+                os.remove(fp)
+            s.delete(img)
+        s.delete(coll)
+        s.commit()
+    coll_dir = os.path.join(COLLECTIONS_DIR, cid)
+    if os.path.isdir(coll_dir) and not os.listdir(coll_dir):
+        os.rmdir(coll_dir)
+    return {"ok": True}
+
+
+@app.delete("/api/collections/{cid}/images/{image_id}")
+async def api_collections_delete_image(cid: str, image_id: str):
+    with get_session() as s:
+        img = s.get(CollectionImage, image_id)
+        if not img or img.collection_id != cid:
+            raise HTTPException(status_code=404, detail="Image not found")
+        fp = os.path.join(COLLECTIONS_DIR, cid, os.path.basename(img.image_path))
+        if os.path.exists(fp):
+            os.remove(fp)
+        s.delete(img)
+        s.commit()
+    return {"ok": True}
+
+
+# ---- Automations ------------------------------------------------------
+from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo
+
+from automations import generate_hooks as auto_generate_hooks, generate_slideshow, post_to_upload_post, TONE_PRESETS
+
+
+DEFAULT_SLIDE = {"id": "s1", "direction": "", "image": {"source": "ai", "image_prompt": "", "collection_id": ""}}
+
+
+class AutomationCreateRequest(BaseModel):
+    name: Optional[str] = "New automation"
+    timezone: Optional[str] = "UTC"
+
+
+class AutomationUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    topic: Optional[str] = None
+    tone_preset: Optional[str] = None
+    tone_prompt: Optional[str] = None
+    hooks: Optional[List[str]] = None
+    hook_image: Optional[dict] = None
+    slides: Optional[List[dict]] = None
+    cta: Optional[dict] = None
+    schedule: Optional[dict] = None
+    tiktok: Optional[dict] = None
+
+
+@app.get("/api/automations")
+async def api_automations_list():
+    with get_session() as s:
+        rows = s.query(SlideshowAutomation).order_by(SlideshowAutomation.created_at.desc()).all()
+        return {"automations": [r.to_dict() for r in rows], "tone_presets": list(TONE_PRESETS.keys())}
+
+
+@app.post("/api/automations")
+async def api_automations_create(req: AutomationCreateRequest):
+    with get_session() as s:
+        row = SlideshowAutomation(
+            name=(req.name or "New automation")[:120],
+            hooks_json="[]",
+            hook_image_json=json.dumps({"source": "ai", "image_prompt": "", "collection_id": ""}),
+            slides_json=json.dumps([dict(DEFAULT_SLIDE)]),
+            cta_json=json.dumps({"enabled": False, "direction": ""}),
+            schedule_json=json.dumps({"timezone": req.timezone or "UTC",
+                                      "times": [{"time": "09:00", "days": [0, 1, 2, 3, 4, 5, 6]}]}),
+            tiktok_json=json.dumps({"auto_post": False, "user_id": "", "platforms": ["tiktok"],
+                                    "title_mode": "prompt", "title": "Title-case the hook",
+                                    "caption_mode": "prompt",
+                                    "caption": "3-5 broad lowercase hashtags about the topic"}),
+        )
+        s.add(row)
+        s.commit()
+        return {"automation": row.to_dict()}
+
+
+@app.get("/api/automations/{aid}")
+async def api_automations_get(aid: str):
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        return {"automation": row.to_dict()}
+
+
+@app.patch("/api/automations/{aid}")
+async def api_automations_update(aid: str, req: AutomationUpdateRequest):
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        if req.name is not None:
+            row.name = req.name[:120]
+        if req.status is not None:
+            if req.status not in ("active", "paused"):
+                raise HTTPException(status_code=400, detail="status must be active|paused")
+            row.status = req.status
+        if req.topic is not None:
+            row.topic = req.topic
+        if req.tone_preset is not None:
+            row.tone_preset = req.tone_preset[:40]
+        if req.tone_prompt is not None:
+            row.tone_prompt = req.tone_prompt
+        if req.hooks is not None:
+            row.hooks_json = json.dumps([h for h in req.hooks if str(h).strip()])
+        if req.hook_image is not None:
+            row.hook_image_json = json.dumps(req.hook_image)
+        if req.slides is not None:
+            row.slides_json = json.dumps(req.slides)
+        if req.cta is not None:
+            row.cta_json = json.dumps(req.cta)
+        if req.schedule is not None:
+            row.schedule_json = json.dumps(req.schedule)
+        if req.tiktok is not None:
+            row.tiktok_json = json.dumps(req.tiktok)
+        s.commit()
+        return {"automation": row.to_dict()}
+
+
+@app.delete("/api/automations/{aid}")
+async def api_automations_delete(aid: str):
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        s.delete(row)
+        s.commit()
+    return {"ok": True}
+
+
+class AutomationMockRequest(BaseModel):
+    mock: Optional[bool] = False
+
+
+@app.post("/api/automations/{aid}/hooks/generate")
+async def api_automations_gen_hooks(aid: str, req: AutomationMockRequest,
+                                    x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        auto = row.to_dict()
+    try:
+        fresh = await asyncio.to_thread(auto_generate_hooks, x_gemini_key, auto["topic"],
+                                        auto["hooks"], 10, bool(req.mock))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hook generation failed: {e}")
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        hooks = json.loads(row.hooks_json or "[]") + fresh
+        row.hooks_json = json.dumps(hooks)
+        s.commit()
+        return {"hooks": hooks}
+
+
+def _run_automation(automation_dict, gemini_key, mock, log=print):
+    """Generate one slideshow for an automation and persist it as a Creation."""
+    pngs, mp4, meta = generate_slideshow(automation_dict, gemini_key, mock=mock, log=log)
+    image_urls = [f"/creations/{os.path.basename(p)}" for p in pngs]
+    video_url = f"/creations/{os.path.basename(mp4)}"
+    creation = _save_creation(
+        kind="auto_slideshow", title=meta["title"] or meta["hook"],
+        template_key="auto_slideshow",
+        slots={"automation_id": automation_dict["id"], "hook": meta["hook"],
+               "texts": meta["texts"], "caption": meta["caption"]},
+        video_path=video_url, image_paths=image_urls,
+    )
+    return creation, image_urls, video_url, meta
+
+
+@app.post("/api/automations/{aid}/generate")
+async def api_automations_generate(aid: str, req: AutomationMockRequest,
+                                   x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        auto = row.to_dict()
+    try:
+        creation, image_urls, video_url, meta = await asyncio.to_thread(
+            _run_automation, auto, x_gemini_key, bool(req.mock))
+        note = "ok"
+    except Exception as e:
+        with get_session() as s:
+            row = s.get(SlideshowAutomation, aid)
+            if row:
+                row.last_run_at = datetime.now(dt_timezone.utc)
+                row.last_run_note = f"error: {e}"[:300]
+                s.commit()
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if row:
+            row.last_run_at = datetime.now(dt_timezone.utc)
+            row.last_run_note = note
+            s.commit()
+    return {"creation": creation, "images": image_urls, "video_url": video_url, "meta": meta}
+
+
+# ---- Automation scheduler --------------------------------------------
+# Fires each automation's (posting time × day-of-week) slots in its own
+# timezone. Headless runs can't read browser-stored keys, so real (non-mock)
+# generation and auto-posting rely on the .env.local server fallbacks
+# (GEMINI_API_KEY / UPLOAD_POST_API_KEY); without a Gemini key the run is
+# skipped and noted on the automation.
+
+def _due_slot(automation_dict, now_utc):
+    """Return the 'YYYY-MM-DD|HH:MM' slot key if the automation is due right now."""
+    schedule = automation_dict.get("schedule") or {}
+    try:
+        tz = ZoneInfo(schedule.get("timezone") or "UTC")
+    except Exception:
+        tz = dt_timezone.utc
+    now_local = now_utc.astimezone(tz)
+    dow = (now_local.weekday() + 1) % 7   # Monday=0 → Sunday=0 indexing (UI chips are Su..Sa)
+    hhmm = now_local.strftime("%H:%M")
+    for t in schedule.get("times") or []:
+        if t.get("time") == hhmm and dow in (t.get("days") or []):
+            return f"{now_local:%Y-%m-%d}|{hhmm}"
+    return None
+
+
+def _scheduler_fire(automation_dict):
+    """Generate (and optionally auto-post) one slideshow for a due automation."""
+    aid = automation_dict["id"]
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    note = "ok (scheduled)"
+    try:
+        if not gemini_key:
+            raise RuntimeError("no server GEMINI_API_KEY — set it in .env.local for scheduled runs")
+        creation, _images, video_url, meta = _run_automation(automation_dict, gemini_key, mock=False)
+
+        tiktok = automation_dict.get("tiktok") or {}
+        upload_key = os.getenv("UPLOAD_POST_API_KEY", "")
+        if tiktok.get("auto_post") and tiktok.get("user_id") and upload_key:
+            mp4_path = os.path.join(CREATIONS_DIR, os.path.basename(video_url))
+            ref = post_to_upload_post(mp4_path, meta["title"], tiktok.get("platforms") or ["tiktok"],
+                                      tiktok["user_id"], upload_key)
+            now_iso = datetime.now(dt_timezone.utc).isoformat()
+            with get_session() as s:
+                s.add(ScheduledPost(creation_id=creation["id"], title=meta["title"],
+                                    platforms_json=json.dumps(tiktok.get("platforms") or ["tiktok"]),
+                                    scheduled_at=now_iso, timezone_name="UTC",
+                                    upload_post_ref=ref, status="posted"))
+                c = s.get(Creation, creation["id"])
+                if c:
+                    c.status = "published"
+                s.commit()
+            note = "ok (scheduled + posted)"
+        elif tiktok.get("auto_post"):
+            note = "generated; auto-post skipped (missing Upload-Post key or account)"
+    except Exception as e:
+        note = f"error: {e}"[:300]
+        print(f"⚠️ Automation {aid} scheduled run failed: {e}")
+    with get_session() as s:
+        row = s.get(SlideshowAutomation, aid)
+        if row:
+            row.last_run_at = datetime.now(dt_timezone.utc)
+            row.last_run_note = note
+            s.commit()
+
+
+async def _automation_scheduler():
+    print("⏰ Slideshow automation scheduler started.")
+    while True:
+        try:
+            now_utc = datetime.now(dt_timezone.utc)
+            with get_session() as s:
+                rows = s.query(SlideshowAutomation).filter(SlideshowAutomation.status == "active").all()
+                due = []
+                for row in rows:
+                    auto = row.to_dict()
+                    slot = _due_slot(auto, now_utc)
+                    if slot and row.last_fired_slot != slot:
+                        row.last_fired_slot = slot   # claim before the slow work → no double-fire
+                        due.append(auto)
+                s.commit()
+            for auto in due:
+                print(f"⏰ Automation due: {auto['name']} ({auto['id']})")
+                await asyncio.to_thread(_scheduler_fire, auto)
+        except Exception as e:
+            print(f"⚠️ Automation scheduler tick failed: {e}")
+        await asyncio.sleep(30)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library } from 'lucide-react';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
@@ -12,6 +12,7 @@ import SaaShortsTab from './components/SaaShortsTab';
 import UGCGallery from './components/UGCGallery';
 import ScheduleWeekModal from './components/ScheduleWeekModal';
 import CreateTab from './components/CreateTab';
+import AutomationsTab from './components/AutomationsTab';
 import CharactersTab from './components/CharactersTab';
 import LibraryTab from './components/LibraryTab';
 import CalendarTab from './components/CalendarTab';
@@ -450,6 +451,7 @@ function App() {
     // Disabled = deferred / out of scope for now (kept visible so the roadmap reads).
     const navItems = [
       { id: 'create', label: 'Create', icon: Clapperboard },
+      { id: 'automations', label: 'Automations', icon: Repeat },
       { id: 'characters', label: 'Characters', icon: Users },
       { id: 'library', label: 'Library', icon: Library },
       { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -873,6 +875,17 @@ function App() {
               debug={debug}
               brand={brand}
               onOpenTab={setActiveTab}
+            />
+          )}
+
+          {/* View: Automations */}
+          {activeTab === 'automations' && (
+            <AutomationsTab
+              geminiApiKey={apiKey}
+              uploadPostKey={uploadPostKey}
+              uploadUserId={uploadUserId}
+              userProfiles={userProfiles}
+              debug={debug}
             />
           )}
 

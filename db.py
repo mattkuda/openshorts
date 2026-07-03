@@ -147,6 +147,72 @@ class CharacterLook(Base):
         }
 
 
+class ImageCollection(Base):
+    """A named pack of preset photos used by slideshow automations."""
+    __tablename__ = "image_collections"
+    id = Column(String(32), primary_key=True, default=_uuid)
+    name = Column(String(120), nullable=False, default="New collection")
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    def to_dict(self, images=None):
+        return {
+            "id": self.id, "name": self.name,
+            "images": images if images is not None else [],
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class CollectionImage(Base):
+    """One preset photo inside an ImageCollection."""
+    __tablename__ = "collection_images"
+    id = Column(String(32), primary_key=True, default=_uuid)
+    collection_id = Column(String(32), nullable=False)
+    image_path = Column(String(500), nullable=False)   # web path under /creations/collections/
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    def to_dict(self):
+        return {"id": self.id, "collection_id": self.collection_id, "image_path": self.image_path}
+
+
+class SlideshowAutomation(Base):
+    """A recurring TikTok photo-carousel recipe (ReelFarm-style automation):
+    topic + tone + hook bank + per-slide content directions + AI-or-collection
+    images + posting schedule + TikTok posting settings."""
+    __tablename__ = "slideshow_automations"
+    id = Column(String(32), primary_key=True, default=_uuid)
+    name = Column(String(120), nullable=False, default="New automation")
+    status = Column(String(20), default="paused")      # active | paused
+    topic = Column(Text, default="")
+    tone_preset = Column(String(40), default="conversational")
+    tone_prompt = Column(Text, default="")             # freeform style rules when preset == custom
+    hooks_json = Column(Text, default="[]")            # ["hook line", ...] — one picked per post
+    hook_image_json = Column(Text, default="{}")       # {source: ai|collection, image_prompt, collection_id}
+    slides_json = Column(Text, default="[]")           # [{id, direction, image: {source, image_prompt, collection_id}}]
+    cta_json = Column(Text, default="{}")              # {enabled, direction}
+    schedule_json = Column(Text, default="{}")         # {timezone, times: [{time: "09:00", days: [0..6]}]}  0=Sun
+    tiktok_json = Column(Text, default="{}")           # {auto_post, user_id, platforms, title_mode, title, caption_mode, caption}
+    last_fired_slot = Column(String(60), default="")   # "YYYY-MM-DD|HH:MM" scheduler dedupe marker
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_run_note = Column(String(300), default="")
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "name": self.name, "status": self.status,
+            "topic": self.topic, "tone_preset": self.tone_preset, "tone_prompt": self.tone_prompt,
+            "hooks": json.loads(self.hooks_json or "[]"),
+            "hook_image": json.loads(self.hook_image_json or "{}"),
+            "slides": json.loads(self.slides_json or "[]"),
+            "cta": json.loads(self.cta_json or "{}"),
+            "schedule": json.loads(self.schedule_json or "{}"),
+            "tiktok": json.loads(self.tiktok_json or "{}"),
+            "last_run_at": self.last_run_at.isoformat() if self.last_run_at else None,
+            "last_run_note": self.last_run_note,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 def init_db():
     Base.metadata.create_all(engine)
     print(f"🗄️ DB ready ({'postgres' if DATABASE_URL.startswith('postgresql') else 'sqlite'})")

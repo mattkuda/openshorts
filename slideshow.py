@@ -170,6 +170,13 @@ def render_slideshow(template_key, slots, out_dir, base_name, character_image=No
     if (slots.get("cta_text") or "").strip():
         pngs.append(_cta_slide(slots["cta_text"], p(len(pngs) + 1), avatar_path=character_image))
 
+    mp4_path = export_mp4(pngs, out_dir, base_name, log=log)
+    log(f"✅ Slideshow rendered → {mp4_path}")
+    return pngs, mp4_path
+
+
+def export_mp4(pngs, out_dir, base_name, log=print):
+    """PNG slide set → MP4 via the ffmpeg concat demuxer. Returns the mp4 path."""
     log(f"🎬 Exporting MP4 ({len(pngs)} slides × {SLIDE_SECONDS}s)…")
     mp4_path = os.path.join(out_dir, f"{base_name}.mp4")
     list_path = os.path.join(out_dir, f"{base_name}_concat.txt")
@@ -187,6 +194,4 @@ def render_slideshow(template_key, slots, out_dir, base_name, character_image=No
     finally:
         if os.path.exists(list_path):
             os.remove(list_path)
-
-    log(f"✅ Slideshow rendered → {mp4_path}")
-    return pngs, mp4_path
+    return mp4_path
