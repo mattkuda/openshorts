@@ -152,11 +152,12 @@ class ImageCollection(Base):
     __tablename__ = "image_collections"
     id = Column(String(32), primary_key=True, default=_uuid)
     name = Column(String(120), nullable=False, default="New collection")
+    kind = Column(String(20), default="user")   # user | starter (seeded, ready-made)
     created_at = Column(DateTime(timezone=True), default=_now)
 
     def to_dict(self, images=None):
         return {
-            "id": self.id, "name": self.name,
+            "id": self.id, "name": self.name, "kind": self.kind or "user",
             "images": images if images is not None else [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

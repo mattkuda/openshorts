@@ -2847,6 +2847,41 @@ COLLECTIONS_DIR = os.path.join(CREATIONS_DIR, "collections")
 os.makedirs(COLLECTIONS_DIR, exist_ok=True)
 
 
+DEFAULT_COLLECTIONS_DIR = "default_collections"
+
+
+def _seed_starter_collections():
+    """Ship ready-made photo packs (ReelFarm-style): each folder under
+    default_collections/ becomes a starter ImageCollection on first boot."""
+    if not os.path.isdir(DEFAULT_COLLECTIONS_DIR):
+        return
+    with get_session() as s:
+        existing = {c.name for c in s.query(ImageCollection).all()}
+        for pack in sorted(os.listdir(DEFAULT_COLLECTIONS_DIR)):
+            pack_dir = os.path.join(DEFAULT_COLLECTIONS_DIR, pack)
+            if not os.path.isdir(pack_dir) or pack in existing:
+                continue
+            files = sorted(f for f in os.listdir(pack_dir)
+                           if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp")))
+            if not files:
+                continue
+            coll = ImageCollection(name=pack[:120], kind="starter")
+            s.add(coll)
+            s.flush()
+            coll_dir = os.path.join(COLLECTIONS_DIR, coll.id)
+            os.makedirs(coll_dir, exist_ok=True)
+            for f in files:
+                name = f"{uuid.uuid4().hex[:10]}_{f.replace(' ', '_')}"
+                shutil.copyfile(os.path.join(pack_dir, f), os.path.join(coll_dir, name))
+                s.add(CollectionImage(collection_id=coll.id,
+                                      image_path=f"/creations/collections/{coll.id}/{name}"))
+            print(f"🖼️ Seeded starter collection: {pack} ({len(files)} photos)")
+        s.commit()
+
+
+_seed_starter_collections()
+
+
 def _collection_dict(session, coll):
     images = [i.to_dict() for i in session.query(CollectionImage)
               .filter(CollectionImage.collection_id == coll.id)

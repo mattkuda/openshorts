@@ -172,6 +172,9 @@ export default function CollectionPickerModal({ open, selectedId, onPick, onClos
                                         <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
                                             {selected && <Check size={14} className="text-primary-strong" />}
                                             {coll.name}
+                                            {coll.kind === 'starter' && (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Starter</span>
+                                            )}
                                         </p>
                                         <p className="text-xs text-muted-foreground">{coll.images.length} photos</p>
                                     </button>
