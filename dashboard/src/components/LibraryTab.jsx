@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RotateCcw, Calendar, Trash2, LayoutGrid, X } from 'lucide-react';
+import { RotateCcw, Calendar, Trash2, LayoutGrid, X, Pencil, Loader2 } from 'lucide-react';
 import { getApiUrl } from '../config';
 
 const KIND_LABELS = {
@@ -22,6 +22,12 @@ export default function LibraryTab({ uploadPostKey, uploadUserId, debug }) {
     const [creations, setCreations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    // Edit-slides dialog state (auto_slideshow drafts — the review gate)
+    const [editTarget, setEditTarget] = useState(null);
+    const [editTexts, setEditTexts] = useState([]);
+    const [rerendering, setRerendering] = useState(false);
+    const [editError, setEditError] = useState('');
 
     // Schedule dialog state
     const [scheduleTarget, setScheduleTarget] = useState(null);
@@ -200,13 +206,28 @@ export default function LibraryTab({ uploadPostKey, uploadUserId, debug }) {
                             </div>
 
                             <div className="flex items-center justify-between">
-                                <button
-                                    onClick={() => openScheduleDialog(creation)}
-                                    className="flex items-center gap-1.5 bg-card border border-border text-foreground hover:bg-muted rounded-lg text-sm px-3 py-1.5 transition-colors"
-                                >
-                                    <Calendar className="w-4 h-4" />
-                                    Schedule
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => openScheduleDialog(creation)}
+                                        className="flex items-center gap-1.5 bg-card border border-border text-foreground hover:bg-muted rounded-lg text-sm px-3 py-1.5 transition-colors"
+                                    >
+                                        <Calendar className="w-4 h-4" />
+                                        Schedule
+                                    </button>
+                                    {creation.kind === 'auto_slideshow' && creation.slots?.raws?.length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                setEditTarget(creation);
+                                                setEditTexts([...(creation.slots.texts || [])]);
+                                                setEditError('');
+                                            }}
+                                            className="flex items-center gap-1.5 bg-card border border-border text-foreground hover:bg-muted rounded-lg text-sm px-3 py-1.5 transition-colors"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                            Edit slides
+                                        </button>
+                                    )}
+                                </div>
                                 <button
                                     onClick={() => handleDelete(creation.id)}
                                     className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
@@ -217,6 +238,87 @@ export default function LibraryTab({ uploadPostKey, uploadUserId, debug }) {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Edit slides dialog (review gate for automation drafts) */}
+            {editTarget && (
+                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card border border-border rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto custom-scrollbar space-y-4">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-foreground">Edit slide text</h2>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Re-renders on the same images — no new AI cost. Numbers are part of the text here.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setEditTarget(null)}
+                                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                                title="Close"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {editTexts.map((text, i) => (
+                                <div key={i} className="flex gap-3 items-start">
+                                    <img
+                                        src={getApiUrl(editTarget.slots.raws[i])}
+                                        alt=""
+                                        className="w-12 aspect-[9/16] object-cover rounded-lg border border-border shrink-0"
+                                    />
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                            Slide {i + 1}
+                                            {editTarget.slots.roles?.[i] && editTarget.slots.roles[i] !== 'content'
+                                                ? ` · ${editTarget.slots.roles[i]}`
+                                                : ''}
+                                        </label>
+                                        <textarea
+                                            value={text}
+                                            onChange={(e) =>
+                                                setEditTexts((prev) => prev.map((t, idx) => (idx === i ? e.target.value : t)))
+                                            }
+                                            rows={2}
+                                            className="input-field w-full resize-y text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {editError && <p className="text-sm text-red-700">{editError}</p>}
+
+                        <button
+                            onClick={async () => {
+                                setRerendering(true);
+                                setEditError('');
+                                try {
+                                    const res = await fetch(getApiUrl('/api/automations/rerender'), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ creation_id: editTarget.id, texts: editTexts }),
+                                    });
+                                    if (!res.ok) throw new Error((await res.text()).slice(0, 200));
+                                    setEditTarget(null);
+                                    setScheduleSuccess('Slides re-rendered.');
+                                    setTimeout(() => setScheduleSuccess(''), 4000);
+                                    fetchLibrary();
+                                } catch (err) {
+                                    setEditError(err.message || 'Re-render failed.');
+                                } finally {
+                                    setRerendering(false);
+                                }
+                            }}
+                            disabled={rerendering}
+                            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {rerendering && <Loader2 size={16} className="animate-spin" />}
+                            {rerendering ? 'Re-rendering…' : 'Save & re-render'}
+                        </button>
+                    </div>
                 </div>
             )}
 

@@ -2971,7 +2971,8 @@ async def api_collections_delete_image(cid: str, image_id: str):
 from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
-from automations import generate_hooks as auto_generate_hooks, generate_slideshow, post_to_upload_post, TONE_PRESETS
+from automations import (generate_hooks as auto_generate_hooks, generate_slideshow,
+                         rerender_slides, post_to_upload_post, TONE_PRESETS)
 
 
 DEFAULT_CONTENT = {"slide_count": 4, "count_mode": "fixed", "count_min": 3, "count_max": 6,
@@ -3302,3 +3303,52 @@ async def _automation_scheduler():
         except Exception as e:
             print(f"⚠️ Automation scheduler tick failed: {e}")
         await asyncio.sleep(30)
+
+
+# ---- Draft review: edit slide text on a generated slideshow ----------
+
+class RerenderRequest(BaseModel):
+    creation_id: str
+    texts: List[str]
+
+
+@app.post("/api/automations/rerender")
+async def api_automations_rerender(req: RerenderRequest):
+    """Re-compose a generated slideshow's slides with edited text (review gate).
+    Uses the raw source images kept at generation time — no new AI calls."""
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        slots = json.loads(creation.slots_json or "{}")
+    raws = slots.get("raws") or []
+    if not raws:
+        raise HTTPException(status_code=400, detail="This slideshow has no editable raw images (generated before v2) — regenerate instead")
+    if len(req.texts) != len(raws):
+        raise HTTPException(status_code=400, detail=f"Expected {len(raws)} slide texts")
+
+    old_images = json.loads(creation.image_paths_json or "[]")
+    old_video = creation.video_path
+    base = f"auto_rr_{req.creation_id[:8]}_{uuid.uuid4().hex[:8]}"
+    try:
+        pngs, mp4 = await asyncio.to_thread(rerender_slides, raws, req.texts, base)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Re-render failed: {e}")
+
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        slots = json.loads(creation.slots_json or "{}")
+        slots["texts"] = req.texts
+        creation.slots_json = json.dumps(slots)
+        creation.image_paths_json = json.dumps([f"/creations/{os.path.basename(p)}" for p in pngs])
+        creation.video_path = f"/creations/{os.path.basename(mp4)}"
+        s.commit()
+        updated = creation.to_dict()
+
+    # old composed files are superseded — raws stay for future edits
+    for web_path in old_images + [old_video]:
+        if (web_path or "").startswith("/creations/") and web_path not in updated["image_paths"]:
+            fp = os.path.join(CREATIONS_DIR, os.path.basename(web_path))
+            if os.path.exists(fp):
+                os.remove(fp)
+    return {"creation": updated}
