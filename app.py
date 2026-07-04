@@ -3145,7 +3145,8 @@ def _run_automation(automation_dict, gemini_key, mock, log=print):
         kind="auto_slideshow", title=meta["title"] or meta["hook"],
         template_key="auto_slideshow",
         slots={"automation_id": automation_dict["id"], "hook": meta["hook"],
-               "texts": meta["texts"], "caption": meta["caption"]},
+               "texts": meta["texts"], "roles": meta.get("roles", []),
+               "raws": meta.get("raws", []), "caption": meta["caption"]},
         video_path=video_url, image_paths=image_urls,
     )
     return creation, image_urls, video_url, meta
