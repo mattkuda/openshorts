@@ -19,7 +19,7 @@ compose plain elements with Tailwind utility classes.
   matters on a screen (primary action, active nav item).
 - **Tokens, not raw colors.** Never hardcode `text-zinc-400`, `bg-white/5`, or hex values in
   components. Use the semantic tokens below. This is what makes the theme consistent and a
-  future dark mode a one-file change.
+  dark mode a one-file change (the `.dark` block in `index.css`; toggled from the app sidebar, persisted in localStorage `aishorts_theme`).
 - **Surgical and consistent.** Match the patterns already in the codebase. A new card should
   look like every other card.
 
@@ -28,7 +28,7 @@ compose plain elements with Tailwind utility classes.
 ## 2. Design tokens
 
 Tokens are CSS variables defined in `dashboard/src/index.css` (`:root` = light, `.dark` =
-dark scaffold) and exposed to Tailwind in `dashboard/tailwind.config.js`. Because they're
+dark theme) and exposed to Tailwind in `dashboard/tailwind.config.js`. Because they're
 defined as HSL channels, **Tailwind opacity modifiers work** (e.g. `bg-primary/15`).
 
 **Surface hierarchy (3 steps).** Depth reads through lightness, not shadow:
@@ -45,7 +45,7 @@ white card on a white surface — it disappears.
 | `text-foreground` | near-black | primary text, headings, body |
 | `text-muted-foreground` | mid gray | secondary text, captions, placeholders, inactive icons |
 | `border-border` | light divider | all borders and dividers |
-| `bg-primary` | **leaf green `#6DB364`** (muted brand green) | primary button bg, active/brand fills |
+| `bg-primary` | **brand green `#53B559`** | primary button bg, active/brand fills |
 | `text-primary-foreground` | deep green | text/icons **on** a green (`bg-primary`) surface |
 | `bg-primary-hover` | deeper green | primary button `:hover` |
 | `text-primary-strong` | readable deep green | green **as text** — links, active nav labels/icons |
@@ -53,8 +53,8 @@ white card on a white surface — it disappears.
 
 **The single most important color rule:**
 
-> `#6DB364` is a mid-lightness leaf green. It is **never** a body-text color on white and **never**
-> carries white text (white on `#6DB364` is ~2.5:1 — fails AA). Green-on-white text fails contrast too.
+> `#53B559` is a mid-lightness brand green. It is **never** a body-text color on white and **never**
+> carries white text (white on `#53B559` is ~2.6:1 — fails AA). Green-on-white text fails contrast too.
 >
 > - Green as a **fill** (button, badge, active pill) → pair with **dark** text
 >   (`text-primary-foreground` or `text-foreground`).
@@ -64,7 +64,7 @@ Target **WCAG AA** (4.5:1 body, 3:1 large text / UI). When in doubt, darken.
 
 ### Adding or changing a token
 Change the value in **one place**: the `:root` block in `index.css` (and its `.dark`
-counterpart). Don't add new hardcoded colors to components — add a token. The brand green (`#6DB364`, sampled from the logo) lives only in `--primary*` — any future change is a single edit there.
+counterpart). Don't add new hardcoded colors to components — add a token. The brand green (`#53B559`) lives only in `--primary*` — any future change is a single edit there.
 
 ---
 

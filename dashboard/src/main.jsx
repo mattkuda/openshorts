@@ -5,6 +5,11 @@ import App from './App.jsx'
 import Landing from './Landing.jsx'
 import Legal from './Legal.jsx'
 
+// Apply the persisted theme before first paint (the toggle lives in the app sidebar).
+if (localStorage.getItem('aishorts_theme') === 'dark') {
+  document.documentElement.classList.add('dark');
+}
+
 function Root() {
   const resolveView = () => {
     const hash = window.location.hash;

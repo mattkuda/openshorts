@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat } from 'lucide-react';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat, Sun, Moon } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
@@ -184,6 +184,11 @@ function App() {
     return next;
   });
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('aishorts_theme') === 'dark');
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('aishorts_theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   // --- Local debug mode (enable with ?debug=true) ---
   const [debug, setDebugState] = useState(() => {
@@ -482,14 +487,14 @@ function App() {
               title="Expand sidebar"
               className="relative w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shrink-0 overflow-hidden"
             >
-              <img src="/logo-clipzoo-white.png" alt="ClipZoo" className="w-6 h-6 object-contain transition-opacity group-hover/sidebar:opacity-0" />
+              <img src={darkMode ? '/logo-clipzoo.png' : '/logo-clipzoo-white.png'} alt="ClipZoo" className="w-6 h-6 object-contain transition-opacity group-hover/sidebar:opacity-0" />
               <PanelLeft size={18} className="absolute text-background opacity-0 transition-opacity group-hover/sidebar:opacity-100" />
             </button>
           ) : (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 bg-foreground rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                  <img src="/logo-clipzoo-white.png" alt="ClipZoo" className="w-6 h-6 object-contain" />
+                  <img src={darkMode ? '/logo-clipzoo.png' : '/logo-clipzoo-white.png'} alt="ClipZoo" className="w-6 h-6 object-contain" />
                 </div>
                 <span className="font-bold text-lg text-foreground tracking-tight whitespace-nowrap">ClipZoo</span>
               </div>
@@ -542,7 +547,15 @@ function App() {
 
         {/* Footer cluster (ReelFarm-style) */}
         <div className="border-t border-border shrink-0">
-          <div className="px-3 pt-3">
+          <div className="px-3 pt-3 space-y-1">
+            <button
+              onClick={() => setDarkMode((prev) => !prev)}
+              className="group relative w-full flex items-center gap-3 px-3 h-9 rounded-xl text-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+            >
+              {darkMode ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
+              {!sidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">{darkMode ? 'Light mode' : 'Dark mode'}</span>}
+              {sidebarCollapsed && tip(darkMode ? 'Light mode' : 'Dark mode')}
+            </button>
             <button className="group relative w-full flex items-center gap-3 px-3 h-9 rounded-xl text-foreground/70 hover:text-foreground hover:bg-muted transition-colors">
               <HelpCircle size={18} className="shrink-0" />
               {!sidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Support</span>}

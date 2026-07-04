@@ -16,14 +16,15 @@
     --muted-foreground: 0 0% 42%;    /* secondary text */
     --foreground: 0 0% 8%;           /* primary text — near-black (#141414) */
     --border: 0 0% 89%;              /* borders & dividers */
-    --primary: 107 34% 55%;          /* brand leaf green (~#6DB364) */
-    --primary-hover: 107 36% 47%;    /* primary button hover (deeper) */
-    --primary-foreground: 110 45% 10%; /* deep green text/icons ON green (white fails AA on #6DB364) */
-    --primary-strong: 110 42% 30%;   /* green-as-text / links / active nav on light (AA on white) */
-    --ring: 107 34% 48%;             /* focus ring */
+    --primary: 123.7 39.8% 51.8%;    /* brand green (#53B559 exact) */
+    --primary-hover: 124 42% 44%;    /* primary button hover (deeper) */
+    --primary-foreground: 125 45% 10%; /* deep green text/icons ON green (white fails AA on #53B559) */
+    --primary-strong: 124 45% 29%;   /* green-as-text / links / active nav on light (AA on white) */
+    --ring: 124 40% 45%;             /* focus ring */
   }
 
-  /* Dark theme scaffold — add `class="dark"` on <html> to flip. */
+  /* Dark theme — toggled via the Dark mode button in the app sidebar
+     (adds `class="dark"` on <html>, persisted in localStorage `aishorts_theme`). */
   .dark {
     --background: 0 0% 7%;
     --surface: 0 0% 11%;
@@ -32,11 +33,11 @@
     --muted-foreground: 0 0% 64%;
     --foreground: 0 0% 96%;
     --border: 0 0% 20%;
-    --primary: 107 34% 55%;
-    --primary-hover: 107 36% 62%;
-    --primary-foreground: 110 45% 10%;
-    --primary-strong: 107 40% 62%;
-    --ring: 107 34% 52%;
+    --primary: 123.7 39.8% 51.8%;
+    --primary-hover: 124 42% 60%;
+    --primary-foreground: 125 45% 10%;
+    --primary-strong: 124 40% 62%;
+    --ring: 124 40% 50%;
   }
 
   body {

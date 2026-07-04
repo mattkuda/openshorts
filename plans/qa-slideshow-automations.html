@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>QA Runbook — Slideshow Automations</title>
+<style>
+  :root {
+    --bg: #000; --fg: #a1a1aa; --heading: #fff;
+    --line: rgba(255,255,255,0.1); --surface: #0a0a0a;
+    --mint: #6DB364; --red: #f87171; --amber: #fbbf24; --comment: #7ee787;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 20px; font-weight: 700; margin: 48px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 660px; }
+  strong { color: #d4d4d8; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; color: #d4d4d8; }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--mint); border-radius: 12px; padding: 18px 20px; margin-top: 24px; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid var(--line); margin: 6px 6px 0 0; }
+  .pill.green { color: var(--mint); border-color: rgba(109,179,100,0.4); }
+  .pill.amber { color: var(--amber); border-color: rgba(251,191,36,0.35); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; vertical-align: top; }
+  th { font-weight: 600; color: rgba(255,255,255,0.55); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td strong { color: var(--heading); }
+  .cost { font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; }
+  .free { color: var(--mint); font-weight: 600; }
+  .note { font-size: 12.5px; color: rgba(255,255,255,0.4); }
+
+  .test {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin: 10px 0;
+  }
+  .test-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .test-title { color: var(--heading); font-weight: 600; font-size: 14.5px; }
+  .test-id { color: rgba(255,255,255,0.35); font-size: 11px; font-family: ui-monospace, Menlo, monospace; margin-right: 8px; }
+  .verdicts { display: flex; gap: 6px; flex-shrink: 0; }
+  .verdicts button {
+    font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 8px;
+    background: transparent; color: var(--fg); border: 1px solid var(--line); cursor: pointer;
+    transition: all 120ms ease;
+  }
+  .verdicts button:hover { border-color: rgba(255,255,255,0.4); }
+  .verdicts button.sel-pass { background: rgba(109,179,100,0.18); color: var(--mint); border-color: var(--mint); }
+  .verdicts button.sel-fail { background: rgba(248,113,113,0.15); color: var(--red); border-color: var(--red); }
+  .verdicts button.sel-skip { background: rgba(251,191,36,0.12); color: var(--amber); border-color: var(--amber); }
+  .steps { margin: 10px 0 4px; padding-left: 20px; font-size: 13.5px; }
+  .steps li { margin: 3px 0; }
+  .expect { font-size: 13px; color: var(--comment); margin: 6px 0 0; }
+  .expect::before { content: "✓ Expect: "; font-weight: 700; }
+  .fail-note { display: none; width: 100%; margin-top: 10px; min-height: 40px; resize: vertical; font: inherit; font-size: 13px; color: var(--heading); background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.3); border-radius: 8px; padding: 8px 10px; }
+  .test.failed .fail-note { display: block; }
+
+  textarea#notes { width: 100%; min-height: 110px; resize: vertical; font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(109,179,100,0.5); }
+
+  .bar { position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px; background: linear-gradient(to top, #000 70%, rgba(0,0,0,0)); display: flex; gap: 12px; align-items: center; }
+  button.action { font: inherit; font-weight: 700; background: var(--mint); color: #071607; border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  button.ghost { font: inherit; background: transparent; color: var(--heading); border: 1px solid var(--line); border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  #progress { color: var(--heading); font-size: 13px; font-weight: 600; }
+  pre#out { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; display: none; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 600; color: var(--heading); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>QA Runbook — Slideshow Automations</h1>
+  <p class="lede">Manual QA pass for the automations feature shipped 2026-07-03: recipe (topic → tone → hooks → per-slide directions → images) → generate → schedule → auto-post. Mark each test Pass / Fail / Skip, then <em>Copy results as Markdown</em> at the bottom and paste it back to Claude to get fixes queued.</p>
+  <p>
+    <span class="pill">App: <code>localhost:5175/#app</code> → Automations tab</span>
+    <span class="pill">Stack: <code>docker compose up</code></span>
+    <span class="pill green">Free path: debug 🐛 → "Mock AI" ON</span>
+    <span class="pill amber">Real path: mockAI OFF (costs below)</span>
+  </p>
+
+  <div class="tldr">
+    <p><strong>TL;DR on cost.</strong> One slideshow generation = <strong>1 cheap Gemini text call (~0.1¢)</strong> + <strong>~7¢ per AI-generated image slide</strong>. Slides that pull from your photo collections are <strong class="free">free</strong>, and the PIL/FFmpeg composition is local. So: all-collection slideshow ≈ <strong class="free">$0.001</strong> · typical 5-slide all-AI (hook + 3 content + CTA) ≈ <strong>$0.34</strong> · hybrid (AI hook image, collection content) ≈ <strong>$0.14</strong>. Posting daily for a month: ~3¢ (collections) to ~$10 (all-AI). Mock mode is $0 everywhere — run this whole runbook free.</p>
+  </div>
+
+  <h2>Cost per generation</h2>
+  <table>
+    <tr><th>Action</th><th>What's billed</th><th>Est. cost</th><th>Runs on</th></tr>
+    <tr><td><strong>Slide text writing</strong> (all slides + title + caption, one call per generation)</td><td>1× Gemini 2.5 Flash text call (~700 in / ~300 out tokens)</td><td class="cost">~$0.001</td><td>Gemini key</td></tr>
+    <tr><td><strong>Each slide set to "AI image"</strong></td><td>1× <code>gemini-3.1-flash-image-preview</code> (1K default, $60/M image tokens)</td><td class="cost">~$0.067</td><td>Gemini key</td></tr>
+    <tr><td>Each slide set to "Collection"</td><td>Nothing — random pick from your uploaded pack</td><td class="cost free">$0.00</td><td>local</td></tr>
+    <tr><td>Slide composition + PNG set + MP4 export</td><td>Nothing — PIL + FFmpeg on your machine</td><td class="cost free">$0.00</td><td>local</td></tr>
+    <tr><td>Hooks "Generate 10 more"</td><td>1× Gemini 2.5 Flash text call</td><td class="cost">~$0.001</td><td>Gemini key</td></tr>
+    <tr><td>Scheduled auto-post</td><td>Upload-Post plan (10 free/mo, then ~$16/mo flat)</td><td class="cost">$0–$0.16 <span class="note">amortized</span></td><td>Upload-Post</td></tr>
+    <tr><td>Anything with <strong>Mock AI</strong> ON</td><td>Nothing anywhere</td><td class="cost free">$0.00</td><td>local</td></tr>
+  </table>
+  <p class="note">Image price is the current published rate for gemini-3.1-flash-image-preview at the default 1K output ($0.067/image standard; $0.034 if Google's batch tier is ever wired in). Text ≈ $0.30/M in + $2.50/M out. Heads-up: the CTA slide reuses the <em>hook slide's image setting</em> — if the hook image is "AI", an enabled CTA generates its own second image (+7¢). Verify rates at ai.google.dev/gemini-api/docs/pricing before scaling volume.</p>
+  <details>
+    <summary>Worked examples: what a posting cadence costs</summary>
+    <table>
+      <tr><th>Recipe</th><th>Per generation</th><th>1 post/day · 30 days</th></tr>
+      <tr><td>Hook + 3 content + CTA, <strong>all AI images</strong> (5 images)</td><td class="cost">~$0.34</td><td class="cost">~$10.10</td></tr>
+      <tr><td>AI hook image + CTA, 3 content from a collection (2 images)</td><td class="cost">~$0.14</td><td class="cost">~$4.10</td></tr>
+      <tr><td><strong>Everything from collections</strong> (0 images)</td><td class="cost free">~$0.001</td><td class="cost free">~$0.03</td></tr>
+    </table>
+    <p class="note" style="margin-top:8px">ReelFarm charges ~$0.50–$1+ per generated slideshow post on their credit plans — even the all-AI recipe here is ~3× cheaper, and the collection recipe is effectively free.</p>
+  </details>
+
+  <h2>Setup (once, ~2 min)</h2>
+  <div class="test" data-id="S1">
+    <div class="test-head"><span><span class="test-id">S1</span><span class="test-title">Stack up &amp; keys loaded</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Run <code>docker compose up</code> (backend :8000, frontend :5175). If backend code changed: <code>docker restart ai-shorts-backend</code>.</li>
+      <li>Open <code>http://localhost:5175/?debug=true#app</code> and click <strong>Automations</strong> in the sidebar (below Create).</li>
+      <li>Backend log should show <code>⏰ Slideshow automation scheduler started.</code> (<code>docker logs ai-shorts-backend | grep ⏰</code>).</li>
+    </ol>
+    <p class="expect">"Slideshow Automations" page loads with a green "New automation" button; scheduler line is in the log.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="S2">
+    <div class="test-head"><span><span class="test-id">S2</span><span class="test-title">Pick your cost mode</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click 🐛 → <strong>Mock AI</strong> ON for a $0 run (placeholder images, canned text), OFF to exercise real Gemini (~$0.40 for this whole runbook with one all-AI generation).</li>
+      <li>The editor's preview column tells you which mode you're in ("Mock mode — placeholder images, no API cost.").</li>
+    </ol>
+    <p class="expect">Mode note appears/disappears with the toggle; persists across reloads.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>A · Automations list</h2>
+  <div class="test" data-id="A1">
+    <div class="test-head"><span><span class="test-id">A1</span><span class="test-title">Create an automation</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click <strong>New automation</strong>.</li>
+    </ol>
+    <p class="expect">You land directly in the editor named "New automation", Paused, with 1 empty content slide, a 9:00 AM posting time with all 7 days on, and your browser timezone preselected.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A2">
+    <div class="test-head"><span><span class="test-id">A2</span><span class="test-title">List card anatomy</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Back out via "← All automations".</li>
+      <li>Inspect the card: status pill, name, topic line, 3 thumbnail wells, schedule summary ("1×/day · 7/week · 9:00 AM"), TikTok account line.</li>
+    </ol>
+    <p class="expect">All present; thumbnails empty until you generate; clicking the name/topic opens the editor.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A3">
+    <div class="test-head"><span><span class="test-id">A3</span><span class="test-title">Pause / resume + delete</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click the play icon — pill flips to green "Active". Click pause — back to "Paused".</li>
+      <li>Click the trash icon → confirm dialog mentions Library items are kept → confirm.</li>
+    </ol>
+    <p class="expect">Status flips persist on reload; deleted card disappears; previously generated slideshows still exist in Library.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>B · Editor — the recipe</h2>
+  <div class="test" data-id="B1">
+    <div class="test-head"><span><span class="test-id">B1</span><span class="test-title">Topic, tone &amp; custom tone</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Create a fresh automation. Set topic: <em>"how i actually stick to my workout plan (promotes the Evex app)"</em>.</li>
+      <li>Cycle the tone dropdown; pick <strong>Custom</strong>.</li>
+    </ol>
+    <p class="expect">Custom reveals a freeform style-rules textarea; other presets hide it. Save button lights up as soon as anything changes.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B2">
+    <div class="test-head"><span><span class="test-id">B2</span><span class="test-title">Hook bank + "Generate 10 more"</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Type one hook manually (one line = one hook).</li>
+      <li>Click <strong>Generate 10 more</strong>.</li>
+      <li>Click it again — the new batch should not repeat the first (real mode).</li>
+    </ol>
+    <p class="expect">Textarea grows by 10 lines about YOUR topic; unsaved edits are auto-saved before the call; Save resets to disabled after.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B3">
+    <div class="test-head"><span><span class="test-id">B3</span><span class="test-title">Slides: directions + add/remove</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Slide 2 direction: <em>"showing up consistently, not overdoing it — ~10 words, all lowercase"</em>.</li>
+      <li><strong>Add slide</strong> twice; give each a direction; remove one with the ✕.</li>
+      <li>Toggle <strong>CTA end slide</strong> on; direction: <em>"soft CTA to track your lifts with the Evex app"</em>.</li>
+    </ol>
+    <p class="expect">Slides renumber correctly after removal; CTA input only shows when the toggle is on; preview column count updates ("N content slides + CTA").</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B4">
+    <div class="test-head"><span><span class="test-id">B4</span><span class="test-title">Image source: AI prompt vs Collection</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>On the hook slide, keep <strong>AI image</strong> and type a photo prompt.</li>
+      <li>On slide 2, flip to <strong>Collection</strong> → "Pick a photo collection…" opens the modal.</li>
+      <li>In the modal: create a collection ("Gym B-roll"), <strong>Add photos</strong> (upload 2–3 jpg/png), then click the collection card to pick it.</li>
+    </ol>
+    <p class="expect">Modal shows a 4-thumb cover grid + photo count; picked collection's name + count replace the button label; per-slide choice persists after Save + reload.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B5">
+    <div class="test-head"><span><span class="test-id">B5</span><span class="test-title">Posting times (the ReelFarm layout)</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Change the default time; click day chips off/on (Su–Sa, all on by default).</li>
+      <li><strong>Add posting time</strong> — second row appears (12:00, all days).</li>
+      <li>Turn 3 days off on one row — the summary line ("2× per day · 11/week") recalculates.</li>
+      <li>Remove a row with the trash icon. Change the timezone dropdown.</li>
+    </ol>
+    <p class="expect">Summary math matches your chips; everything persists after Save + reload.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B6">
+    <div class="test-head"><span><span class="test-id">B6</span><span class="test-title">TikTok posting settings</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Toggle <strong>auto-post</strong> on.</li>
+      <li>If Upload-Post is connected: your TikTok profiles appear in the dropdown — pick one. If not: a hint points to Settings.</li>
+      <li>Flip Post title between <strong>AI prompt</strong> ("Title-case the hook") and <strong>Static</strong>; same for Caption.</li>
+    </ol>
+    <p class="expect">Mode toggles swap the placeholder text; all values persist after Save.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>C · Generation</h2>
+  <div class="test" data-id="C1">
+    <div class="test-head"><span><span class="test-id">C1</span><span class="test-title">Generate now — the money shot</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click <strong>Generate now</strong> (auto-saves dirty edits first).</li>
+      <li>Mock: ~3s. Real: ~15–60s depending on AI image count.</li>
+    </ol>
+    <p class="expect">Preview fills with slide 1 (your hook text over the image, white text + black outline, upper third); ‹ › arrows and dots page through hook → content slides → CTA; each content slide's text follows its direction (incl. casing/length rules); collection slides use YOUR uploaded photos; "Saved to Library." appears.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="C2">
+    <div class="test-head"><span><span class="test-id">C2</span><span class="test-title">Library + card thumbnails + persistence</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Library tab → newest item is kind "Slideshow", status draft, playable MP4, Schedule button works on it.</li>
+      <li>Automations tab → the card's 3 thumbnail wells now show recent generations.</li>
+      <li><code>docker restart ai-shorts-backend</code>, reload — automation, collections, and creations all survive.</li>
+    </ol>
+    <p class="expect">Everything persists (SQLite `data/clipzoo.db` + files under `creations/`).</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="C3">
+    <div class="test-head"><span><span class="test-id">C3</span><span class="test-title">Variety across runs</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Generate 2–3 more times from the same automation.</li>
+    </ol>
+    <p class="expect">Different hooks get picked across runs (random from the bank); collection slides rotate photos instead of always reusing one (with ≥2 photos uploaded); slide text varies in real mode.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>D · Scheduler (the "automation" part)</h2>
+  <div class="test" data-id="D1">
+    <div class="test-head"><span><span class="test-id">D1</span><span class="test-title">A scheduled slot fires once</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Set a posting time 2 minutes from now (today's day chip on), Save, set status <strong>Active</strong>.</li>
+      <li>Watch <code>docker logs -f ai-shorts-backend</code>.</li>
+      <li>Note: headless runs use the <code>.env.local</code> <code>GEMINI_API_KEY</code> — a real (non-mock) generation. With an all-collection recipe this is ~0.1¢; with AI images budget ~7¢ each.</li>
+    </ol>
+    <p class="expect">At the minute: <code>⏰ Automation due: &lt;name&gt;</code> exactly ONCE (no double-fire); a new slideshow lands in Library; the card would show <code>last_run_note</code> errors if anything failed. <strong>Pause the automation after this test</strong> or it posts daily.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="D2">
+    <div class="test-head"><span><span class="test-id">D2</span><span class="test-title">Auto-post to TikTok (optional — real post!)</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Requires <code>UPLOAD_POST_API_KEY</code> in <code>.env.local</code> + auto-post on + a TikTok account picked.</li>
+      <li>Repeat D1. <strong>This publishes a real video to the linked account</strong> — use a test account, or Skip this row.</li>
+    </ol>
+    <p class="expect">Log shows the post; Calendar tab gains a "posted" entry; creation flips to published. (Not exercised in Claude's QA pass — no test TikTok account.)</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>E · Edge cases</h2>
+  <div class="test" data-id="E1">
+    <div class="test-head"><span><span class="test-id">E1</span><span class="test-title">Guard rails</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>New automation with an empty hook bank → <strong>Generate now</strong>.</li>
+      <li>Pick "Collection" on a slide but never choose one → Generate.</li>
+      <li>Delete an automation that has generated content → check Library.</li>
+    </ol>
+    <p class="expect">1: clean error "Automation has no hooks — add at least one hook line". 2: still generates (falls back to a neutral placeholder image — no crash). 3: Library items survive the delete.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>Anything else?</h2>
+  <textarea id="notes" placeholder="Impressions, UX gripes, ideas — anything the checkboxes didn't capture. This gets included in the copy."></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy results as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span id="progress"></span>
+    <span class="hint">Verdicts + notes are saved in this browser.</span>
+  </div>
+  <pre id="out"></pre>
+</main>
+
+<script>
+  const VERDICTS = ['Pass', 'Fail', 'Skip'];
+  const CLS = { Pass: 'sel-pass', Fail: 'sel-fail', Skip: 'sel-skip' };
+  const STORE = 'clipzoo_qa_automations_v1';
+  const state = JSON.parse(localStorage.getItem(STORE) || '{}');
+
+  function save() { localStorage.setItem(STORE, JSON.stringify(state)); updateProgress(); }
+
+  function updateProgress() {
+    const tests = document.querySelectorAll('.test').length;
+    const done = Object.values(state.v || {}).filter(Boolean).length;
+    const fails = Object.values(state.v || {}).filter(v => v === 'Fail').length;
+    document.getElementById('progress').textContent = `${done}/${tests} checked` + (fails ? ` · ${fails} failing` : '');
+  }
+
+  document.querySelectorAll('.test').forEach(test => {
+    const id = test.dataset.id;
+    const holder = test.querySelector('.verdicts');
+    const noteEl = test.querySelector('.fail-note');
+    state.v = state.v || {}; state.n = state.n || {};
+
+    VERDICTS.forEach(v => {
+      const b = document.createElement('button');
+      b.textContent = v;
+      b.onclick = () => {
+        state.v[id] = state.v[id] === v ? '' : v;
+        render();
+        save();
+      };
+      holder.appendChild(b);
+    });
+
+    if (noteEl) {
+      noteEl.value = state.n[id] || '';
+      noteEl.addEventListener('input', () => { state.n[id] = noteEl.value; save(); });
+    }
+
+    function render() {
+      [...holder.children].forEach(b => {
+        b.className = state.v[id] === b.textContent ? CLS[b.textContent] : '';
+      });
+      test.classList.toggle('failed', state.v[id] === 'Fail');
+    }
+    test._render = render;
+    render();
+  });
+
+  const notes = document.getElementById('notes');
+  notes.value = state.notes || '';
+  notes.addEventListener('input', () => { state.notes = notes.value; save(); });
+  updateProgress();
+
+  function buildMarkdown() {
+    let md = '## QA results — Slideshow Automations\n';
+    document.querySelectorAll('h2').forEach(h2 => {
+      const sectionTests = [];
+      let el = h2.nextElementSibling;
+      while (el && el.tagName !== 'H2') {
+        if (el.classList?.contains('test')) sectionTests.push(el);
+        el = el.nextElementSibling;
+      }
+      if (!sectionTests.length) return;
+      md += `\n### ${h2.textContent.trim()}\n`;
+      sectionTests.forEach(t => {
+        const id = t.dataset.id;
+        const title = t.querySelector('.test-title').textContent.trim();
+        const v = state.v?.[id] || '(not run)';
+        const icon = v === 'Pass' ? '✅' : v === 'Fail' ? '❌' : v === 'Skip' ? '⏭️' : '⬜';
+        md += `- ${icon} **${id} ${title}** — ${v}`;
+        if (v === 'Fail' && state.n?.[id]) md += `\n  - ${state.n[id].trim().replace(/\n/g, '\n    ')}`;
+        md += '\n';
+      });
+    });
+    md += `\n## Notes\n${(state.notes || '').trim() || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+  copyBtn.onclick = async () => {
+    const md = buildMarkdown();
+    out.textContent = md; out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy results as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy results as Markdown', 2500);
+    }
+  };
+  document.getElementById('clear').onclick = () => {
+    if (!confirm('Clear all verdicts and notes?')) return;
+    localStorage.removeItem(STORE);
+    state.v = {}; state.n = {}; state.notes = '';
+    document.querySelectorAll('.test').forEach(t => { t.querySelector('.fail-note').value = ''; t._render(); });
+    notes.value = ''; out.style.display = 'none'; updateProgress();
+  };
+</script>
+</body>
+</html>

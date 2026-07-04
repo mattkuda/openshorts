@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>QA Runbook — Create UGC ads flow</title>
+<style>
+  :root {
+    --bg: #000; --fg: #a1a1aa; --heading: #fff;
+    --line: rgba(255,255,255,0.1); --surface: #0a0a0a;
+    --mint: #6DB364; --red: #f87171; --amber: #fbbf24; --comment: #7ee787;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 20px; font-weight: 700; margin: 48px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 660px; }
+  strong { color: #d4d4d8; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; color: #d4d4d8; }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--mint); border-radius: 12px; padding: 18px 20px; margin-top: 24px; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid var(--line); margin: 6px 6px 0 0; }
+  .pill.green { color: var(--mint); border-color: rgba(109,179,100,0.4); }
+  .pill.amber { color: var(--amber); border-color: rgba(251,191,36,0.35); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; vertical-align: top; }
+  th { font-weight: 600; color: rgba(255,255,255,0.55); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td strong { color: var(--heading); }
+  .cost { font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; }
+  .free { color: var(--mint); font-weight: 600; }
+  .note { font-size: 12.5px; color: rgba(255,255,255,0.4); }
+
+  /* QA test rows */
+  .test {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin: 10px 0;
+  }
+  .test-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .test-title { color: var(--heading); font-weight: 600; font-size: 14.5px; }
+  .test-id { color: rgba(255,255,255,0.35); font-size: 11px; font-family: ui-monospace, Menlo, monospace; margin-right: 8px; }
+  .verdicts { display: flex; gap: 6px; flex-shrink: 0; }
+  .verdicts button {
+    font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 8px;
+    background: transparent; color: var(--fg); border: 1px solid var(--line); cursor: pointer;
+    transition: all 120ms ease;
+  }
+  .verdicts button:hover { border-color: rgba(255,255,255,0.4); }
+  .verdicts button.sel-pass { background: rgba(109,179,100,0.18); color: var(--mint); border-color: var(--mint); }
+  .verdicts button.sel-fail { background: rgba(248,113,113,0.15); color: var(--red); border-color: var(--red); }
+  .verdicts button.sel-skip { background: rgba(251,191,36,0.12); color: var(--amber); border-color: var(--amber); }
+  .steps { margin: 10px 0 4px; padding-left: 20px; font-size: 13.5px; }
+  .steps li { margin: 3px 0; }
+  .expect { font-size: 13px; color: var(--comment); margin: 6px 0 0; }
+  .expect::before { content: "✓ Expect: "; font-weight: 700; }
+  .fail-note { display: none; width: 100%; margin-top: 10px; min-height: 40px; resize: vertical; font: inherit; font-size: 13px; color: var(--heading); background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.3); border-radius: 8px; padding: 8px 10px; }
+  .test.failed .fail-note { display: block; }
+
+  textarea#notes { width: 100%; min-height: 110px; resize: vertical; font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(109,179,100,0.5); }
+
+  .bar { position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px; background: linear-gradient(to top, #000 70%, rgba(0,0,0,0)); display: flex; gap: 12px; align-items: center; }
+  button.action { font: inherit; font-weight: 700; background: var(--mint); color: #071607; border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  button.ghost { font: inherit; background: transparent; color: var(--heading); border: 1px solid var(--line); border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  #progress { color: var(--heading); font-size: 13px; font-weight: 600; }
+  pre#out { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; display: none; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 600; color: var(--heading); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>QA Runbook — Create UGC ads flow</h1>
+  <p class="lede">Manual QA pass for the ReelFarm-style pipeline shipped 2026-07-03: hooks → avatars → demos → preview → sound → render → library. Mark each test Pass / Fail / Skip, then <em>Copy results as Markdown</em> at the bottom and paste it back to Claude to get fixes queued.</p>
+  <p>
+    <span class="pill">App: <code>localhost:5175/#app</code></span>
+    <span class="pill">Stack: <code>docker compose up</code></span>
+    <span class="pill green">Free path: debug 🐛 → "Mock AI + mock videos" ON</span>
+    <span class="pill amber">Real path: mockAI OFF (costs below)</span>
+  </p>
+
+  <div class="tldr">
+    <p><strong>TL;DR on cost.</strong> The Create UGC ads generation itself is <strong class="free">$0 per video</strong> — FFmpeg runs locally, and avatars/hooks are reused assets. You only pay when creating <em>new</em> AI assets: ~<strong>4¢</strong> per character portrait or look (Gemini), ~<strong>0.1¢</strong> per hook batch. The only meaningfully-priced generation in the app is the AI Actor Ad (fal.ai talking head), ~<strong>$0.50–$1.50</strong> per video. Your $10 fal balance ≈ 7–20 actor ads; everything in THIS runbook costs at most ~9¢ total on the real path, $0 on the mock path.</p>
+  </div>
+
+  <h2>Cost per generation</h2>
+  <table>
+    <tr><th>Action</th><th>What's billed</th><th>Est. cost</th><th>Runs on</th></tr>
+    <tr><td><strong>Generate a Hook+Demo video</strong> (avatar + demo + sound → MP4)</td><td>Nothing — FFmpeg assembly on your machine</td><td class="cost free">$0.00</td><td>local</td></tr>
+    <tr><td>Hook suggestions (auto-load, batch of 8)</td><td>1× Gemini 2.5 Flash text call</td><td class="cost">~$0.001</td><td>Gemini key</td></tr>
+    <tr><td><strong>New character portrait</strong></td><td>1× Gemini image gen (<code>gemini-3.1-flash-image-preview</code>)</td><td class="cost">~$0.04</td><td>Gemini key</td></tr>
+    <tr><td><strong>New character look</strong> (reference-image edit)</td><td>1× Gemini image gen</td><td class="cost">~$0.04</td><td>Gemini key</td></tr>
+    <tr><td>Slideshow render (PNG set + MP4)</td><td>Nothing — PIL + FFmpeg local</td><td class="cost free">$0.00</td><td>local</td></tr>
+    <tr><td>Slideshow AI autofill</td><td>1× Gemini text call</td><td class="cost">~$0.001</td><td>Gemini key</td></tr>
+    <tr><td><strong>AI Actor Ad</strong> (talking head, the AI Actor Ads tab)</td><td>Flux portraits + ElevenLabs voice + Kling avatar (+ B-roll)</td><td class="cost">~$0.50–$1.50</td><td><strong>fal.ai</strong> + ElevenLabs</td></tr>
+    <tr><td>Publish / schedule a post</td><td>Upload-Post plan (10 free/mo, then ~$16/mo flat)</td><td class="cost">$0–$0.16 <span class="note">amortized</span></td><td>Upload-Post</td></tr>
+    <tr><td>Anything with <strong>Mock AI + mock videos</strong> ON</td><td>Nothing anywhere</td><td class="cost free">$0.00</td><td>local</td></tr>
+  </table>
+  <p class="note">Gemini prices are approximate (Flash text ≈ $0.30/M in + $2.50/M out; Flash image ≈ $0.039/image — the "Nano Banana" tier ReelFarm itself uses). fal.ai range depends on clip length and whether B-roll is generated. Verify current rates at ai.google.dev/pricing and fal.ai/pricing before scaling volume.</p>
+  <details>
+    <summary>Worked example: a week of Evex content</summary>
+    <p style="margin-top:10px">1 character (portrait + 4 looks) = ~20¢ once · 5 hook+demo videos = $0 · 2 slideshows = $0 · hooks/autofill ≈ 1¢ · <strong>Total ≈ 21¢/week</strong> — plus $0.50–1.50 each only if you add AI actor ads. Posting stays free under 10/mo on Upload-Post.</p>
+  </details>
+
+  <h2>Setup (once, ~2 min)</h2>
+  <div class="test" data-id="S1">
+    <div class="test-head"><span><span class="test-id">S1</span><span class="test-title">Stack up &amp; keys loaded</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Run <code>docker compose up</code> (backend :8000, frontend :5175). If backend code changed since last run: <code>docker restart ai-shorts-backend</code>.</li>
+      <li>Open <code>http://localhost:5175/?debug=true#app</code>.</li>
+      <li>Header should NOT warn about a Gemini key (comes from <code>.env.local</code>) — only Upload-Post may warn.</li>
+    </ol>
+    <p class="expect">App loads on the Create tab, green ClipZoo theme, amber 🐛 button bottom-right.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="S2">
+    <div class="test-head"><span><span class="test-id">S2</span><span class="test-title">Pick your cost mode</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click 🐛 → toggle <strong>Mock AI + mock videos</strong>: ON for a $0 run, OFF to exercise real Gemini (~9¢ for this whole runbook).</li>
+      <li>Confirm Brand Profile is set (Settings → Brand Profile → "Evex") — hooks and CTAs derive from it.</li>
+    </ol>
+    <p class="expect">Toggle persists across reloads (localStorage).</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>A · Create UGC ads (the core flow)</h2>
+  <div class="test" data-id="A1">
+    <div class="test-head"><span><span class="test-id">A1</span><span class="test-title">Hooks auto-generate from the brand</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Create → <strong>Hook + Demo</strong>.</li>
+      <li>Watch step "1. Hook" while it loads.</li>
+    </ol>
+    <p class="expect">Within ~5s the carousel fills with 8 hooks about YOUR app (Evex/fitness), counter shows "1/8". Mock mode shows canned fitness hooks instantly.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A2">
+    <div class="test-head"><span><span class="test-id">A2</span><span class="test-title">Hook carousel + inline editing</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click ‹ and › — counter cycles and wraps (8/8 → 1/8).</li>
+      <li>Type into the hook card; flip away and back.</li>
+    </ol>
+    <p class="expect">Preview text updates live as you type; your edit is remembered per-slot while cycling.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A3">
+    <div class="test-head"><span><span class="test-id">A3</span><span class="test-title">Avatar tabs: Default / My characters / Uploads</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li><strong>Default</strong>: 4 photoreal thumbnails; first is pre-selected; click others.</li>
+      <li><strong>My characters</strong>: shows Runner Rachel's portrait + looks (and Mock Mia's placeholders).</li>
+      <li><strong>Uploads</strong>: upload a selfie clip, or debug "Mock clip".</li>
+      <li>Click a selected thumb again to deselect.</li>
+    </ol>
+    <p class="expect">Every selection instantly swaps the preview background; green ring marks selection; no broken-image icons.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A4">
+    <div class="test-head"><span><span class="test-id">A4</span><span class="test-title">Text position toggles (inside preview)</span></span><div class="verdicts"></div></div>
+    <ol class="steps"><li>Click the three small buttons at the bottom of the 9:16 preview.</li></ol>
+    <p class="expect">Hook text jumps top / center / bottom; active toggle is white.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A5">
+    <div class="test-head"><span><span class="test-id">A5</span><span class="test-title">Demos step</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click <strong>+</strong> and attach any screen-recording (or debug "Use mock demo").</li>
+      <li>Click <strong>None</strong> to clear, re-attach.</li>
+    </ol>
+    <p class="expect">Attached demo shows as a bordered thumbnail; None/thumbnail states are mutually exclusive.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A6">
+    <div class="test-head"><span><span class="test-id">A6</span><span class="test-title">Sound modal</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Click <strong>Sound</strong> → modal "Choose background music".</li>
+      <li>Press ▶ on "sample ambient tone" — hear it; press again to stop.</li>
+      <li>Uploaded Sounds tab → upload an .mp3 → appears in list.</li>
+      <li>Select a track → modal closes, Sound button shows its name. Reopen → "No Sound" clears it.</li>
+    </ol>
+    <p class="expect">Preview playback works; selection state highlighted; upload persists after reopening.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A7">
+    <div class="test-head"><span><span class="test-id">A7</span><span class="test-title">Generate — the money shot ($0)</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Hook picked + avatar selected + demo attached (or mock) + sound selected → <strong>Generate</strong>.</li>
+      <li>Wait ~30–60s (Ken Burns render is the slow part).</li>
+    </ol>
+    <p class="expect">Spinner overlays the preview → finished video plays in place: avatar push-in with outlined hook text at YOUR chosen position → your demo → music audible under everything. "Saved to your Library" appears.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="A8">
+    <div class="test-head"><span><span class="test-id">A8</span><span class="test-title">My Videos + Library + persistence</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Scroll down — My Videos count incremented; new video playable.</li>
+      <li>Library tab shows the same creation as a draft with a Schedule button.</li>
+      <li><code>docker restart ai-shorts-backend</code>, reload — everything still there.</li>
+    </ol>
+    <p class="expect">Creations survive restarts (SQLite/Postgres), files under <code>creations/</code>.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>B · Characters (the paid-asset flow, ~8¢ real)</h2>
+  <div class="test" data-id="B1">
+    <div class="test-head"><span><span class="test-id">B1</span><span class="test-title">Create a character (1 image = ~4¢ real / $0 mock)</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Characters → New Character → pick chips, add "extra details", name it → Generate portrait &amp; save.</li>
+    </ol>
+    <p class="expect">Real: photoreal 9:16 selfie-style portrait matching your attributes in ~10–20s. Mock: colored placeholder instantly.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B2">
+    <div class="test-head"><span><span class="test-id">B2</span><span class="test-title">Identity-consistent look (~4¢ real)</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Open the character → prompt bar → "Random" or type a scene → Generate.</li>
+      <li>Compare the look against the portrait side by side.</li>
+    </ol>
+    <p class="expect"><strong>Same face, hair, and vibe</strong> in the new scene (this is the whole feature — fail it if the person changes).</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="B3">
+    <div class="test-head"><span><span class="test-id">B3</span><span class="test-title">Character reuse everywhere</span></span><div class="verdicts"></div></div>
+    <ol class="steps">
+      <li>Hook+Demo → My characters tab → new look appears.</li>
+      <li>Create → Listicle → character circle picker → render → face on title + CTA slides.</li>
+      <li>AI Actor Ads → step 2 → "My characters" strip present (don't run the paid generation).</li>
+    </ol>
+    <p class="expect">One identity visible in all three surfaces.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>C · Regression spot-checks</h2>
+  <div class="test" data-id="C1">
+    <div class="test-head"><span><span class="test-id">C1</span><span class="test-title">Slideshow still renders ($0)</span></span><div class="verdicts"></div></div>
+    <ol class="steps"><li>Create → Listicle → AI fill → Render.</li></ol>
+    <p class="expect">5 slides + MP4; Evex is the green payoff slide; saved to Library.</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="C2">
+    <div class="test-head"><span><span class="test-id">C2</span><span class="test-title">Calendar + mock schedule</span></span><div class="verdicts"></div></div>
+    <ol class="steps"><li>Library → Schedule on any creation → pick platforms + future time (mockAI ON = no Upload-Post call) → Calendar tab.</li></ol>
+    <p class="expect">Post appears on the right day; X cancels it (strikethrough).</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+  <div class="test" data-id="C3">
+    <div class="test-head"><span><span class="test-id">C3</span><span class="test-title">Theme & nav sanity</span></span><div class="verdicts"></div></div>
+    <ol class="steps"><li>Skim every enabled tab; hover nav items; check disabled tabs show SOON and don't navigate.</li></ol>
+    <p class="expect">Leaf-green accents only (no leftover neon mint/violet), readable text everywhere, no console errors (F12).</p>
+    <textarea class="fail-note" placeholder="What went wrong?"></textarea>
+  </div>
+
+  <h2>Notes</h2>
+  <p style="font-size:14px">Anything else — visual nits, copy changes, ideas mid-QA.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy results as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span id="progress"></span>
+    <span class="hint">Verdicts + notes are saved in this browser.</span>
+  </div>
+  <pre id="out"></pre>
+</main>
+
+<script>
+  const VERDICTS = ['Pass', 'Fail', 'Skip'];
+  const CLS = { Pass: 'sel-pass', Fail: 'sel-fail', Skip: 'sel-skip' };
+  const STORE = 'clipzoo_qa_ugc_v1';
+  const state = JSON.parse(localStorage.getItem(STORE) || '{}');
+
+  function save() { localStorage.setItem(STORE, JSON.stringify(state)); updateProgress(); }
+
+  function updateProgress() {
+    const tests = document.querySelectorAll('.test').length;
+    const done = Object.values(state.v || {}).filter(Boolean).length;
+    const fails = Object.values(state.v || {}).filter(v => v === 'Fail').length;
+    document.getElementById('progress').textContent = `${done}/${tests} checked` + (fails ? ` · ${fails} failing` : '');
+  }
+
+  document.querySelectorAll('.test').forEach(test => {
+    const id = test.dataset.id;
+    const holder = test.querySelector('.verdicts');
+    const noteEl = test.querySelector('.fail-note');
+    state.v = state.v || {}; state.n = state.n || {};
+
+    VERDICTS.forEach(v => {
+      const b = document.createElement('button');
+      b.textContent = v;
+      b.onclick = () => {
+        state.v[id] = state.v[id] === v ? '' : v;
+        render();
+        save();
+      };
+      holder.appendChild(b);
+    });
+
+    if (noteEl) {
+      noteEl.value = state.n[id] || '';
+      noteEl.addEventListener('input', () => { state.n[id] = noteEl.value; save(); });
+    }
+
+    function render() {
+      [...holder.children].forEach(b => {
+        b.className = state.v[id] === b.textContent ? CLS[b.textContent] : '';
+      });
+      test.classList.toggle('failed', state.v[id] === 'Fail');
+    }
+    test._render = render;
+    render();
+  });
+
+  const notes = document.getElementById('notes');
+  notes.value = state.notes || '';
+  notes.addEventListener('input', () => { state.notes = notes.value; save(); });
+  updateProgress();
+
+  function buildMarkdown() {
+    let md = '## QA results — Create UGC ads flow\n';
+    document.querySelectorAll('h2').forEach(h2 => {
+      const sectionTests = [];
+      let el = h2.nextElementSibling;
+      while (el && el.tagName !== 'H2') {
+        if (el.classList?.contains('test')) sectionTests.push(el);
+        el = el.nextElementSibling;
+      }
+      if (!sectionTests.length) return;
+      md += `\n### ${h2.textContent.trim()}\n`;
+      sectionTests.forEach(t => {
+        const id = t.dataset.id;
+        const title = t.querySelector('.test-title').textContent.trim();
+        const v = state.v?.[id] || '(not run)';
+        const icon = v === 'Pass' ? '✅' : v === 'Fail' ? '❌' : v === 'Skip' ? '⏭️' : '⬜';
+        md += `- ${icon} **${id} ${title}** — ${v}`;
+        if (v === 'Fail' && state.n?.[id]) md += `\n  - ${state.n[id].trim().replace(/\n/g, '\n    ')}`;
+        md += '\n';
+      });
+    });
+    md += `\n## Notes\n${(state.notes || '').trim() || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+  copyBtn.onclick = async () => {
+    const md = buildMarkdown();
+    out.textContent = md; out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy results as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy results as Markdown', 2500);
+    }
+  };
+  document.getElementById('clear').onclick = () => {
+    if (!confirm('Clear all verdicts and notes?')) return;
+    localStorage.removeItem(STORE);
+    state.v = {}; state.n = {}; state.notes = '';
+    document.querySelectorAll('.test').forEach(t => { t.querySelector('.fail-note').value = ''; t._render(); });
+    notes.value = ''; out.style.display = 'none'; updateProgress();
+  };
+</script>
+</body>
+</html>
