@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     ArrowLeft, Sparkles, Wand2, Loader2, Plus, Trash2, X, Play, Pause,
     ChevronLeft, ChevronRight, Images, Clock,
@@ -28,7 +28,10 @@ const label = 'text-xs font-bold uppercase tracking-wider text-muted-foreground'
 
 function SegmentedPair({ value, options, onChange }) {
     return (
-        <div className="grid grid-cols-2 bg-muted rounded-lg p-0.5 text-xs font-medium">
+        <div
+            className="grid bg-muted rounded-lg p-0.5 text-xs font-medium"
+            style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+        >
             {options.map((opt) => (
                 <button
                     key={opt.value}
@@ -46,27 +49,64 @@ function SegmentedPair({ value, options, onChange }) {
     );
 }
 
-function ImageSourceControl({ image, collections, onChange, onOpenPicker }) {
+function Toggle({ on, onChange, title }) {
+    return (
+        <button
+            onClick={onChange}
+            className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${on ? 'bg-primary' : 'bg-border'}`}
+            role="switch"
+            aria-checked={!!on}
+            title={title}
+        >
+            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+        </button>
+    );
+}
+
+function ImageSourceControl({ image, collections, onChange, onOpenPicker, allowSpecific = false }) {
     const source = image?.source || 'ai';
     const coll = collections.find((c) => c.id === image?.collection_id);
+    const fileRef = useRef(null);
+    const [uploading, setUploading] = useState(false);
+
+    const uploadSpecific = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch(getApiUrl('/api/automations/assets'), { method: 'POST', body: fd });
+            if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+            const data = await res.json();
+            onChange({ ...image, source: 'specific', image_path: data.image_path });
+        } catch {
+            /* surfaced by the unchanged filename */
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const options = [
+        { value: 'ai', label: 'AI image' },
+        { value: 'collection', label: 'Collection' },
+        ...(allowSpecific ? [{ value: 'specific', label: 'Specific' }] : []),
+    ];
+
     return (
         <div className="space-y-2">
-            <SegmentedPair
-                value={source}
-                options={[
-                    { value: 'ai', label: 'AI image' },
-                    { value: 'collection', label: 'Collection' },
-                ]}
-                onChange={(v) => onChange({ ...image, source: v })}
-            />
-            {source === 'ai' ? (
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={uploadSpecific} />
+            <SegmentedPair value={source} options={options} onChange={(v) => onChange({ ...image, source: v })} />
+            {source === 'ai' && (
                 <input
                     value={image?.image_prompt || ''}
                     onChange={(e) => onChange({ ...image, image_prompt: e.target.value })}
                     placeholder="Describe the photo… (e.g. gym bag by the door, morning light)"
                     className="input-field text-sm"
                 />
-            ) : (
+            )}
+            {source === 'collection' && (
                 <button
                     onClick={onOpenPicker}
                     className="w-full flex items-center gap-2 bg-card border border-border text-sm rounded-xl px-3 py-2.5 hover:bg-muted transition-colors text-left"
@@ -78,6 +118,23 @@ function ImageSourceControl({ image, collections, onChange, onOpenPicker }) {
                         </span>
                     ) : (
                         <span className="text-muted-foreground">Pick a photo collection…</span>
+                    )}
+                </button>
+            )}
+            {source === 'specific' && (
+                <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full flex items-center gap-2 bg-card border border-border text-sm rounded-xl px-3 py-2.5 hover:bg-muted transition-colors text-left disabled:opacity-50"
+                >
+                    {image?.image_path ? (
+                        <>
+                            <img src={getApiUrl(image.image_path)} alt="" className="w-7 h-7 rounded object-cover shrink-0" />
+                            <span className="text-foreground truncate">{image.image_path.split('_').slice(1).join('_') || 'pinned image'}</span>
+                            <span className="text-muted-foreground text-xs ml-auto shrink-0">Replace</span>
+                        </>
+                    ) : (
+                        <span className="text-muted-foreground">{uploading ? 'Uploading…' : 'Upload the exact image to use…'}</span>
                     )}
                 </button>
             )}
@@ -124,7 +181,9 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
             const body = {
                 name: auto.name, status: auto.status, topic: auto.topic,
                 tone_preset: auto.tone_preset, tone_prompt: auto.tone_prompt,
-                hooks: auto.hooks, hook_image: auto.hook_image, slides: auto.slides,
+                hooks: auto.hooks, hook_image: auto.hook_image,
+                content: auto.content, slides: auto.slides,
+                image_default: auto.image_default, image_overrides: auto.image_overrides,
                 cta: auto.cta, schedule: auto.schedule, tiktok: auto.tiktok,
                 ...extraPatch,
             };
@@ -194,19 +253,33 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
         }
     };
 
-    // --- slide helpers ---
-    const setSlide = (i, patch) => {
-        update({ slides: auto.slides.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) });
+    // --- content / override helpers ---
+    const setContent = (patch) => update({ content: { ...auto.content, ...patch } });
+
+    const setOverride = (i, patch) => {
+        update({ slides: auto.slides.map((o, idx) => (idx === i ? { ...o, ...patch } : o)) });
     };
-    const addSlide = () => {
-        const id = `s${Date.now().toString(36)}`;
+    const addOverride = () => {
+        const taken = new Set(auto.slides.map((o) => o.slide_n));
+        let n = 2;
+        while (taken.has(n)) n += 1;
+        update({ slides: [...auto.slides, { slide_n: n, direction: '' }] });
+    };
+    const removeOverride = (i) => update({ slides: auto.slides.filter((_, idx) => idx !== i) });
+
+    const setImageOverride = (i, patch) => {
+        update({ image_overrides: auto.image_overrides.map((o, idx) => (idx === i ? { ...o, ...patch } : o)) });
+    };
+    const addImageOverride = () => {
+        const taken = new Set(auto.image_overrides.map((o) => o.slide_n));
+        let n = 2;
+        while (taken.has(n)) n += 1;
         update({
-            slides: [...auto.slides, { id, direction: '', image: { source: 'ai', image_prompt: '', collection_id: '' } }],
+            image_overrides: [...auto.image_overrides,
+                { slide_n: n, source: 'ai', image_prompt: '', collection_id: '', image_path: '' }],
         });
     };
-    const removeSlide = (i) => {
-        update({ slides: auto.slides.filter((_, idx) => idx !== i) });
-    };
+    const removeImageOverride = (i) => update({ image_overrides: auto.image_overrides.filter((_, idx) => idx !== i) });
 
     // --- schedule helpers ---
     const setTime = (i, patch) => {
@@ -245,6 +318,13 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
     const perWeek = (auto.schedule?.times || []).reduce((n, t) => n + (t.days?.length || 0), 0);
     const previewImages = result?.images || [];
     const connectedProfiles = (userProfiles || []).filter((p) => p.connected?.includes('tiktok'));
+    const content = auto.content || {};
+    const maxContent = content.count_mode === 'vary' ? (content.count_max ?? 6) : (content.slide_count ?? 4);
+    const totalSlides = 1 + Number(maxContent || 4) + (auto.cta?.enabled ? 1 : 0);
+    const slideNumbers = Array.from({ length: Math.max(totalSlides - 1, 1) }, (_, i) => i + 2);
+    const countLabel = content.count_mode === 'vary'
+        ? `${content.count_min ?? 3}–${content.count_max ?? 6} content slides`
+        : `${content.slide_count ?? 4} content slides`;
 
     return (
         <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-10 animate-[fadeIn_0.3s_ease-out]">
@@ -350,75 +430,158 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                             <div>
                                 <h2 className="text-lg font-semibold text-foreground">Slides</h2>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    The hook is slide 1. Give each content slide a direction — the AI writes the
-                                    on-image text to match it.
+                                    Slide 1 is always the intro (from your hook bank). The AI writes the rest
+                                    from your instructions — add an override only where a slide needs specifics.
                                 </p>
                             </div>
 
-                            {/* Hook slide */}
-                            <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Hook</span>
-                                    <span className="text-xs text-muted-foreground">Text comes from your hook bank</span>
+                            {/* Count / numbering / length row */}
+                            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                                <div>
+                                    <label className={`${label} block mb-1.5`}>Content slides</label>
+                                    <div className="flex items-center gap-2">
+                                        {content.count_mode === 'vary' ? (
+                                            <>
+                                                <input
+                                                    type="number" min={1} max={12}
+                                                    value={content.count_min ?? 3}
+                                                    onChange={(e) => setContent({ count_min: Number(e.target.value) })}
+                                                    className="input-field w-16 text-sm py-1.5"
+                                                />
+                                                <span className="text-xs text-muted-foreground">to</span>
+                                                <input
+                                                    type="number" min={1} max={12}
+                                                    value={content.count_max ?? 6}
+                                                    onChange={(e) => setContent({ count_max: Number(e.target.value) })}
+                                                    className="input-field w-16 text-sm py-1.5"
+                                                />
+                                            </>
+                                        ) : (
+                                            <input
+                                                type="number" min={1} max={12}
+                                                value={content.slide_count ?? 4}
+                                                onChange={(e) => setContent({ slide_count: Number(e.target.value) })}
+                                                className="input-field w-16 text-sm py-1.5"
+                                            />
+                                        )}
+                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={content.count_mode === 'vary'}
+                                                onChange={(e) => setContent({ count_mode: e.target.checked ? 'vary' : 'fixed' })}
+                                                className="accent-[hsl(var(--primary))]"
+                                            />
+                                            vary per post
+                                        </label>
+                                    </div>
                                 </div>
-                                <ImageSourceControl
-                                    image={auto.hook_image}
-                                    collections={collections}
-                                    onChange={(image) => update({ hook_image: image })}
-                                    onOpenPicker={() => setPickerTarget('hook')}
+                                <div>
+                                    <label className={`${label} block mb-1.5`}>Numbered list</label>
+                                    <div className="flex items-center gap-2 h-8">
+                                        <Toggle
+                                            on={!!content.numbering}
+                                            onChange={() => setContent({ numbering: !content.numbering })}
+                                            title="Prefix content slides with 1. 2. 3."
+                                        />
+                                        <span className="text-xs text-muted-foreground">1. 2. 3. — intro &amp; CTA never numbered</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`${label} block mb-1.5`}>Text length</label>
+                                    <SegmentedPair
+                                        value={content.text_length || 'short'}
+                                        options={[
+                                            { value: 'short', label: 'Short' },
+                                            { value: 'medium', label: 'Medium' },
+                                            { value: 'long', label: 'Long' },
+                                        ]}
+                                        onChange={(v) => setContent({ text_length: v })}
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground -mt-1">
+                                {(content.text_length || 'short') === 'short' && 'One punchy line per slide (≤12 words).'}
+                                {content.text_length === 'medium' && '2–3 sentences per slide (~25–45 words).'}
+                                {content.text_length === 'long' && '4–6 sentences per slide (~60–90 words) — storytime depth.'}
+                            </p>
+
+                            {/* Global instructions */}
+                            <div>
+                                <label className={`${label} block mb-2`}>What should the slides cover?</label>
+                                <textarea
+                                    value={content.instructions || ''}
+                                    onChange={(e) => setContent({ instructions: e.target.value })}
+                                    rows={3}
+                                    placeholder="e.g. tips for actually sticking to a workout plan — showing up consistently, form over weight, rest days, tracking progress. supportive, all lowercase."
+                                    className="input-field w-full resize-y"
                                 />
                             </div>
 
-                            {/* Content slides */}
-                            {(auto.slides || []).map((slide, i) => (
-                                <div key={slide.id || i} className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                            {/* Sparse slide overrides */}
+                            {(auto.slides || []).map((ov, i) => (
+                                <div key={i} className="bg-muted border border-border rounded-lg p-3 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-foreground">Slide {i + 2}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Override</span>
+                                            <select
+                                                value={ov.slide_n}
+                                                onChange={(e) => setOverride(i, { slide_n: Number(e.target.value) })}
+                                                className="input-field w-auto text-xs py-1"
+                                            >
+                                                {slideNumbers.map((n) => (
+                                                    <option key={n} value={n}>Slide {n}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                         <button
-                                            onClick={() => removeSlide(i)}
+                                            onClick={() => removeOverride(i)}
                                             className="p-1 text-muted-foreground hover:text-foreground hover:bg-card rounded transition-colors"
-                                            title="Remove slide"
+                                            title="Remove override"
                                         >
                                             <X size={14} />
                                         </button>
                                     </div>
                                     <textarea
-                                        value={slide.direction}
-                                        onChange={(e) => setSlide(i, { direction: e.target.value })}
+                                        value={ov.direction}
+                                        onChange={(e) => setOverride(i, { direction: e.target.value })}
                                         rows={2}
-                                        placeholder="What should this slide say? e.g. reaffirm the problem — ~10 words, all lowercase"
+                                        placeholder="What must THIS slide do? e.g. subtly mention tracking lifts with the Evex app — as something that helped, not an ad"
                                         className="input-field w-full resize-y text-sm"
-                                    />
-                                    <ImageSourceControl
-                                        image={slide.image}
-                                        collections={collections}
-                                        onChange={(image) => setSlide(i, { image })}
-                                        onOpenPicker={() => setPickerTarget(i)}
                                     />
                                 </div>
                             ))}
-
                             <button
-                                onClick={addSlide}
+                                onClick={addOverride}
                                 className="w-full flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg py-2.5 transition-colors"
                             >
-                                <Plus size={14} /> Add slide
+                                <Plus size={14} /> Add slide override
                             </button>
 
                             {/* CTA */}
                             <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-foreground">CTA end slide</span>
-                                    <button
-                                        onClick={() => update({ cta: { ...auto.cta, enabled: !auto.cta?.enabled } })}
-                                        className={`relative w-9 h-5 rounded-full transition-colors ${auto.cta?.enabled ? 'bg-primary' : 'bg-border'}`}
-                                        role="switch"
-                                        aria-checked={!!auto.cta?.enabled}
-                                    >
-                                        <span
-                                            className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${auto.cta?.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
-                                        />
-                                    </button>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-xs font-semibold text-foreground">CTA slide</span>
+                                        {auto.cta?.enabled && (
+                                            <select
+                                                value={auto.cta?.position ?? 'last'}
+                                                onChange={(e) => update({
+                                                    cta: { ...auto.cta, position: e.target.value === 'last' ? 'last' : Number(e.target.value) },
+                                                })}
+                                                className="input-field w-auto text-xs py-1"
+                                            >
+                                                <option value="last">Position: last</option>
+                                                {slideNumbers.map((n) => (
+                                                    <option key={n} value={n}>Position: slide {n}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                    <Toggle
+                                        on={!!auto.cta?.enabled}
+                                        onChange={() => update({ cta: { ...auto.cta, enabled: !auto.cta?.enabled } })}
+                                        title="Enable CTA slide"
+                                    />
                                 </div>
                                 {auto.cta?.enabled && (
                                     <input
@@ -429,6 +592,81 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                     />
                                 )}
                             </div>
+                        </div>
+
+                        {/* Images */}
+                        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                            <div>
+                                <h2 className="text-lg font-semibold text-foreground">Images</h2>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    A default for every slide, plus per-slide overrides (AI prompt · collection · a specific pinned image).
+                                </p>
+                            </div>
+
+                            <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Hook</span>
+                                    <span className="text-xs text-muted-foreground">Slide 1 image</span>
+                                </div>
+                                <ImageSourceControl
+                                    image={auto.hook_image}
+                                    collections={collections}
+                                    allowSpecific
+                                    onChange={(image) => update({ hook_image: image })}
+                                    onOpenPicker={() => setPickerTarget('hook')}
+                                />
+                            </div>
+
+                            <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-foreground">Default for all other slides</span>
+                                </div>
+                                <ImageSourceControl
+                                    image={auto.image_default}
+                                    collections={collections}
+                                    onChange={(image) => update({ image_default: image })}
+                                    onOpenPicker={() => setPickerTarget('default')}
+                                />
+                            </div>
+
+                            {(auto.image_overrides || []).map((ov, i) => (
+                                <div key={i} className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Image override</span>
+                                            <select
+                                                value={ov.slide_n}
+                                                onChange={(e) => setImageOverride(i, { slide_n: Number(e.target.value) })}
+                                                className="input-field w-auto text-xs py-1"
+                                            >
+                                                {slideNumbers.map((n) => (
+                                                    <option key={n} value={n}>Slide {n}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={() => removeImageOverride(i)}
+                                            className="p-1 text-muted-foreground hover:text-foreground hover:bg-card rounded transition-colors"
+                                            title="Remove image override"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <ImageSourceControl
+                                        image={ov}
+                                        collections={collections}
+                                        allowSpecific
+                                        onChange={(patch) => setImageOverride(i, patch)}
+                                        onOpenPicker={() => setPickerTarget(i)}
+                                    />
+                                </div>
+                            ))}
+                            <button
+                                onClick={addImageOverride}
+                                className="w-full flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border rounded-lg py-2.5 transition-colors"
+                            >
+                                <Plus size={14} /> Add image override
+                            </button>
                         </div>
 
                         {/* Schedule */}
@@ -624,11 +862,14 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                         <p className="text-xs text-muted-foreground">
                                             {(auto.hooks || []).filter((h) => h.trim()).length > 0
                                                 ? `Slide 1: “${(auto.hooks.find((h) => h.trim()) || '').slice(0, 60)}”`
-                                                : 'Add hooks and slide directions, then generate a preview.'}
+                                                : 'Add hooks and instructions, then generate a preview.'}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {(auto.slides || []).length} content slide{(auto.slides || []).length === 1 ? '' : 's'}
-                                            {auto.cta?.enabled ? ' + CTA' : ''}
+                                            {countLabel}
+                                            {content.numbering ? ' · numbered' : ''}
+                                            {auto.cta?.enabled
+                                                ? ` + CTA (${auto.cta?.position === 'last' || !auto.cta?.position ? 'last' : `slide ${auto.cta.position}`})`
+                                                : ''}
                                         </p>
                                     </div>
                                 )}
@@ -660,17 +901,19 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                 selectedId={
                     pickerTarget === 'hook'
                         ? auto.hook_image?.collection_id
-                        : typeof pickerTarget === 'number'
-                            ? auto.slides[pickerTarget]?.image?.collection_id
-                            : undefined
+                        : pickerTarget === 'default'
+                            ? auto.image_default?.collection_id
+                            : typeof pickerTarget === 'number'
+                                ? auto.image_overrides[pickerTarget]?.collection_id
+                                : undefined
                 }
                 onPick={(coll) => {
                     if (pickerTarget === 'hook') {
                         update({ hook_image: { ...auto.hook_image, source: 'collection', collection_id: coll.id } });
+                    } else if (pickerTarget === 'default') {
+                        update({ image_default: { ...auto.image_default, source: 'collection', collection_id: coll.id } });
                     } else if (typeof pickerTarget === 'number') {
-                        setSlide(pickerTarget, {
-                            image: { ...auto.slides[pickerTarget].image, source: 'collection', collection_id: coll.id },
-                        });
+                        setImageOverride(pickerTarget, { source: 'collection', collection_id: coll.id });
                     }
                     setPickerTarget(null);
                     fetch(getApiUrl('/api/collections'))
