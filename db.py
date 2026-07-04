@@ -186,9 +186,13 @@ class SlideshowAutomation(Base):
     tone_preset = Column(String(40), default="conversational")
     tone_prompt = Column(Text, default="")             # freeform style rules when preset == custom
     hooks_json = Column(Text, default="[]")            # ["hook line", ...] — one picked per post
-    hook_image_json = Column(Text, default="{}")       # {source: ai|collection, image_prompt, collection_id}
-    slides_json = Column(Text, default="[]")           # [{id, direction, image: {source, image_prompt, collection_id}}]
-    cta_json = Column(Text, default="{}")              # {enabled, direction}
+    hook_image_json = Column(Text, default="{}")       # {source: ai|collection|specific, image_prompt, collection_id, image_path}
+    content_json = Column(Text, default="{}")          # {slide_count, count_mode: fixed|vary, count_min, count_max,
+                                                       #  instructions, numbering, text_length: short|medium|long}
+    slides_json = Column(Text, default="[]")           # sparse overrides: [{slide_n, direction}]
+    image_default_json = Column(Text, default="{}")    # default image source for content/CTA slides
+    image_overrides_json = Column(Text, default="[]")  # [{slide_n, source, image_prompt, collection_id, image_path}]
+    cta_json = Column(Text, default="{}")              # {enabled, direction, position: "last" | slide number}
     schedule_json = Column(Text, default="{}")         # {timezone, times: [{time: "09:00", days: [0..6]}]}  0=Sun
     tiktok_json = Column(Text, default="{}")           # {auto_post, user_id, platforms, title_mode, title, caption_mode, caption}
     last_fired_slot = Column(String(60), default="")   # "YYYY-MM-DD|HH:MM" scheduler dedupe marker
@@ -203,7 +207,10 @@ class SlideshowAutomation(Base):
             "topic": self.topic, "tone_preset": self.tone_preset, "tone_prompt": self.tone_prompt,
             "hooks": json.loads(self.hooks_json or "[]"),
             "hook_image": json.loads(self.hook_image_json or "{}"),
+            "content": json.loads(self.content_json or "{}"),
             "slides": json.loads(self.slides_json or "[]"),
+            "image_default": json.loads(self.image_default_json or "{}"),
+            "image_overrides": json.loads(self.image_overrides_json or "[]"),
             "cta": json.loads(self.cta_json or "{}"),
             "schedule": json.loads(self.schedule_json or "{}"),
             "tiktok": json.loads(self.tiktok_json or "{}"),
@@ -213,8 +220,30 @@ class SlideshowAutomation(Base):
         }
 
 
+def _ensure_columns():
+    """create_all doesn't ALTER existing tables — add any columns models grew later.
+    ADD COLUMN with a constant default is safe on both SQLite and Postgres."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                coltype = column.type.compile(engine.dialect)
+                default = ""
+                if isinstance(column.default.arg if column.default is not None else None, str):
+                    default = f" DEFAULT '{column.default.arg}'"
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {column.name} {coltype}{default}'))
+                print(f"🗄️ Migrated: {table.name} + {column.name}")
+
+
 def init_db():
     Base.metadata.create_all(engine)
+    _ensure_columns()
     print(f"🗄️ DB ready ({'postgres' if DATABASE_URL.startswith('postgresql') else 'sqlite'})")
 
 

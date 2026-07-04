@@ -2939,7 +2939,49 @@ from zoneinfo import ZoneInfo
 from automations import generate_hooks as auto_generate_hooks, generate_slideshow, post_to_upload_post, TONE_PRESETS
 
 
-DEFAULT_SLIDE = {"id": "s1", "direction": "", "image": {"source": "ai", "image_prompt": "", "collection_id": ""}}
+DEFAULT_CONTENT = {"slide_count": 4, "count_mode": "fixed", "count_min": 3, "count_max": 6,
+                   "instructions": "", "numbering": True, "text_length": "short"}
+DEFAULT_IMAGE = {"source": "ai", "image_prompt": "", "collection_id": "", "image_path": ""}
+
+ASSETS_DIR = os.path.join(CREATIONS_DIR, "automation_assets")
+os.makedirs(ASSETS_DIR, exist_ok=True)
+
+
+def _migrate_automations_v2():
+    """One-time data migration: v1 shape (required per-slide directions, each with an
+    embedded image spec) → v2 (content config + sparse overrides + image overrides)."""
+    with get_session() as s:
+        for row in s.query(SlideshowAutomation).all():
+            content = json.loads(row.content_json or "{}")
+            slides = json.loads(row.slides_json or "[]")
+            old_shape = any(("image" in sl or "id" in sl) for sl in slides)
+            if content.get("slide_count") and not old_shape:
+                continue
+            if old_shape:
+                overrides, image_overrides = [], []
+                for i, sl in enumerate(slides):
+                    slide_n = i + 2  # slide 1 is the hook
+                    if (sl.get("direction") or "").strip():
+                        overrides.append({"slide_n": slide_n, "direction": sl["direction"]})
+                    img = sl.get("image") or {}
+                    if img.get("image_prompt") or img.get("collection_id"):
+                        image_overrides.append({"slide_n": slide_n, **{**DEFAULT_IMAGE, **img}})
+                row.slides_json = json.dumps(overrides)
+                row.image_overrides_json = json.dumps(image_overrides)
+            row.content_json = json.dumps({**DEFAULT_CONTENT, **content,
+                                           "slide_count": len(slides) if old_shape else content.get("slide_count", DEFAULT_CONTENT["slide_count"]),
+                                           "numbering": content.get("numbering", False if old_shape else True)})
+            if not json.loads(row.image_default_json or "{}"):
+                row.image_default_json = json.dumps(dict(DEFAULT_IMAGE))
+            cta = json.loads(row.cta_json or "{}")
+            if "position" not in cta:
+                cta["position"] = "last"
+                row.cta_json = json.dumps(cta)
+            print(f"🗄️ Automation migrated to v2: {row.name}")
+        s.commit()
+
+
+_migrate_automations_v2()
 
 
 class AutomationCreateRequest(BaseModel):
@@ -2955,7 +2997,10 @@ class AutomationUpdateRequest(BaseModel):
     tone_prompt: Optional[str] = None
     hooks: Optional[List[str]] = None
     hook_image: Optional[dict] = None
+    content: Optional[dict] = None
     slides: Optional[List[dict]] = None
+    image_default: Optional[dict] = None
+    image_overrides: Optional[List[dict]] = None
     cta: Optional[dict] = None
     schedule: Optional[dict] = None
     tiktok: Optional[dict] = None
@@ -2974,9 +3019,12 @@ async def api_automations_create(req: AutomationCreateRequest):
         row = SlideshowAutomation(
             name=(req.name or "New automation")[:120],
             hooks_json="[]",
-            hook_image_json=json.dumps({"source": "ai", "image_prompt": "", "collection_id": ""}),
-            slides_json=json.dumps([dict(DEFAULT_SLIDE)]),
-            cta_json=json.dumps({"enabled": False, "direction": ""}),
+            hook_image_json=json.dumps(dict(DEFAULT_IMAGE)),
+            content_json=json.dumps(dict(DEFAULT_CONTENT)),
+            slides_json="[]",
+            image_default_json=json.dumps(dict(DEFAULT_IMAGE)),
+            image_overrides_json="[]",
+            cta_json=json.dumps({"enabled": False, "direction": "", "position": "last"}),
             schedule_json=json.dumps({"timezone": req.timezone or "UTC",
                                       "times": [{"time": "09:00", "days": [0, 1, 2, 3, 4, 5, 6]}]}),
             tiktok_json=json.dumps({"auto_post": False, "user_id": "", "platforms": ["tiktok"],
@@ -3020,8 +3068,14 @@ async def api_automations_update(aid: str, req: AutomationUpdateRequest):
             row.hooks_json = json.dumps([h for h in req.hooks if str(h).strip()])
         if req.hook_image is not None:
             row.hook_image_json = json.dumps(req.hook_image)
+        if req.content is not None:
+            row.content_json = json.dumps({**DEFAULT_CONTENT, **req.content})
         if req.slides is not None:
             row.slides_json = json.dumps(req.slides)
+        if req.image_default is not None:
+            row.image_default_json = json.dumps(req.image_default)
+        if req.image_overrides is not None:
+            row.image_overrides_json = json.dumps(req.image_overrides)
         if req.cta is not None:
             row.cta_json = json.dumps(req.cta)
         if req.schedule is not None:
@@ -3041,6 +3095,18 @@ async def api_automations_delete(aid: str):
         s.delete(row)
         s.commit()
     return {"ok": True}
+
+
+@app.post("/api/automations/assets")
+async def api_automations_upload_asset(file: UploadFile = File(...)):
+    """Upload one specific/pinned image for a slide (image override source='specific')."""
+    if not (file.filename or "").lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        raise HTTPException(status_code=400, detail="Image files only (.jpg/.png/.webp)")
+    safe = os.path.basename(file.filename).replace(" ", "_")
+    name = f"{uuid.uuid4().hex[:10]}_{safe}"
+    with open(os.path.join(ASSETS_DIR, name), "wb") as out:
+        shutil.copyfileobj(file.file, out)
+    return {"image_path": f"/creations/automation_assets/{name}"}
 
 
 class AutomationMockRequest(BaseModel):
