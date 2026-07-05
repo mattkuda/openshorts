@@ -109,15 +109,28 @@ function ImageSourceControl({ image, collections, onChange, onOpenPicker, allowS
             {source === 'collection' && (
                 <button
                     onClick={onOpenPicker}
-                    className="w-full flex items-center gap-2 bg-card border border-border text-sm rounded-xl px-3 py-2.5 hover:bg-muted transition-colors text-left"
+                    className="w-full bg-card border border-border rounded-xl p-2 hover:bg-muted transition-colors text-left"
                 >
-                    <Images size={14} className="text-muted-foreground shrink-0" />
                     {coll ? (
-                        <span className="text-foreground truncate">
-                            {coll.name} <span className="text-muted-foreground">· {coll.images.length} photos</span>
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <div className="grid grid-cols-4 gap-1 w-36 shrink-0">
+                                {[0, 1, 2, 3].map((i) => (
+                                    <div key={i} className="aspect-square bg-muted rounded overflow-hidden">
+                                        {coll.images[i] ? (
+                                            <img src={getApiUrl(coll.images[i].image_path)} alt="" className="w-full h-full object-cover" />
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm text-foreground truncate">{coll.name}</p>
+                                <p className="text-xs text-muted-foreground">{coll.images.length} photos · random pick per post</p>
+                            </div>
+                        </div>
                     ) : (
-                        <span className="text-muted-foreground">Pick a photo collection…</span>
+                        <span className="flex items-center gap-2 px-1 py-1 text-sm text-muted-foreground">
+                            <Images size={14} className="shrink-0" /> Pick a photo collection…
+                        </span>
                     )}
                 </button>
             )}
