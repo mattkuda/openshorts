@@ -2976,7 +2976,8 @@ from automations import (generate_hooks as auto_generate_hooks, generate_slidesh
 
 
 DEFAULT_CONTENT = {"slide_count": 4, "count_mode": "fixed", "count_min": 3, "count_max": 6,
-                   "instructions": "", "numbering": True, "text_length": "short"}
+                   "instructions": "", "numbering": True, "text_length": "short",
+                   "text_style": {"style": "outline", "size": "md", "position": "top", "width": 80}}
 DEFAULT_IMAGE = {"source": "ai", "image_prompt": "", "collection_id": "", "image_path": ""}
 
 ASSETS_DIR = os.path.join(CREATIONS_DIR, "automation_assets")
@@ -3182,7 +3183,8 @@ def _run_automation(automation_dict, gemini_key, mock, log=print):
         template_key="auto_slideshow",
         slots={"automation_id": automation_dict["id"], "hook": meta["hook"],
                "texts": meta["texts"], "roles": meta.get("roles", []),
-               "raws": meta.get("raws", []), "caption": meta["caption"]},
+               "raws": meta.get("raws", []), "text_style": meta.get("text_style") or {},
+               "caption": meta["caption"]},
         video_path=video_url, image_paths=image_urls,
     )
     return creation, image_urls, video_url, meta
@@ -3331,7 +3333,8 @@ async def api_automations_rerender(req: RerenderRequest):
     old_video = creation.video_path
     base = f"auto_rr_{req.creation_id[:8]}_{uuid.uuid4().hex[:8]}"
     try:
-        pngs, mp4 = await asyncio.to_thread(rerender_slides, raws, req.texts, base)
+        pngs, mp4 = await asyncio.to_thread(rerender_slides, raws, req.texts, base,
+                                            slots.get("text_style") or {})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Re-render failed: {e}")
 

@@ -265,8 +265,18 @@ def _resolve_image(spec, used_paths, api_key, mock, out_dir, tag):
     return out_path
 
 
-def _compose_slide(image_path, text, out_path):
-    """Photo + TikTok-style caption → 1080x1920 slide PNG."""
+DEFAULT_TEXT_STYLE = {"style": "outline", "size": "md", "position": "top", "width": 80}
+TEXT_SIZES = {"sm": 48, "md": 64, "lg": 84}
+TEXT_ANCHORS = {"top": 0.30, "center": 0.50, "bottom": 0.72}
+
+
+def _compose_slide(image_path, text, out_path, text_style=None):
+    """Photo + TikTok-style caption → 1080x1920 slide PNG.
+
+    text_style: {style: outline|white|white_bg, size: sm|md|lg,
+                 position: top|center|bottom, width: percent of frame}
+    """
+    ts = {**DEFAULT_TEXT_STYLE, **(text_style or {})}
     img = Image.open(image_path).convert("RGB")
     # cover-crop to 9:16
     target = W / H
@@ -281,24 +291,35 @@ def _compose_slide(image_path, text, out_path):
         img = img.crop((0, y, img.width, y + new_h))
     img = img.resize((W, H))
 
-    # soft dark overlay so white text stays readable on any photo
-    overlay = Image.new("L", (W, H), 60)
-    img = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), img, overlay)
+    # soft dark overlay so text stays readable on any photo (skip for white_bg — the box carries contrast)
+    if ts["style"] != "white_bg":
+        overlay = Image.new("L", (W, H), 60)
+        img = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), img, overlay)
 
     from PIL import ImageDraw
     d = ImageDraw.Draw(img)
     if (text or "").strip():
-        font = _font(64)
-        lines = _wrap(d, text, font, int(W * 0.8))
+        font = _font(TEXT_SIZES.get(ts.get("size"), 64))
+        max_w = int(W * max(30, min(100, int(ts.get("width") or 80))) / 100)
+        lines = _wrap(d, text, font, max_w)
         heights = [d.textbbox((0, 0), l or " ", font=font)[3] for l in lines]
         gap = 16
         total = sum(heights) + gap * (len(lines) - 1)
-        y = int(H * 0.30) - total // 2
+        y = int(H * TEXT_ANCHORS.get(ts.get("position"), 0.30)) - total // 2
         for line, h in zip(lines, heights):
             lw = d.textbbox((0, 0), line, font=font)[2]
-            d.text(((W - lw) // 2, y), line, font=font, fill=(255, 255, 255),
-                   stroke_width=4, stroke_fill=(0, 0, 0))
-            y += h + gap
+            lx = (W - lw) // 2
+            if ts["style"] == "white_bg":
+                pad_x, pad_y = 28, 14
+                d.rounded_rectangle([lx - pad_x, y - pad_y, lx + lw + pad_x, y + h + pad_y],
+                                    radius=18, fill=(255, 255, 255))
+                d.text((lx, y), line, font=font, fill=(20, 20, 20))
+            elif ts["style"] == "white":
+                d.text((lx, y), line, font=font, fill=(255, 255, 255))
+            else:  # outline
+                d.text((lx, y), line, font=font, fill=(255, 255, 255),
+                       stroke_width=4, stroke_fill=(0, 0, 0))
+            y += h + gap + (28 if ts["style"] == "white_bg" else 0)
     img.save(out_path)
     return out_path
 
@@ -336,6 +357,7 @@ def generate_slideshow(automation, api_key, mock=False, log=print):
     base = f"auto_{automation.get('id', 'x')[:8]}_{random.getrandbits(40):010x}"
     os.makedirs(AUTO_DIR, exist_ok=True)
 
+    text_style = content.get("text_style") or {}
     slide_texts_by_role = {"hook": [hook], "content": list(texts["slides"]), "cta": [texts.get("cta_text", "")]}
     used_paths = set()
     pngs, raws, roles, final_texts = [], [], [], []
@@ -350,7 +372,7 @@ def generate_slideshow(automation, api_key, mock=False, log=print):
             if src.startswith(os.path.join(AUTO_DIR, base)):
                 os.remove(src)
         out = os.path.join(AUTO_DIR, f"{base}_slide{idx:02d}.png")
-        pngs.append(_compose_slide(raw, text, out))
+        pngs.append(_compose_slide(raw, text, out, text_style=text_style))
         raws.append(raw)
         roles.append(role)
         final_texts.append(text)
@@ -358,11 +380,12 @@ def generate_slideshow(automation, api_key, mock=False, log=print):
     mp4 = export_mp4(pngs, AUTO_DIR, base, log=log)
     meta = {"hook": hook, "texts": final_texts, "roles": roles,
             "raws": [f"/creations/{os.path.basename(r)}" for r in raws],
+            "text_style": text_style,
             "title": texts.get("title") or hook, "caption": texts.get("caption", "")}
     return pngs, mp4, meta
 
 
-def rerender_slides(raw_web_paths, new_texts, base, log=print):
+def rerender_slides(raw_web_paths, new_texts, base, text_style=None, log=print):
     """Re-compose slides from kept raw images with edited texts → (pngs, mp4)."""
     os.makedirs(AUTO_DIR, exist_ok=True)
     pngs = []
@@ -371,7 +394,7 @@ def rerender_slides(raw_web_paths, new_texts, base, log=print):
         if not raw:
             raise ValueError(f"Raw image missing for slide {idx} — regenerate instead")
         out = os.path.join(AUTO_DIR, f"{base}_slide{idx:02d}.png")
-        pngs.append(_compose_slide(raw, text, out))
+        pngs.append(_compose_slide(raw, text, out, text_style=text_style))
     mp4 = export_mp4(pngs, AUTO_DIR, base, log=log)
     return pngs, mp4
 
