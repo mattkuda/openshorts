@@ -2545,6 +2545,43 @@ async def api_library():
         return {"creations": [r.to_dict() for r in rows]}
 
 
+@app.get("/api/library/{creation_id}/download")
+async def api_library_download(creation_id: str):
+    """Zip a creation's slide images (+ MP4 if present) for manual posting."""
+    import io
+    import zipfile
+    from fastapi.responses import Response
+
+    with get_session() as s:
+        row = s.get(Creation, creation_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Not found")
+        creation = row.to_dict()
+
+    files = []
+    for i, web_path in enumerate(creation["image_paths"], start=1):
+        fp = os.path.join(CREATIONS_DIR, os.path.basename(web_path))
+        if os.path.exists(fp):
+            files.append((f"slide{i:02d}.png", fp))
+    if (creation["video_path"] or "").startswith("/creations/"):
+        fp = os.path.join(CREATIONS_DIR, os.path.basename(creation["video_path"]))
+        if os.path.exists(fp):
+            files.append(("slideshow.mp4", fp))
+    if not files:
+        raise HTTPException(status_code=400, detail="No downloadable files for this creation")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, fp in files:
+            z.write(fp, name)
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in (creation["title"] or "slideshow"))[:60].strip() or "slideshow"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.zip"'},
+    )
+
+
 @app.delete("/api/library/{creation_id}")
 async def api_library_delete(creation_id: str):
     with get_session() as s:
@@ -3029,6 +3066,7 @@ class AutomationCreateRequest(BaseModel):
 class AutomationUpdateRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
+    favorite: Optional[bool] = None
     topic: Optional[str] = None
     tone_preset: Optional[str] = None
     tone_prompt: Optional[str] = None
@@ -3095,6 +3133,8 @@ async def api_automations_update(aid: str, req: AutomationUpdateRequest):
             if req.status not in ("active", "paused"):
                 raise HTTPException(status_code=400, detail="status must be active|paused")
             row.status = req.status
+        if req.favorite is not None:
+            row.favorite = 1 if req.favorite else 0
         if req.topic is not None:
             row.topic = req.topic
         if req.tone_preset is not None:

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Repeat, Play, Pause, Pencil, Trash2, Sparkles, Loader2, Clock } from 'lucide-react';
+import { Plus, Repeat, Play, Pause, Trash2, Clock, Star } from 'lucide-react';
 import { getApiUrl } from '../config';
 import AutomationEditor from './AutomationEditor';
 
@@ -24,8 +24,6 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [editingId, setEditingId] = useState(null);
-    const [generatingId, setGeneratingId] = useState(null);
-    const [notice, setNotice] = useState('');
 
     const fetchAll = useCallback(async () => {
         setError('');
@@ -80,33 +78,19 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
         fetchAll();
     };
 
+    const toggleFavorite = async (auto) => {
+        await fetch(getApiUrl(`/api/automations/${auto.id}`), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ favorite: !auto.favorite }),
+        });
+        fetchAll();
+    };
+
     const deleteAutomation = async (auto) => {
         if (!window.confirm(`Delete "${auto.name}"? Generated slideshows stay in your Library.`)) return;
         await fetch(getApiUrl(`/api/automations/${auto.id}`), { method: 'DELETE' });
         fetchAll();
-    };
-
-    const generateNow = async (auto) => {
-        setGeneratingId(auto.id);
-        setError('');
-        try {
-            const res = await fetch(getApiUrl(`/api/automations/${auto.id}/generate`), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(geminiApiKey ? { 'X-Gemini-Key': geminiApiKey } : {}),
-                },
-                body: JSON.stringify({ mock: !!debug?.mockAI || !geminiApiKey }),
-            });
-            if (!res.ok) throw new Error((await res.text()).slice(0, 200));
-            setNotice('Slideshow generated — saved to Library.');
-            setTimeout(() => setNotice(''), 4000);
-            fetchAll();
-        } catch (err) {
-            setError(`Generation failed: ${err.message}`);
-        } finally {
-            setGeneratingId(null);
-        }
     };
 
     if (editingId) {
@@ -136,12 +120,9 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
                             Recurring TikTok photo carousels — set the recipe once, post on a schedule.
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        {notice && <span className="text-xs font-medium text-green-700">{notice}</span>}
-                        <button onClick={createAutomation} className="btn-primary flex items-center gap-2 text-sm">
-                            <Plus size={16} /> New automation
-                        </button>
-                    </div>
+                    <button onClick={createAutomation} className="btn-primary flex items-center gap-2 text-sm">
+                        <Plus size={16} /> New automation
+                    </button>
                 </div>
 
                 {error && <p className="text-sm text-red-700">{error}</p>}
@@ -161,38 +142,67 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {automations.map((auto) => {
+                        {[...automations]
+                            .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
+                            .map((auto) => {
                             const recent = creations
                                 .filter((c) => c.slots?.automation_id === auto.id)
                                 .slice(0, 3);
                             const active = auto.status === 'active';
                             return (
-                                <div key={auto.id} className="bg-card border border-border rounded-xl p-5 space-y-4">
+                                <div
+                                    key={auto.id}
+                                    onClick={() => setEditingId(auto.id)}
+                                    className="bg-card border border-border rounded-xl p-5 space-y-4 cursor-pointer hover:border-primary/60 transition-colors"
+                                >
                                     <div className="flex items-center justify-between gap-2">
                                         <span
-                                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
                                                 active
                                                     ? 'bg-green-500/10 text-green-700'
                                                     : 'bg-muted text-muted-foreground border border-border'
                                             }`}
                                         >
+                                            <span
+                                                className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-600 animate-pulse' : 'bg-muted-foreground/50'}`}
+                                            />
                                             {active ? 'Active' : 'Paused'}
                                         </span>
-                                        <button
-                                            onClick={() => deleteAutomation(auto)}
-                                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                                            title="Delete automation"
-                                        >
-                                            <Trash2 size={15} />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleFavorite(auto); }}
+                                                className={`p-1.5 rounded-lg transition-colors ${
+                                                    auto.favorite
+                                                        ? 'text-amber-500 hover:text-amber-600'
+                                                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                                }`}
+                                                title={auto.favorite ? 'Unfavorite' : 'Favorite — shows first'}
+                                            >
+                                                <Star size={15} fill={auto.favorite ? 'currentColor' : 'none'} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleStatus(auto); }}
+                                                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                                                title={active ? 'Pause' : 'Resume'}
+                                            >
+                                                {active ? <Pause size={15} /> : <Play size={15} />}
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteAutomation(auto); }}
+                                                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                                                title="Delete automation"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <button onClick={() => setEditingId(auto.id)} className="block w-full text-left">
+                                    <div>
                                         <p className="text-sm font-semibold text-foreground truncate">{auto.name}</p>
                                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 min-h-[2rem]">
                                             {auto.topic || 'No topic set — click to edit'}
                                         </p>
-                                    </button>
+                                    </div>
 
                                     <div className="grid grid-cols-3 gap-1.5">
                                         {[0, 1, 2].map((i) => (
@@ -220,35 +230,6 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
                                         {auto.last_run_note && auto.last_run_note.startsWith('error') && (
                                             <p className="text-xs text-red-700 line-clamp-2">{auto.last_run_note}</p>
                                         )}
-                                    </div>
-
-                                    <div className="flex items-center gap-2 pt-1">
-                                        <button
-                                            onClick={() => generateNow(auto)}
-                                            disabled={generatingId === auto.id}
-                                            className="flex-1 flex items-center justify-center gap-1.5 bg-card border border-border text-foreground hover:bg-muted rounded-lg text-sm px-3 py-1.5 transition-colors disabled:opacity-50"
-                                        >
-                                            {generatingId === auto.id ? (
-                                                <Loader2 size={14} className="animate-spin" />
-                                            ) : (
-                                                <Sparkles size={14} />
-                                            )}
-                                            Generate
-                                        </button>
-                                        <button
-                                            onClick={() => toggleStatus(auto)}
-                                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                                            title={active ? 'Pause' : 'Resume'}
-                                        >
-                                            {active ? <Pause size={15} /> : <Play size={15} />}
-                                        </button>
-                                        <button
-                                            onClick={() => setEditingId(auto.id)}
-                                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                                            title="Edit"
-                                        >
-                                            <Pencil size={15} />
-                                        </button>
                                     </div>
                                 </div>
                             );

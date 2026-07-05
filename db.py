@@ -183,6 +183,7 @@ class SlideshowAutomation(Base):
     id = Column(String(32), primary_key=True, default=_uuid)
     name = Column(String(120), nullable=False, default="New automation")
     status = Column(String(20), default="paused")      # active | paused
+    favorite = Column(Integer, default=0)              # favorites sort first in the list
     topic = Column(Text, default="")
     tone_preset = Column(String(40), default="conversational")
     tone_prompt = Column(Text, default="")             # freeform style rules when preset == custom
@@ -205,6 +206,7 @@ class SlideshowAutomation(Base):
     def to_dict(self):
         return {
             "id": self.id, "name": self.name, "status": self.status,
+            "favorite": bool(self.favorite),
             "topic": self.topic, "tone_preset": self.tone_preset, "tone_prompt": self.tone_prompt,
             "hooks": json.loads(self.hooks_json or "[]"),
             "hook_image": json.loads(self.hook_image_json or "{}"),

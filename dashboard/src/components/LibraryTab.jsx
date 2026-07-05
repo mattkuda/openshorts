@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RotateCcw, Calendar, Trash2, LayoutGrid, X, Pencil, Loader2 } from 'lucide-react';
+import { RotateCcw, Calendar, Trash2, LayoutGrid, X, Pencil, Loader2, Download } from 'lucide-react';
 import { getApiUrl } from '../config';
 
 const KIND_LABELS = {
@@ -228,13 +228,25 @@ export default function LibraryTab({ uploadPostKey, uploadUserId, debug }) {
                                         </button>
                                     )}
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(creation.id)}
-                                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center">
+                                    {(creation.image_paths?.length > 0 || creation.video_path) && (
+                                        <a
+                                            href={getApiUrl(`/api/library/${creation.id}/download`)}
+                                            download
+                                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                                            title="Download images + video as ZIP"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => handleDelete(creation.id)}
+                                        className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                                        title="Delete"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
