@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Slideshow Automations v2 — proposal</title>
+<style>
+  :root {
+    --bg: #000; --fg: #a1a1aa; --heading: #fff;
+    --line: rgba(255,255,255,0.1); --surface: #0a0a0a;
+    --accent: #fff; --mint: #53B559; --comment: #7ee787; --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 20px; font-weight: 700; margin: 48px 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  h3 { color: var(--heading); font-size: 16px; font-weight: 600; margin: 28px 0 4px; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 660px; }
+  strong { color: #d4d4d8; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; color: #d4d4d8; }
+  .q-help { color: var(--fg); font-size: 14px; margin: 2px 0 14px; }
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--mint); border-radius: 12px; padding: 18px 20px; margin-top: 24px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 8px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; vertical-align: top; }
+  th { font-weight: 600; color: rgba(255,255,255,0.55); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td strong { color: var(--heading); }
+
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .option {
+    text-align: left; font: inherit; color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .option:hover { border-color: rgba(255,255,255,0.35); }
+  .option.selected { border-color: var(--mint); background: rgba(83,181,89,0.08); box-shadow: 0 0 0 1px var(--mint) inset; }
+  .opt-title { color: var(--heading); font-weight: 600; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .opt-title::before {
+    content: ""; width: 14px; height: 14px; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 999px; flex: 0 0 auto; transition: background 120ms ease, border-color 120ms ease;
+  }
+  .decision[data-select="multi"] .opt-title::before { border-radius: 4px; }
+  .option.selected .opt-title::before { background: var(--mint); border-color: var(--mint); box-shadow: inset 0 0 0 3px #000; }
+  .opt-desc { font-size: 13px; }
+  .rec { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--mint); border: 1px solid rgba(83,181,89,0.45); border-radius: 999px; padding: 1px 8px; margin-left: auto; }
+
+  /* Light-theme mockup frame (the mockup carve-out) */
+  .mockframe { background: #f6f7f6; border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin: 16px 0; color: #3f3f46; font-size: 13px; }
+  .mockframe * { box-sizing: border-box; }
+  .m-card { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 16px; }
+  .m-title { color: #18181b; font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  .m-sub { color: #71717a; font-size: 11.5px; margin-bottom: 12px; }
+  .m-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+  .m-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; width: 100%; }
+  .m-input { background: #fff; border: 1px solid #e4e4e7; border-radius: 10px; padding: 8px 12px; color: #18181b; font-size: 12.5px; }
+  .m-input.grow { flex: 1; min-width: 200px; }
+  .m-area { width: 100%; min-height: 44px; border: 1px solid #e4e4e7; border-radius: 10px; padding: 8px 12px; background: #fff; color: #52525b; font-size: 12.5px; }
+  .m-seg { display: inline-flex; background: #f4f4f5; border-radius: 8px; padding: 2px; font-size: 11.5px; font-weight: 600; }
+  .m-seg span { padding: 4px 10px; border-radius: 6px; color: #71717a; }
+  .m-seg span.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+  .m-toggle { width: 30px; height: 17px; border-radius: 999px; background: #53B559; position: relative; display: inline-block; vertical-align: middle; }
+  .m-toggle::after { content: ""; position: absolute; top: 2px; right: 2px; width: 13px; height: 13px; border-radius: 999px; background: #fff; }
+  .m-toggle.off { background: #d4d4d8; } .m-toggle.off::after { right: auto; left: 2px; }
+  .m-well { background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .m-chip { display: inline-block; font-size: 10.5px; font-weight: 600; background: rgba(83,181,89,0.15); color: #2c6b30; border-radius: 999px; padding: 2px 8px; }
+  .m-ghost { color: #71717a; border: 1px dashed #d4d4d8; border-radius: 10px; padding: 7px 12px; text-align: center; font-size: 12px; margin-top: 8px; }
+
+  textarea#notes { width: 100%; min-height: 120px; resize: vertical; font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(83,181,89,0.5); }
+
+  .bar { position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px; background: linear-gradient(to top, #000 70%, rgba(0,0,0,0)); display: flex; gap: 12px; align-items: center; }
+  button.action { font: inherit; font-weight: 700; background: var(--mint); color: #06130a; border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  button.ghost { font: inherit; background: transparent; color: var(--heading); border: 1px solid var(--line); border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  pre#out { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; display: none; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 600; color: var(--heading); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Slideshow Automations v2</h1>
+  <p class="lede">What SlideReels, ReelFarm, and the rest actually do; how our current build compares; and a requirements proposal with decisions for you to check off. Pick an option per block, add comments in any option's context or the notes box, then <em>Copy decisions as Markdown</em> and paste it back.</p>
+
+  <div class="tldr">
+    <p><strong>My recommendation in one paragraph.</strong> Go the ReelFarm direction, but cleaner: an automation has <strong>global slide instructions + a slide-count picker</strong>, and per-slide "overrides" are <strong>optional and sparse</strong> — you only write one when a specific slide needs it (e.g. "slide 4 soft-sells Evex"). Slide 1 is always the intro/hook (from the hook bank). Add the four controls you listed — <strong>CTA toggle with position, numbering toggle, text-length setting, and a third image source ("specific image")</strong> — and keep text AI-generated fresh on every run so no two posts are identical. That gets you SlideReels' sense of control with ReelFarm's automation, without ReelFarm's clutter.</p>
+  </div>
+
+  <h2>1 · What the competitors actually do</h2>
+  <table>
+    <tr><th>Product</th><th>Model</th><th>Text on slides</th><th>Images</th><th>Automation</th></tr>
+    <tr>
+      <td><strong>SlideReels</strong></td>
+      <td>Manual <em>creator</em> — you build one carousel at a time</td>
+      <td>You type each caption (150 chars), or one "Generate Captions" button fills them; you verify everything before posting</td>
+      <td>Per slide: stock Gallery / My Uploads / AI Generated</td>
+      <td>None — you click post or download each time</td>
+    </tr>
+    <tr>
+      <td><strong>ReelFarm</strong></td>
+      <td><em>Automation</em> — a recipe that generates a different slideshow per run</td>
+      <td>Fresh AI text every run: hook bank (one line picked per post) + Tone &amp; Style prompt + <strong>slide count</strong> + <strong>sparse per-slide "Slide overrides"</strong></td>
+      <td>Image collection per slide role (Hook/Content/CTA), "Auto-images" (Pinterest by niche), + <strong>Image overrides</strong> to pin a specific image to a slide #</td>
+      <td>Posting times × day-of-week schedule, auto-posts to TikTok</td>
+    </tr>
+    <tr>
+      <td><strong>Genviral</strong></td>
+      <td>Cloner — "drop a viral slideshow URL → 100 spins"</td>
+      <td>AI variants of a proven post, not authored instructions</td>
+      <td>Inherited from the source post</td>
+      <td>Bulk scheduling across 10 platforms, API-first</td>
+    </tr>
+    <tr>
+      <td><strong>Us (shipped yesterday)</strong></td>
+      <td>Automation, ReelFarm-style</td>
+      <td>Hook bank + tone preset + a <strong>required direction on every slide</strong> (no global instructions, no count picker — slide list <em>is</em> the count)</td>
+      <td>Per slide: AI prompt or Collection (no "specific image" pin)</td>
+      <td>Posting times × days schedule; auto-post via Upload-Post; drafts land in Library</td>
+    </tr>
+  </table>
+
+  <details>
+    <summary>The key ReelFarm detail (answers your main question)</summary>
+    <p style="margin-top:10px">In their editor the Content tab has a <strong>Slide count</strong> field (e.g. Static · 5) and a separate <strong>"Slide overrides — + Add"</strong> list that starts <em>empty</em>. You don't write instructions for every slide — the AI writes all 5 content slides from the automation's topic + tone + the chosen hook, and an override exists only where you added one (their example: <em>Slide 4 — "this slide should subtly mention Cal AI as the solution to the problem — weave it in naturally as something that helped, not as an ad"</em>). Same pattern for images: a default collection per slide role, plus optional "Image overrides" to pin slide 3 to one specific image. So the answer to "do I need to give each slide an override, or global instructions?" is: <strong>ReelFarm does global-by-default with optional per-slide pinning, and it's the right call</strong> — required per-slide directions (our current build) is busywork for a 6-slide show and makes changing the count awkward. Text is generated fresh per run (that's why their preview shows lorem text — real text doesn't exist until generation).</p>
+  </details>
+
+  <h2>2 · Decisions</h2>
+
+  <section class="decision" data-select="single">
+    <h3>D1. Instruction model — global vs per-slide</h3>
+    <p class="q-help">Where do the content instructions live?</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Global + optional overrides <span class="rec">Recommended</span></span>
+        <span class="opt-desc">One "what the slides should cover" textarea + slide count. A sparse override list ("+ Add override → pick slide #") for slides that need specifics. Exactly ReelFarm's model; least typing, easiest to re-count.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Per-slide required (current)</span>
+        <span class="opt-desc">Every slide has its own direction box. Max control, but 6 slides = 6 mandatory prompts and count changes mean re-writing.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Global only</span>
+        <span class="opt-desc">Just the series topic + tone; AI decides everything per slide. Simplest, but you can't force "slide 4 mentions Evex".</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D2. Slide count</h3>
+    <p class="q-help">Slide 1 is always the intro/hook slide in every option.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Count picker + "vary" option <span class="rec">Recommended</span></span>
+        <span class="opt-desc">A number stepper (content slides, e.g. 4), plus an optional "vary between N–M" mode so consecutive posts aren't all the same length. ReelFarm's dropdown hints at Static vs dynamic — variance reads less botted.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Fixed count picker only</span>
+        <span class="opt-desc">One number, every post identical length. Simpler; add variance later if wanted.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Keep the explicit slide list</span>
+        <span class="opt-desc">Count = however many slide rows you added (current). Only makes sense if D1 stays per-slide-required.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D3. CTA slide</h3>
+    <p class="q-help">You asked for: enable toggle + control over which slide it lands on.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Toggle + position picker <span class="rec">Recommended</span></span>
+        <span class="opt-desc">Toggle on → CTA direction box + position: <em>Last slide</em> (default) or a specific slide #. Mid-stack CTAs ("slide 3 of 6") are a real TikTok pattern — cheap to support.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Toggle, always last (current)</span>
+        <span class="opt-desc">CTA is always the final slide. One less control; covers 90% of use.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D4. Numbering toggle</h3>
+    <p class="q-help">Intro: "tips to grow your back" → content slides start "1 …", "2 …", "3 …". Intro and CTA never numbered.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Ship it <span class="rec">Recommended</span></span>
+        <span class="opt-desc">A simple on/off. Enforced in the prompt AND post-processed (strip/add prefixes) so it's reliable, not vibes. Listicle numbering is the highest-performing slideshow format — worth a first-class switch.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Skip — let instructions handle it</span>
+        <span class="opt-desc">Users who want numbers write "number each slide" in the global instructions. Zero UI, less reliable output.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D5. Slide text length</h3>
+    <p class="q-help">Your ask: short / medium / long. Proposed definitions below — tweak in notes if you'd cut differently.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Global setting, 3 sizes <span class="rec">Recommended</span></span>
+        <span class="opt-desc"><strong>Short</strong>: one punchy line, ≤12 words. <strong>Medium</strong>: 2–3 sentences (~25–45 words). <strong>Long</strong>: 4–6 sentences (~60–90 words, storytime style). One segmented control for the whole automation; a per-slide override can still say "keep this one to 5 words".</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Per-slide length control</span>
+        <span class="opt-desc">A length dropdown on every slide/override. More knobs, more clutter — the override text can already express it.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D6. Image sources</h3>
+    <p class="q-help">Competitors offer: AI-generated / pull from a collection / one specific image.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">All three + a global default <span class="rec">Recommended</span></span>
+        <span class="opt-desc">Automation-level default (AI prompt-theme or a collection) applied to all slides; per-slide image overrides for AI / Collection / <strong>Specific image</strong> (pin one upload — e.g. your app screenshot on the CTA slide). Matches ReelFarm's default + Image overrides.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Keep AI + Collection per slide (current)</span>
+        <span class="opt-desc">No pinned-image option, no global default. Fine, but you can't guarantee the Evex screenshot appears.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">One global mode only</span>
+        <span class="opt-desc">Whole slideshow is all-AI or all-collection. Simplest possible; loses per-slide intent.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D7. Text freshness — preset vs generated per run</h3>
+    <p class="q-help">You asked what ReelFarm does: they generate on the fly, every post is different. SlideReels is fixed text you typed.</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Fresh AI text every run <span class="rec">Recommended</span></span>
+        <span class="opt-desc">Hook rotates from the bank; slide text regenerates from instructions each time (current behavior). This is the whole point of an automation — 30 posts/month that aren't clones. Consistency comes from tone + instructions + length + numbering.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Hybrid: freeze what you approve</span>
+        <span class="opt-desc">Generate once, hand-edit, and "lock" specific slide texts so future runs reuse them verbatim while the rest stay fresh. More control, notably more complexity.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Fixed preset texts</span>
+        <span class="opt-desc">SlideReels-style: you write the captions once, every post is identical (images can still rotate). TikTok tends to punish duplicate text.</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>D8. Review gate before posting</h3>
+    <p class="q-help">SlideReels' strength is you verify everything before it goes out. Where does that fit in an automation?</p>
+    <div class="options">
+      <button class="option">
+        <span class="opt-title">Per-automation toggle <span class="rec">Recommended</span></span>
+        <span class="opt-desc"><em>Review first</em> (default): scheduled runs land as drafts in Library, you approve/edit/post. <em>Auto-post</em>: straight to TikTok. This is mostly what's built — auto_post already exists; we'd add a lightweight "review &amp; edit slide text, re-render" pass on drafts.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Always auto-post</span>
+        <span class="opt-desc">Pure ReelFarm autopilot. Bravest option; one bad generation posts publicly.</span>
+      </button>
+      <button class="option">
+        <span class="opt-title">Always review</span>
+        <span class="opt-desc">Nothing posts without your click. Safest, but then it's not really an automation.</span>
+      </button>
+    </div>
+  </section>
+
+  <h2>3 · What the editor would look like</h2>
+  <p class="q-help">The revised Slides section, assuming the recommended options. Everything else (Content card, Posting times, TikTok posting) stays as-is.</p>
+
+  <div class="mockframe">
+    <div class="m-card">
+      <div class="m-title">Slides</div>
+      <div class="m-sub">Slide 1 is always the intro (from your hook bank). The AI writes the rest from your instructions.</div>
+
+      <div class="m-row">
+        <div><span class="m-label">Content slides</span><span class="m-input">5 &nbsp;▾</span> <span style="font-size:11px;color:#a1a1aa">(or vary 4–6)</span></div>
+        <div><span class="m-label">Numbered list</span><span class="m-toggle"></span> <span style="font-size:11px;color:#71717a">1, 2, 3…</span></div>
+        <div><span class="m-label">Text length</span><span class="m-seg"><span class="on">Short</span><span>Medium</span><span>Long</span></span></div>
+      </div>
+
+      <span class="m-label">What should the slides cover?</span>
+      <div class="m-area">tips for actually sticking to a workout plan — showing up consistently, form over weight, rest days, tracking progress. supportive, all lowercase.</div>
+
+      <div class="m-well">
+        <span class="m-chip">Slide 4 override</span>
+        <div style="margin-top:6px; color:#52525b">subtly mention tracking lifts with the Evex app — as something that helped, not an ad</div>
+      </div>
+      <div class="m-ghost">+ Add slide override (pick slide #)</div>
+
+      <div class="m-well" style="display:flex; align-items:center; gap:10px; justify-content:space-between">
+        <div><strong style="color:#18181b; font-size:12.5px">CTA slide</strong> <span style="font-size:11.5px">· position: <strong style="color:#18181b">Last</strong> ▾</span>
+        <div style="margin-top:4px; color:#52525b">soft CTA to track your lifts with the Evex app</div></div>
+        <span class="m-toggle"></span>
+      </div>
+
+      <div class="m-row" style="margin-top:14px">
+        <span class="m-label">Images — default for all slides</span>
+        <span class="m-seg"><span class="on">AI images</span><span>Collection</span></span>
+        <span class="m-input grow">cinematic gym b-roll, moody morning light, no people's faces</span>
+      </div>
+      <div class="m-well"><span class="m-chip">Slide 6 image</span> <span style="font-size:12px">· Specific image: <strong style="color:#18181b">evex-screenshot.png</strong></span></div>
+      <div class="m-ghost">+ Add image override (AI prompt · collection · specific image)</div>
+    </div>
+  </div>
+
+  <h2>4 · What this changes in the current build</h2>
+  <table>
+    <tr><th>Area</th><th>Change</th></tr>
+    <tr><td>Schema</td><td>Add <code>slide_count</code> (+ optional min/max), <code>global_instructions</code>, <code>numbering</code>, <code>text_length</code>, <code>cta.position</code>, <code>image_default</code>; slide list becomes sparse <code>overrides[{slide_n, direction}]</code> + <code>image_overrides[{slide_n, source, prompt|collection_id|image_path}]</code>. Hook bank, tone, schedule, TikTok settings unchanged.</td></tr>
+    <tr><td>Generation</td><td>Prompt takes global instructions + count + length budget + numbering rule + overrides keyed by slide #; numbering also enforced in post-processing. "Specific image" source skips generation/pick.</td></tr>
+    <tr><td>Editor UI</td><td>Slides card rebuilt per the mockup (count/numbering/length row, one instructions box, sparse override wells, CTA row with position, image default + overrides). Removes N required direction boxes.</td></tr>
+    <tr><td>Review flow (D8)</td><td>Drafts in Library get "Edit slide text → re-render" so a scheduled draft can be touched up and posted without regenerating images.</td></tr>
+    <tr><td>Migration</td><td>Existing automations: each current slide direction becomes an override on its slide #, count = old slide list length. No data loss.</td></tr>
+  </table>
+
+  <h2>Out of scope for this round</h2>
+  <p class="q-help">Noted from competitors but deliberately not in this proposal: Genviral-style "paste a viral slideshow URL → clone it", ReelFarm's public slideshow inspiration library, background music on the MP4 export, Pinterest-style auto image sourcing. Flag in notes if any should move up.</p>
+
+  <h2>Notes</h2>
+  <p class="q-help">Length definitions, naming, anything the options don't capture — questions back to me welcome.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy decisions as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span class="hint">Selections + notes are copied together.</span>
+  </div>
+  <pre id="out"></pre>
+</main>
+
+<script>
+  document.querySelectorAll('.decision').forEach(section => {
+    const multi = section.dataset.select === 'multi';
+    section.querySelectorAll('.option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!multi) section.querySelectorAll('.option').forEach(b => { if (b !== btn) b.classList.remove('selected'); });
+        btn.classList.toggle('selected');
+      });
+    });
+  });
+
+  function buildMarkdown() {
+    let md = '## Decisions — Slideshow Automations v2\n';
+    document.querySelectorAll('.decision').forEach(section => {
+      const q = section.querySelector('h3').textContent.trim();
+      const chosen = [...section.querySelectorAll('.option.selected')]
+        .map(b => b.querySelector('.opt-title').textContent.replace(/Recommended/i, '').trim());
+      md += `\n### ${q}\n`;
+      md += chosen.length ? chosen.map(c => `- **Selected:** ${c}`).join('\n') + '\n' : '- _(not answered)_\n';
+    });
+    const notes = document.getElementById('notes').value.trim();
+    md += `\n## Notes\n${notes || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+  copyBtn.onclick = async () => {
+    const md = buildMarkdown();
+    out.textContent = md; out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 2500);
+    }
+  };
+  document.getElementById('clear').onclick = () => {
+    document.querySelectorAll('.option.selected').forEach(b => b.classList.remove('selected'));
+    document.getElementById('notes').value = '';
+    out.style.display = 'none';
+  };
+</script>
+</body>
+</html>
