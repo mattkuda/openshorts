@@ -303,6 +303,22 @@ function App() {
     }
   }, [uploadPostKey]);
 
+  // Mock social accounts (debug): lets the account pickers and per-automation
+  // TikTok selection be exercised without an Upload-Post key. Real profiles
+  // always win — mocks only appear when no key is configured.
+  useEffect(() => {
+    if (debug.mockAuth && !uploadPostKey) {
+      setUserProfiles([
+        { username: 'evex.community', connected: ['tiktok'] },
+        { username: 'evex-test-2', connected: ['tiktok', 'instagram'] },
+      ]);
+      setUploadUserId((prev) => prev || 'evex.community');
+    } else if (!uploadPostKey) {
+      setUserProfiles([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debug.mockAuth, uploadPostKey]);
+
   // Load the brand profile (Evex etc.) once — templates pre-fill from it.
   useEffect(() => {
     fetch(getApiUrl('/api/brand'))

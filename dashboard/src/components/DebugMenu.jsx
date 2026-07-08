@@ -32,7 +32,7 @@ export default function DebugMenu({ debug, setDebug }) {
                     </div>
                     <div className="px-4 py-1 divide-y divide-border">
                         <Toggle checked={debug.mockAuth} onChange={(v) => setDebug({ mockAuth: v })}
-                            label="Mock auth" hint="Treat API keys as set — hides the missing-keys warnings." />
+                            label="Mock auth" hint="Treat API keys as set — hides the missing-keys warnings and adds two mock TikTok accounts to the account pickers." />
                         <Toggle checked={debug.mockAI} onChange={(v) => setDebug({ mockAI: v })}
                             label="Mock AI + mock videos" hint="Canned AI output, and the server uses mocks/mock-ai-generation.mp4 as demo footage — verify text overlays without burning credits." />
                         <Toggle checked={debug.mockProcessing} onChange={(v) => setDebug({ mockProcessing: v })}
