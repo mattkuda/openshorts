@@ -53,12 +53,13 @@ function Toggle({ on, onChange, title }) {
     return (
         <button
             onClick={onChange}
-            className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${on ? 'bg-primary' : 'bg-border'}`}
+            className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${on ? 'bg-primary' : 'bg-muted-foreground/40'}`}
             role="switch"
             aria-checked={!!on}
             title={title}
         >
-            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            {/* Thumb stays white in both themes — the switch-knob convention; it must read on the green (on) and gray (off) tracks alike. */}
+            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
         </button>
     );
 }
@@ -910,17 +911,11 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                         Upload-Post. Headless runs use the server keys in <code>.env.local</code>.
                                     </p>
                                 </div>
-                                <button
-                                    onClick={() => update({ tiktok: { ...auto.tiktok, auto_post: !auto.tiktok?.auto_post } })}
-                                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${auto.tiktok?.auto_post ? 'bg-primary' : 'bg-border'}`}
-                                    role="switch"
-                                    aria-checked={!!auto.tiktok?.auto_post}
+                                <Toggle
+                                    on={!!auto.tiktok?.auto_post}
+                                    onChange={() => update({ tiktok: { ...auto.tiktok, auto_post: !auto.tiktok?.auto_post } })}
                                     title="Auto-post"
-                                >
-                                    <span
-                                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${auto.tiktok?.auto_post ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
-                                    />
-                                </button>
+                                />
                             </div>
 
                             <div>
