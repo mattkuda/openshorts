@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Posting layer — SaaS scaling options</title>
+<style>
+  :root {
+    --bg: #000; --fg: #a1a1aa; --heading: #fff;
+    --line: rgba(255,255,255,0.1); --surface: #0a0a0a;
+    --mint: #53B559; --amber: #fbbf24; --red: #f87171; --blue: #6ea8fe; --comment: #7ee787;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 940px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 20px; font-weight: 700; margin: 52px 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  h3 { color: var(--heading); font-size: 16px; font-weight: 600; margin: 24px 0 4px; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 680px; }
+  strong { color: #d4d4d8; }
+  a { color: var(--blue); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px; color: #d4d4d8; }
+  .q-help { color: var(--fg); font-size: 14px; margin: 2px 0 14px; }
+
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--mint); border-radius: 12px; padding: 18px 20px; margin-top: 24px; }
+  .flag { background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.28); border-left: 3px solid var(--amber); border-radius: 12px; padding: 16px 20px; margin: 20px 0; }
+  .flag strong { color: var(--amber); }
+
+  .scroll { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--heading); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; background: #0c0c0c; position: sticky; top: 0; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.rowh { color: var(--heading); font-weight: 600; white-space: nowrap; }
+  .yes { color: var(--mint); font-weight: 600; }
+  .no { color: var(--red); font-weight: 600; }
+  .mid { color: var(--amber); font-weight: 600; }
+  .cell-note { display: block; color: rgba(255,255,255,0.45); font-size: 11.5px; margin-top: 2px; }
+
+  /* selectable decision cards */
+  .options { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .option {
+    text-align: left; font: inherit; color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer;
+    display: flex; gap: 12px; align-items: flex-start;
+    transition: border-color 120ms ease, background 120ms ease;
+  }
+  .option:hover { border-color: rgba(255,255,255,0.35); }
+  .option.selected { border-color: var(--mint); background: rgba(83,181,89,0.08); box-shadow: 0 0 0 1px var(--mint) inset; }
+  .radio { width: 15px; height: 15px; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; flex: 0 0 auto; margin-top: 3px; transition: background 120ms, border-color 120ms; }
+  .decision[data-select="multi"] .radio { border-radius: 4px; }
+  .option.selected .radio { background: var(--mint); border-color: var(--mint); box-shadow: inset 0 0 0 3px #000; }
+  .opt-body { min-width: 0; }
+  .opt-title { color: var(--heading); font-weight: 600; font-size: 14.5px; }
+  .opt-title .rec { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--mint); border: 1px solid rgba(83,181,89,0.45); border-radius: 999px; padding: 1px 7px; margin-left: 8px; vertical-align: middle; }
+  .opt-desc { font-size: 13px; margin-top: 3px; }
+  .opt-meta { font-size: 12px; margin-top: 6px; color: rgba(255,255,255,0.5); }
+  .opt-meta b { color: #d4d4d8; }
+
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 600; color: var(--heading); font-size: 14px; }
+  details p { margin: 10px 0 4px; font-size: 13.5px; }
+  details ul { margin: 6px 0; padding-left: 18px; font-size: 13.5px; }
+  details li { margin: 3px 0; }
+
+  textarea#notes { width: 100%; min-height: 110px; resize: vertical; font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(83,181,89,0.5); }
+
+  .bar { position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px; background: linear-gradient(to top, #000 72%, rgba(0,0,0,0)); display: flex; gap: 12px; align-items: center; }
+  button.action { font: inherit; font-weight: 700; background: var(--mint); color: #06130a; border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  button.ghost { font: inherit; background: transparent; color: var(--heading); border: 1px solid var(--line); border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  pre#out { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; display: none; }
+  .src { font-size: 12px; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+<main>
+  <h1>The posting layer: what to build your SaaS on</h1>
+  <p class="lede">Five ways to get ClipZoo's slideshows onto TikTok / IG / YouTube at scale — from staying on Upload-Post to owning the platform APIs directly. Costs and constraints below are from July 2026 research; treat the scale numbers as rough, order-of-magnitude estimates. Pick a direction at the bottom and export.</p>
+
+  <div class="tldr">
+    <p style="margin:0"><strong>My recommendation.</strong> Don't marry a vendor. Put every posting integration behind one <code>PostingProvider</code> interface, launch on a <strong>middleman API</strong> so you skip months of platform audits, and keep the option to go <strong>direct on TikTok</strong> when per-customer cost or dependency risk starts to hurt. Which middleman: <strong>Ayrshare if you want a proven, published enterprise ramp</strong> (Upload-Post's biggest weakness is exactly what you hit — no visible enterprise tier); a flat-rate newcomer if you want the cheapest predictable COGS and can tolerate a smaller vendor.</p>
+  </div>
+
+  <div class="flag">
+    <p style="margin:0"><strong>Your instinct is right.</strong> The "0/2 profiles" cap is just the free tier, but the real problem you bumped into is that <strong>Upload-Post publishes no enterprise / high-volume / reseller pricing at all.</strong> For a SaaS, opaque scaling economics is a genuine risk: you can't model your own margins or unit costs past a handful of customers without emailing sales and hoping. That alone is a reason to compare.</p>
+  </div>
+
+  <h2>Near-term: your cheapest path to a live e2e demo</h2>
+  <p class="q-help">You're not SaaSifying yet — you just want to see the pipeline post something real. The platform is almost incidental here; what you're de-risking is <em>our</em> code: generate → hand to the provider → scheduler fires → a real post lands. Two paths, and doing both costs $24 total.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Path</th><th>Cost</th><th>Setup friction</th><th>What it proves</th><th>Catch</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="rowh">Instagram on<br>Upload-Post <b>free</b></td>
+          <td class="yes">$0</td>
+          <td class="mid">Convert IG to Business/Creator + link a Facebook Page (~10 min)</td>
+          <td>Full pipeline to a <b>live public post</b>, for free — within 10 uploads/mo</td>
+          <td>IG API refuses personal accounts; must be a Professional account. Not your target channel.</td>
+        </tr>
+        <tr>
+          <td class="rowh">TikTok on<br>Upload-Post <b>Basic</b></td>
+          <td class="mid">$24/mo</td>
+          <td class="yes">Just OAuth-login your TikTok (evex.community) — simplest connect</td>
+          <td>Real e2e on your <b>actual target channel</b></td>
+          <td>$24/mo, TikTok is paid-only on Upload-Post</td>
+        </tr>
+        <tr>
+          <td class="rowh">TikTok <b>direct</b>,<br>unaudited/private</td>
+          <td class="yes">$0</td>
+          <td class="no">Register a TikTok dev app + build OAuth + Content Posting client (~1–2 days new code)</td>
+          <td>Real e2e straight to TikTok's own API — no middleman</td>
+          <td>Posts forced <b>SELF_ONLY (private, only you see them)</b>; https-redirect friction (likely needs ngrok); app-registration wait</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>Can't I just use TikTok's API directly with private posts for now?</summary>
+    <p><b>Yes — technically it works, and it's free.</b> Unaudited TikTok apps are exactly this sandbox: post to your own account, forced <code>SELF_ONLY</code> (private), ≤5 users/24h. One user posting privately to themselves is fully inside those limits, so it genuinely proves e2e against the real TikTok API — no $24, no audit.</p>
+    <p><b>But the ROI is bad if the goal is just a demo.</b> "Free" hides ~1–2 days of <em>new</em> code you don't have yet:</p>
+    <ul>
+      <li>Register a TikTok developer app, add the Content Posting API product, configure scopes — has its own (light) registration wait, not instant.</li>
+      <li>Implement TikTok's OAuth (Login Kit): redirect handling, code→token exchange, refresh. TikTok wants an <b>https</b> redirect URI, so localhost usually means running an <b>ngrok</b> tunnel.</li>
+      <li>Build the Content Posting client: query <code>creator_info</code> first (required), chunked <code>FILE_UPLOAD</code>, poll status, handle their finicky error codes. And our slideshow is <em>photos</em> → that's TikTok's separate photo-post flow, or you post the rendered MP4 as video (simpler, one path).</li>
+      <li>Lands <b>private</b> by default — but you're not stuck there: you can flip it public in-app (three-dots → Privacy → "Only me" → "Everyone", account must be public), or use the <b>inbox flow</b> (<code>/v2/post/publish/inbox/…</code>) so it drops as a draft and you publish it Public yourself. So "private-only" is softer than it sounds — you just finish the post by hand.</li>
+    </ul>
+    <p>Compare: the $24 Upload-Post path is ~15 minutes, reuses the integration you already built, and posts <b>public</b>. So for "see it work," direct-sandbox is the worst effort-per-demo of the three.</p>
+    <p><b>When it's actually the right move:</b> if you want to start building the <code>TikTokDirectProvider</code> you'd need at SaaS scale anyway. Then the free sandbox is the smart, zero-cost place to build and test that increment <em>now</em> — it's not throwaway, it's the first slice of owning TikTok. Do it as a real engineering task, not a demo shortcut.</p>
+  </details>
+
+  <div class="tldr" style="border-left-color:var(--blue)">
+    <p style="margin:0"><strong>My call for the demo:</strong> do both, in order. <b>(1)</b> Prove the pipeline <em>free</em> on Instagram this week — it validates every line of our posting code at $0. <b>(2)</b> Then pay the <b>$24/mo</b> to add TikTok and get the real demo on your headline channel. And keep the provider as-is: for a solo demo, <b>stay on Upload-Post</b> — you already built it, it's cheapest, and switching providers is a SaaS-scale decision you're explicitly not at yet. Ayrshare/direct is a "later, when you have paying customers" question.</p>
+  </div>
+
+  <h2>Why is TikTok the hard one?</h2>
+  <p>Instagram and YouTube are comparatively open; TikTok is the locked-down major. Two layers of friction, depending on how you reach it:</p>
+  <ul style="font-size:14px;">
+    <li><b>Through an aggregator (Upload-Post):</b> TikTok is the single platform they gate behind a paid tier. That's because TikTok's Content Posting API is a vetted <em>partner</em> program — the aggregator's own app must pass TikTok's audit and stay in good standing. Meta/YouTube don't impose that same partner gate, so those stay on the free tier. You're effectively paying for Upload-Post's audited TikTok pipeline.</li>
+    <li><b>Going direct (your own TikTok app):</b> until <em>your</em> app passes TikTok's audit (2–4 weeks, multiple rounds), you're capped at <b>5 users / 24h</b>, every post is forced <b>SELF_ONLY (private)</b>, and you must show the creator's avatar + username before each post. You literally cannot run a public production workflow unaudited.</li>
+    <li><b>Why so strict:</b> TikTok has been under sustained regulatory and security pressure (US divestiture fights, data-handling scrutiny), so it keeps posting tightly permissioned — few partners, mandatory audits, private-by-default for unaudited apps. It's a policy posture, not a technical limit, and it's unlikely to loosen soon.</li>
+  </ul>
+  <p class="q-help">Takeaway: for anything near-term, let an audited aggregator carry the TikTok compliance — that's exactly the $24 you'd pay Upload-Post. Owning the TikTok audit yourself only makes sense once TikTok volume justifies killing the middleman margin.</p>
+
+  <details>
+    <summary>What TikTok's audit actually checks (beyond the 2–4 week wait)</summary>
+    <p>The time isn't the hard part — the <b>requirements</b> are. To pass, your app must demonstrate:</p>
+    <ul>
+      <li><b>A clear, legitimate use case.</b> Vague or spammy "post anything anywhere" apps get rejected outright.</li>
+      <li><b>A working, deployed demo they can log into.</b> You provide a live URL + test email/password + a short guide to scheduling a post. <em>Not localhost</em> — you need a real product instance running.</li>
+      <li><b>A privacy policy URL.</b></li>
+      <li><b>The exact posting UX they mandate</b> (verified in review): show the creator's <b>avatar + username</b> before every post, show a <b>preview</b> of the content, let the user <b>edit the title/caption/hashtags</b>, and only upload after <b>explicit consent</b>.</li>
+      <li><b>A commercial-content disclosure toggle</b> — "does this promote a brand / product / service?", off by default. This one's directly relevant to you: your whole use case <em>is</em> promoting an app, so you'd have to build that toggle into the posting UI.</li>
+      <li><b>No client-injected watermarks, logos, or promo text</b> added to the content by your app.</li>
+    </ul>
+    <p>That deployed-demo + mandated-UX bar is the real reason small teams ride an aggregator instead — the aggregator already passed all of this.</p>
+  </details>
+
+  <details>
+    <summary>How do ReelFarm / SlideReels actually post? (evidence vs. suspicion)</summary>
+    <p><b>The one certainty:</b> anyone auto-posting <em>public</em> TikToks on a schedule, to many accounts, has crossed the audit line — there is no bypass for that behavior. So both competitors are, one way or another, on an <b>audited</b> Content Posting API integration.</p>
+    <ul>
+      <li><b>ReelFarm — high confidence, audited.</b> It publishes public slideshows automatically, daily, at scale, to users' connected accounts. That's impossible unaudited (which forces private + ≤5 users/24h). It runs its own API and brands its own "connect your TikTok" flow, so it most likely got <b>its own app directly audited</b> — though it could ride an audited aggregator under the hood. Either way: audited.</li>
+      <li><b>SlideReels — suspicion, lower confidence.</b> If it truly auto-posts public on a schedule, it's also audited. Given it's a smaller/newer product, my guess is it <b>rides an aggregator</b> (Ayrshare / Upload-Post-style) to inherit their audit rather than run its own — but I have no direct evidence.</li>
+    </ul>
+    <p><b>The reframe that matters:</b> using an aggregator means you <b>inherit their audit</b> — you never pass TikTok's yourself. That's the entire value you're buying. Going direct means <em>you</em> own the audit. There is no third path to fully-automated public posting.</p>
+  </details>
+
+  <h2>The five options at a glance</h2>
+  <p class="q-help">The rest of this doc is the <em>SaaS-scale</em> decision (many customers). For your solo demo, the near-term table above is the answer — but here's the full landscape for when you get there.</p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Option</th>
+          <th>Entry cost</th>
+          <th>Cost model at scale</th>
+          <th>TikTok</th>
+          <th>Multi-tenant / white-label</th>
+          <th>Time to market</th>
+          <th>Vendor / compliance risk</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rowh">Upload-Post<br><span class="cell-note">(current)</span></td>
+          <td>Free (2 profiles, no TikTok); ~$16–24/mo for 5<span class="cell-note">TikTok needs a paid tier</span></td>
+          <td class="mid">Per-profile, tiered<span class="cell-note">no published enterprise tier — unknown past small scale</span></td>
+          <td class="yes">Yes (paid)</td>
+          <td class="mid">Yes — "connect your users" + Share flow</td>
+          <td class="yes">Days</td>
+          <td class="mid">Small vendor; opaque scaling</td>
+        </tr>
+        <tr>
+          <td class="rowh">Ayrshare</td>
+          <td>$149/mo (1 profile)<span class="cell-note">$599/mo = 30 profiles</span></td>
+          <td class="yes">Per active profile, published<span class="cell-note">+$8.99 each; ~$1–2 at 500+ (enterprise)</span></td>
+          <td class="yes">Yes</td>
+          <td class="yes">Purpose-built for this ("products, not seats")</td>
+          <td class="yes">Days</td>
+          <td class="yes">Mature, predictable ramp</td>
+        </tr>
+        <tr>
+          <td class="rowh">Flat-rate API<br><span class="cell-note">(Blotato, Late, etc.)</span></td>
+          <td>~$29/mo = 20 accounts<span class="cell-note">flat regardless of volume</span></td>
+          <td class="yes">Flat tiers, cheapest COGS<span class="cell-note">$29 / $97 / $499 bands</span></td>
+          <td class="yes">Yes</td>
+          <td class="mid">Varies — verify per-tenant model</td>
+          <td class="yes">Days</td>
+          <td class="mid">Newer/smaller vendors</td>
+        </tr>
+        <tr>
+          <td class="rowh">Direct platform APIs<br><span class="cell-note">(own TikTok/Meta/YT apps)</span></td>
+          <td class="yes">$0 API<span class="cell-note">you pay infra + eng time</span></td>
+          <td class="yes">$0 per customer<span class="cell-note">fixed eng cost, no middleman margin</span></td>
+          <td class="mid">Yes — after audit</td>
+          <td class="yes">You own the whole relationship</td>
+          <td class="no">Weeks–months (audits)</td>
+          <td class="mid">No vendor risk, but you own every review + breakage</td>
+        </tr>
+        <tr>
+          <td class="rowh">Self-host OSS<br><span class="cell-note">(Postiz / Mixpost)</span></td>
+          <td class="yes">Free (self-host) + infra</td>
+          <td class="yes">$0 per customer<span class="cell-note">you run the servers</span></td>
+          <td class="mid">Yes — after audit</td>
+          <td class="yes">Yes</td>
+          <td class="mid">Medium (engine exists, apps don't)</td>
+          <td class="mid">You still hold the platform apps + audits</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="q-help">A "profile" = one of your customers, connecting any number of their own social accounts. That's the unit your cost scales on for every middleman option.</p>
+
+  <h2>What it roughly costs you per month, by customer count</h2>
+  <p class="q-help">Middleman platform fee only (not Gemini image cost or your infra). Illustrative — real numbers need a sales quote, especially for Upload-Post.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Customers</th><th>Upload-Post</th><th>Ayrshare</th><th>Flat-rate (Blotato-style)</th><th>Direct / OSS</th></tr></thead>
+      <tbody>
+        <tr><td class="rowh">10</td><td>~$24</td><td>~$149</td><td>~$29</td><td class="yes">$0 + infra</td></tr>
+        <tr><td class="rowh">100</td><td class="mid">? (no public tier)</td><td>~$1,230</td><td>~$499</td><td class="yes">$0 + infra</td></tr>
+        <tr><td class="rowh">1,000</td><td class="mid">? (contact sales)</td><td>~$2,000–8,000<span class="cell-note">volume discount tier</span></td><td class="mid">? (past top tier — quote)</td><td class="yes">$0 + infra</td></tr>
+        <tr><td class="rowh">5,000</td><td class="mid">? (contact sales)</td><td>~$5,000–10,000<span class="cell-note">~$1–2/profile enterprise</span></td><td class="mid">? (quote)</td><td class="yes">$0 + infra</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="q-help">The shape of the story: middleman cost grows with every customer (linear COGS); direct/OSS is a fixed engineering cost that gets cheaper per-user as you scale — but you pay it up front in audits and maintenance. The crossover is usually a few hundred to a couple thousand active customers.</p>
+
+  <h2>The deeper trade-offs</h2>
+
+  <details>
+    <summary>Upload-Post — cheapest to start, but a scaling black box</summary>
+    <ul>
+      <li><b>Good:</b> cheapest entry, fastest to wire up, and it already has the "let your own users connect" Share flow you'd need for multi-tenant.</li>
+      <li><b>The problem you found:</b> no public enterprise/reseller pricing. You literally cannot model COGS at 500+ customers without a sales conversation — and a company that doesn't publish that ramp may not have productized it.</li>
+      <li><b>Vendor risk:</b> smaller/newer company than Ayrshare. If they raise prices, throttle, or their TikTok app gets suspended, every customer stops posting.</li>
+      <li><b>Verify before betting on it:</b> (1) email them for volume/reseller pricing; (2) confirm the OAuth consent screen shows <em>your</em> brand, not "Upload Post."</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>Ayrshare — the grown-up API, priced for products</summary>
+    <ul>
+      <li><b>Built for exactly this:</b> "pay per active profile," one profile spans all a customer's networks, and there's a <em>published</em> enterprise ramp down to ~$1–2/profile at 500+ — so you can actually model margins.</li>
+      <li><b>The catch:</b> a $149/mo floor makes it pricey while you have &lt;10 customers, and per-profile fees mean COGS still grows linearly with users (just predictably).</li>
+      <li><b>Best when:</b> you're serious about SaaSifying and want a battle-tested dependency with numbers you can put in a spreadsheet today.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>Flat-rate newcomers (Blotato, Late, bundle.social, social-api.ai)</summary>
+    <ul>
+      <li><b>Good:</b> flat pricing (e.g. ~$29/mo for 20 accounts, ~$499 agency) means the cheapest and most predictable COGS — "riding a viral moment doesn't change the price." Some ship an MCP server for agent-driven posting.</li>
+      <li><b>Watch:</b> "connected accounts" isn't always the same as "isolated per-tenant profiles with their own OAuth" — verify the multi-tenant/white-label model before building onboarding on it. And these are the youngest vendors = highest dependency risk.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>Direct platform APIs — max control &amp; margin, real compliance tax</summary>
+    <p>You register your own developer apps with each platform. No middleman fee ever, full control of branding and rate limits — but you inherit every platform's review process and quirks:</p>
+    <ul>
+      <li><b>TikTok Content Posting API:</b> unaudited clients are capped at <b>5 users / 24h</b> and posts are forced to <b>SELF_ONLY (private)</b> — you literally can't run production until you pass audit (2–4 weeks, multiple rounds). You must also show the creator's avatar + username before every post (hard requirement they verify).</li>
+      <li><b>Meta (Instagram/Threads):</b> free API but gated behind App Review; Instagram posting requires a Business/Creator account + Facebook Page linkage.</li>
+      <li><b>YouTube Data API:</b> priced in quota units — an upload costs 1,600 of a default 10,000/day (~6 uploads/day) until you request (and justify) a quota increase.</li>
+      <li><b>X:</b> now pay-per-use (~$0.20 per post with a URL).</li>
+      <li><b>Bottom line:</b> the middlemen exist to sell you out of exactly this pain. Go direct per-platform only when a platform's volume justifies killing the margin — TikTok first, since it's your core channel.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>Self-hosted open source (Postiz / Mixpost) — the middle path</summary>
+    <ul>
+      <li><b>Good:</b> a posting/scheduling engine already built, self-hostable (Postiz is AGPL). You skip building the scheduler and own your data.</li>
+      <li><b>But:</b> you still register and hold the platform developer apps yourself → you inherit the <em>same</em> TikTok/Meta/YouTube audits as "direct." It removes the build cost, not the compliance cost.</li>
+      <li><b>Best as:</b> a way to own the platform relationships without writing the posting engine from scratch — a stepping stone toward full direct integration.</li>
+    </ul>
+  </details>
+
+  <h2>How this changes the code (any option)</h2>
+  <p>Whatever you pick, the smart move is the same: today the Upload-Post key + <code>user_id</code>-per-automation is hardwired. Abstract it behind one interface so the vendor is swappable and you can even run two at once (e.g. Ayrshare for IG/YT, direct for TikTok):</p>
+  <pre style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.55;color:#d4d4d8;"><span style="color:var(--comment)"># one interface, many backends — nothing else in the app knows the vendor</span>
+class PostingProvider:
+    def create_profile(self, tenant_id) -> str: ...        <span style="color:var(--comment)"># on signup</span>
+    def connect_url(self, profile_id, platform) -> str: ... <span style="color:var(--comment)"># OAuth/Share flow in onboarding</span>
+    def publish(self, profile_id, media, caption, platforms) -> Ref: ...
+
+UploadPostProvider(PostingProvider)   <span style="color:var(--comment)"># today</span>
+AyrshareProvider(PostingProvider)     <span style="color:var(--comment)"># swap by config</span>
+TikTokDirectProvider(PostingProvider) <span style="color:var(--comment)"># later, TikTok only</span></pre>
+  <p class="q-help">Our data model already stores <code>tiktok.user_id</code> per automation, so this is an onboarding flow + a server-side key + a profiles table — not a rewrite. It also makes the "which vendor" decision reversible, which is the whole point.</p>
+
+  <h2>Decisions</h2>
+  <p class="q-help">Pick a direction and a stance, add anything in the notes, then <em>Copy decisions as Markdown</em> and paste it back to me.</p>
+
+  <section class="decision" data-select="single">
+    <h3>0. Near-term demo path (what to do this week)</h3>
+    <div class="options">
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Free Instagram test first, then $24 TikTok <span class="rec">My pick</span></span>
+        <span class="opt-desc">Prove the pipeline for $0 on IG, then pay $24/mo to demo the real TikTok channel. Total $24 to a working demo.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Just pay $24 and go straight to TikTok</span>
+        <span class="opt-desc">Skip IG setup friction (business account + FB Page); demo your headline channel directly.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Free Instagram only for now</span>
+        <span class="opt-desc">$0, no card. Validates the whole flow; add TikTok whenever you want to spend the $24.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Build TikTok direct (unaudited, private) now</span>
+        <span class="opt-desc">$0 but ~1–2 days of new OAuth + Content Posting code. Only worth it if you want to start owning the direct-TikTok provider, not as a demo shortcut.</span>
+      </span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>1. Primary posting-layer direction (SaaS-scale)</h3>
+    <div class="options">
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Stay on Upload-Post for now</span>
+        <span class="opt-desc">Cheapest to launch; get a volume/enterprise quote from their sales before committing past ~50 customers.</span>
+        <span class="opt-meta"><b>Best if:</b> validating fast, low customer count, want to move today.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Move to Ayrshare <span class="rec">Recommended for SaaS</span></span>
+        <span class="opt-desc">Proven, published enterprise ramp so you can model margins; the "no enterprise tier" problem goes away.</span>
+        <span class="opt-meta"><b>Best if:</b> serious about SaaSifying and want predictable, spreadsheet-able COGS.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Flat-rate newcomer (Blotato / Late)</span>
+        <span class="opt-desc">Cheapest predictable COGS; verify the per-tenant/white-label model and accept a younger vendor.</span>
+        <span class="opt-meta"><b>Best if:</b> COGS-sensitive and comfortable with a smaller dependency.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Go direct on the platform APIs</span>
+        <span class="opt-desc">$0 middleman fee, full control — but weeks of audits (TikTok especially) before you can onboard real users.</span>
+        <span class="opt-meta"><b>Best if:</b> high volume already, or margin/control matters more than speed.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Hybrid: middleman now, direct-TikTok later <span class="rec">My pick</span></span>
+        <span class="opt-desc">Launch on a middleman, build direct TikTok when volume justifies it, keep IG/YT on the middleman.</span>
+        <span class="opt-meta"><b>Best if:</b> you want speed now without painting yourself into a corner.</span>
+      </span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>2. Architecture stance</h3>
+    <div class="options">
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Abstract behind a PostingProvider interface now <span class="rec">Recommended</span></span>
+        <span class="opt-desc">Small upfront refactor; makes the vendor swappable and lets you run two backends at once. Reversible decision.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Stay hardwired to one vendor, refactor only if needed</span>
+        <span class="opt-desc">Less work now; higher switching cost later if the vendor's pricing or reliability disappoints.</span>
+      </span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>3. What should I do next?</h3>
+    <div class="options">
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Nothing yet — just wanted the lay of the land</span>
+        <span class="opt-desc">You'll digest this and decide later.</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Plan the PostingProvider refactor + multi-tenant profiles</span>
+        <span class="opt-desc">I write an implementation plan (interface, onboarding OAuth flow, server-side key, profiles table).</span>
+      </span></button>
+      <button class="option"><span class="radio"></span><span class="opt-body">
+        <span class="opt-title">Deeper dive on one vendor</span>
+        <span class="opt-desc">Tell me which in the notes; I'll pull exact tiers, white-label details, and API fit.</span>
+      </span></button>
+    </div>
+  </section>
+
+  <h2>Notes</h2>
+  <p class="q-help">Budget ceiling, target customer count, must-have platforms, risk tolerance, which vendor to dig into — anything the options don't capture.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy decisions as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span class="hint">Selections + notes are copied together.</span>
+  </div>
+  <pre id="out"></pre>
+
+  <p class="src" style="margin-top:28px">Sources: <a href="https://www.ayrshare.com/pricing/">Ayrshare pricing</a> · <a href="https://www.linkstartai.com/en/agents/upload-post">Upload-Post review</a> · <a href="https://www.blotato.com/blog/social-media-api">Blotato API pricing guide</a> · <a href="https://developers.tiktok.com/doc/content-posting-api-get-started">TikTok Content Posting API</a> · <a href="https://www.postpeer.dev/blog/best-tiktok-posting-api">TikTok API audit constraints</a>. Figures are July 2026 estimates — verify current pricing before committing.</p>
+</main>
+
+<script>
+  document.querySelectorAll('.decision').forEach(section => {
+    const multi = section.dataset.select === 'multi';
+    section.querySelectorAll('.option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!multi) section.querySelectorAll('.option').forEach(b => { if (b !== btn) b.classList.remove('selected'); });
+        btn.classList.toggle('selected');
+      });
+    });
+  });
+
+  function buildMarkdown() {
+    let md = '## Decisions — posting layer\n';
+    document.querySelectorAll('.decision').forEach(section => {
+      const q = section.querySelector('h3').textContent.trim();
+      const chosen = [...section.querySelectorAll('.option.selected')]
+        .map(b => b.querySelector('.opt-title').textContent.replace(/Recommended.*|My pick/gi, '').trim());
+      md += `\n### ${q}\n`;
+      md += chosen.length ? chosen.map(c => `- **Selected:** ${c}`).join('\n') + '\n' : '- _(not answered)_\n';
+    });
+    const notes = document.getElementById('notes').value.trim();
+    md += `\n## Notes\n${notes || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+  copyBtn.onclick = async () => {
+    const md = buildMarkdown();
+    out.textContent = md; out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 2500);
+    }
+  };
+  document.getElementById('clear').onclick = () => {
+    document.querySelectorAll('.option.selected').forEach(b => b.classList.remove('selected'));
+    document.getElementById('notes').value = '';
+    out.style.display = 'none';
+  };
+</script>
+</body>
+</html>

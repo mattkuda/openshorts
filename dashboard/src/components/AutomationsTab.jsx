@@ -18,7 +18,7 @@ function scheduleSummary(schedule) {
     return `${times.length}×/day · ${perWeek}/week · ${label}`;
 }
 
-export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUserId, userProfiles, debug }) {
+export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUserId, userProfiles, debug, navGuard }) {
     const [automations, setAutomations] = useState([]);
     const [creations, setCreations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -102,6 +102,7 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
                 uploadUserId={uploadUserId}
                 userProfiles={userProfiles}
                 debug={debug}
+                navGuard={navGuard}
                 onBack={() => {
                     setEditingId(null);
                     fetchAll();
@@ -112,7 +113,7 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
 
     return (
         <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-10 animate-[fadeIn_0.3s_ease-out]">
-            <div className="max-w-6xl mx-auto space-y-6">
+            <div className="space-y-6">
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Slideshow Automations</h1>
@@ -141,7 +142,7 @@ export default function AutomationsTab({ geminiApiKey, uploadPostKey, uploadUser
                         </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                         {[...automations]
                             .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0))
                             .map((auto) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     ArrowLeft, Sparkles, Wand2, Loader2, Plus, Trash2, X, Play, Pause,
-    ChevronLeft, ChevronRight, Images, Clock,
+    ChevronLeft, ChevronRight, Images, Clock, GalleryHorizontal, LayoutGrid, Copy,
 } from 'lucide-react';
 import { getApiUrl } from '../config';
 import CollectionPickerModal from './CollectionPickerModal';
@@ -26,17 +26,43 @@ const TIMEZONES = [
 
 const label = 'text-xs font-bold uppercase tracking-wider text-muted-foreground';
 
+// Starting point dropped into the custom tone box so users edit an example
+// instead of staring at an empty prompt.
+const CUSTOM_TONE_PREFILL = 'first person ("i", "my"), like texting a friend — plain words, '
+    + 'no motivational clichés or hype, all lowercase, one concrete detail per slide';
+
+/** Underline-style tabs: highlighted label with a colored bar below (no pill). */
+function TabBar({ tabs, value, onChange, small = false }) {
+    return (
+        <div className="flex items-center gap-6 border-b border-border">
+            {tabs.map((t) => (
+                <button
+                    key={t.value}
+                    onClick={() => onChange(t.value)}
+                    className={`-mb-px border-b-2 font-medium transition-colors ${small ? 'pb-2 text-xs' : 'pb-2.5 text-sm'} ${
+                        value === t.value
+                            ? 'border-primary text-foreground'
+                            : `border-transparent hover:text-foreground ${t.muted ? 'text-muted-foreground/60' : 'text-muted-foreground'}`
+                    }`}
+                >
+                    {t.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 function SegmentedPair({ value, options, onChange }) {
     return (
         <div
-            className="grid bg-muted rounded-lg p-0.5 text-xs font-medium"
+            className="grid bg-muted border border-border rounded-lg p-0.5 text-xs font-medium"
             style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
         >
             {options.map((opt) => (
                 <button
                     key={opt.value}
                     onClick={() => onChange(opt.value)}
-                    className={`px-2 py-1 rounded-md transition-colors ${
+                    className={`px-2 py-1 rounded-md whitespace-nowrap transition-colors ${
                         value === opt.value
                             ? 'bg-card shadow-sm text-foreground'
                             : 'text-muted-foreground hover:text-foreground'
@@ -59,7 +85,7 @@ function Toggle({ on, onChange, title }) {
             title={title}
         >
             {/* Thumb stays white in both themes — the switch-knob convention; it must read on the green (on) and gray (off) tracks alike. */}
-            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            <span className={`absolute top-0.5 left-0 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
         </button>
     );
 }
@@ -68,11 +94,13 @@ const PLAN_TEXT_PX = { sm: 12, md: 16, lg: 21 };
 const PLAN_ANCHOR = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
 
 /** Simulates one rendered 1080x1920 slide before generation. Colors here are
- *  canvas simulation (what the PIL renderer outputs), not UI theme tokens. */
-function PlanSlide({ slide, textStyle }) {
-    const px = PLAN_TEXT_PX[textStyle.size] || 16;
+ *  canvas simulation (what the PIL renderer outputs), not UI theme tokens.
+ *  `compact` renders for small grid tiles: scaled-down text, no badge. */
+function PlanSlide({ slide, textStyle, compact = false }) {
+    const px = (PLAN_TEXT_PX[textStyle.size] || 16) * (compact ? 0.45 : 1);
     const lineStyle = textStyle.style === 'white_bg'
-        ? { background: '#ffffff', color: '#141414', borderRadius: 5, padding: '2px 7px',
+        ? { background: '#ffffff', color: '#141414', borderRadius: compact ? 3 : 5,
+            padding: compact ? '1px 3px' : '2px 7px',
             boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone', lineHeight: 2 }
         : textStyle.style === 'white'
             ? { color: '#ffffff' }
@@ -89,9 +117,11 @@ function PlanSlide({ slide, textStyle }) {
                     className="absolute inset-0 flex items-end justify-center p-3"
                     style={{ background: 'linear-gradient(160deg, #2b2b30, #16161a)' }}
                 >
-                    <p className="text-[10px] text-center mb-8" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                        {slide.imgNote}
-                    </p>
+                    {!compact && (
+                        <p className="text-[10px] text-center mb-8" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                            {slide.imgNote}
+                        </p>
+                    )}
                 </div>
             )}
             <div
@@ -109,12 +139,14 @@ function PlanSlide({ slide, textStyle }) {
                     {slide.text}
                 </p>
             </div>
-            <span
-                className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap max-w-[95%] truncate"
-                style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.85)' }}
-            >
-                {slide.badge}
-            </span>
+            {!compact && (
+                <span
+                    className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap max-w-[95%] truncate"
+                    style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.85)' }}
+                >
+                    {slide.badge}
+                </span>
+            )}
         </div>
     );
 }
@@ -211,7 +243,129 @@ function ImageSourceControl({ image, collections, onChange, onOpenPicker, allowS
     );
 }
 
-export default function AutomationEditor({ automationId, geminiApiKey, userProfiles, debug, onBack }) {
+/** Modal viewer over the automation's generation history — keeps results out of
+ *  the editing view; the preview column always shows the live plan. Arrow keys
+ *  step through slides; Newer/Older steps through generations. */
+function GenerationViewer({ history, index, fresh, onNavigate, onClose }) {
+    const [idx, setIdx] = useState(0);
+    const gen = index !== null ? history[index] : null;
+    const images = gen?.image_paths || [];
+
+    useEffect(() => {
+        setIdx(0);
+    }, [index]);
+
+    useEffect(() => {
+        if (!gen) return undefined;
+        const onKey = (e) => {
+            if (e.key === 'Escape') onClose();
+            if (e.key === 'ArrowLeft') setIdx((p) => Math.max(0, p - 1));
+            if (e.key === 'ArrowRight') setIdx((p) => Math.min(images.length - 1, p + 1));
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [gen, images.length, onClose]);
+
+    if (!gen) return null;
+
+    const when = gen.created_at
+        ? new Date(gen.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '';
+
+    return (
+        <div
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={onClose}
+        >
+            <div
+                className="bg-card border border-border rounded-2xl shadow-xl p-4 w-full max-w-md space-y-3"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{gen.title || 'Generation'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                            {when && <span>Generated {when}</span>}
+                            {gen.status === 'published' && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-700">
+                                    Posted
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors shrink-0"
+                        title="Close"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+                <div className="aspect-[9/16] max-h-[70vh] mx-auto rounded-xl overflow-hidden relative bg-black">
+                    {images[idx] && (
+                        <img
+                            src={getApiUrl(images[Math.min(idx, images.length - 1)])}
+                            alt={`Slide ${idx + 1}`}
+                            className="w-full h-full object-contain"
+                        />
+                    )}
+                    {images.length > 1 && (
+                        <>
+                            <button
+                                onClick={() => setIdx((p) => Math.max(0, p - 1))}
+                                disabled={idx === 0}
+                                className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/80 text-foreground disabled:opacity-30"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button
+                                onClick={() => setIdx((p) => Math.min(images.length - 1, p + 1))}
+                                disabled={idx >= images.length - 1}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/80 text-foreground disabled:opacity-30"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </>
+                    )}
+                </div>
+                <div className="flex items-center justify-center gap-1.5">
+                    {images.map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setIdx(i)}
+                            className={`w-1.5 h-1.5 rounded-full transition-colors ${i === idx ? 'bg-primary' : 'bg-border'}`}
+                            aria-label={`Slide ${i + 1}`}
+                        />
+                    ))}
+                </div>
+                {fresh && <p className="text-xs text-green-700 text-center">Saved to Library.</p>}
+                {history.length > 1 && (
+                    <div className="flex items-center justify-between border-t border-border pt-3">
+                        <button
+                            onClick={() => onNavigate(index - 1)}
+                            disabled={index <= 0}
+                            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 py-1.5 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            <ChevronLeft size={14} /> Newer
+                        </button>
+                        <span className="text-xs text-muted-foreground">
+                            {index + 1} of {history.length}
+                        </span>
+                        <button
+                            onClick={() => onNavigate(index + 1)}
+                            disabled={index >= history.length - 1}
+                            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 py-1.5 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            Older <ChevronRight size={14} />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function AutomationEditor({ automationId, geminiApiKey, userProfiles, debug, navGuard, onBack }) {
     const [auto, setAuto] = useState(null);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -219,22 +373,56 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
     const [dirty, setDirty] = useState(false);
     const [hooksBusy, setHooksBusy] = useState(false);
     const [generating, setGenerating] = useState(false);
-    const [result, setResult] = useState(null);
     const [previewIndex, setPreviewIndex] = useState(0);
     const [collections, setCollections] = useState([]);
     const [pickerTarget, setPickerTarget] = useState(null); // 'hook' | 'default' | image-override index
-    const [viewMode, setViewMode] = useState('plan');       // 'plan' | 'latest'
+    const [viewerIdx, setViewerIdx] = useState(null);       // index into history — generation modal (null = closed)
+    const [viewerFresh, setViewerFresh] = useState(false);  // viewing a generation that just finished
     const [history, setHistory] = useState([]);             // recent generations for this automation
+    const [viewLayout, setViewLayout] = useState('strip');  // preview layout: 'strip' | 'grid'
+    const [tab, setTab] = useState('format');               // main tab: 'format' | 'style' | 'history' | 'settings'
+    const [formatTab, setFormatTab] = useState('hook');     // format sub-tab: 'hook' | 'content' | 'cta'
+    const stripRef = useRef(null);
+    const stripProgrammatic = useRef(false);                // true while we drive the strip's scroll
 
-    const fetchHistory = useCallback(() => {
-        fetch(getApiUrl('/api/library'))
-            .then((r) => r.json())
-            .then((d) => setHistory(
-                (d.creations || [])
-                    .filter((c) => c.kind === 'auto_slideshow' && c.slots?.automation_id === automationId)
-                    .slice(0, 8)
-            ))
-            .catch(() => { /* history optional */ });
+    // Warn before losing unsaved changes: browser close/refresh…
+    useEffect(() => {
+        if (!dirty) return undefined;
+        const onBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [dirty]);
+
+    // …in-app sidebar navigation (App consults this guard before switching tabs)…
+    useEffect(() => {
+        if (!navGuard) return undefined;
+        navGuard.current = dirty
+            ? () => window.confirm('You have unsaved changes — leave without saving?')
+            : null;
+        return () => { navGuard.current = null; };
+    }, [navGuard, dirty]);
+
+    // …and the in-editor back button.
+    const handleBack = () => {
+        if (dirty && !window.confirm('You have unsaved changes — leave without saving?')) return;
+        onBack();
+    };
+
+    const fetchHistory = useCallback(async () => {
+        try {
+            const r = await fetch(getApiUrl('/api/library'));
+            const d = await r.json();
+            const h = (d.creations || [])
+                .filter((c) => c.kind === 'auto_slideshow' && c.slots?.automation_id === automationId)
+                .slice(0, 24);
+            setHistory(h);
+            return h;
+        } catch {
+            return []; /* history optional */
+        }
     }, [automationId]);
 
     useEffect(() => {
@@ -310,11 +498,50 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                 imgNote = spec.image_prompt ? `AI image: “${spec.image_prompt}”` : 'AI image (add a prompt or pick a collection)';
                 badge = spec.image_prompt ? `AI: ${spec.image_prompt.slice(0, 40)}` : 'AI image';
             }
-            return { pos, role, text, placeholder, img, imgNote, badge: `${pos === 1 ? 'hook · ' : role === 'cta' ? 'CTA · ' : ''}${badge}` };
+            const slideLabel = role === 'hook' ? 'Hook' : role === 'cta' ? 'CTA' : `Content ${contentIdx}`;
+            return { pos, role, label: slideLabel, text, placeholder, img, imgNote, badge: `${pos === 1 ? 'hook · ' : role === 'cta' ? 'CTA · ' : ''}${badge}` };
         });
     }, [auto, collections]);
 
     const mock = !!debug?.mockAI || !geminiApiKey;
+
+    // Filmstrip ↔ selection sync. Selecting a slide (dots/arrows/peek click) centers
+    // it in the strip; manual swipes update the selection to the nearest-center slide.
+    useEffect(() => {
+        if (viewLayout !== 'strip') return undefined;
+        const c = stripRef.current;
+        const el = c?.children[previewIndex];
+        if (!c || !el) return undefined;
+        stripProgrammatic.current = true;
+        c.scrollTo({ left: el.offsetLeft - (c.clientWidth - el.clientWidth) / 2, behavior: 'smooth' });
+        const t = setTimeout(() => { stripProgrammatic.current = false; }, 700);
+        return () => clearTimeout(t);
+    }, [previewIndex, viewLayout, planSlides.length]);
+
+    // Jump the preview to the slide the active Format sub-tab configures.
+    useEffect(() => {
+        if (tab !== 'format') return;
+        const i = formatTab === 'hook'
+            ? 0
+            : planSlides.findIndex((s) => s.role === (formatTab === 'cta' ? 'cta' : 'content'));
+        if (i >= 0) setPreviewIndex(i);
+        // planSlides intentionally omitted — only re-run on tab switches, not plan edits
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab, formatTab]);
+
+    const onStripScroll = () => {
+        if (stripProgrammatic.current) return;
+        const c = stripRef.current;
+        if (!c) return;
+        const center = c.scrollLeft + c.clientWidth / 2;
+        let best = 0;
+        let bestDist = Infinity;
+        Array.from(c.children).forEach((ch, i) => {
+            const d = Math.abs(ch.offsetLeft + ch.offsetWidth / 2 - center);
+            if (d < bestDist) { bestDist = d; best = i; }
+        });
+        setPreviewIndex((p) => (p === best ? p : best));
+    };
 
     useEffect(() => {
         fetch(getApiUrl(`/api/automations/${automationId}`))
@@ -364,6 +591,50 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
         }
     };
 
+    const duplicateAutomation = async () => {
+        setError('');
+        try {
+            if (dirty) await save();
+            const res = await fetch(getApiUrl('/api/automations'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: `${auto.name} (copy)` }),
+            });
+            if (!res.ok) throw new Error(`Create failed (${res.status})`);
+            const data = await res.json();
+            const body = {
+                name: `${auto.name} (copy)`, status: 'paused', topic: auto.topic,
+                tone_preset: auto.tone_preset, tone_prompt: auto.tone_prompt,
+                hooks: auto.hooks, hook_image: auto.hook_image,
+                content: auto.content, slides: auto.slides,
+                image_default: auto.image_default, image_overrides: auto.image_overrides,
+                cta: auto.cta, schedule: auto.schedule, tiktok: auto.tiktok,
+            };
+            const res2 = await fetch(getApiUrl(`/api/automations/${data.automation.id}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res2.ok) throw new Error(`Copy failed (${res2.status})`);
+            onBack(); // back to the list, where the copy now shows (paused)
+        } catch (e) {
+            setError(`Duplicate failed: ${e.message}`);
+        }
+    };
+
+    const deleteAutomation = async () => {
+        if (!window.confirm(`Delete "${auto.name}"? Generated slideshows stay in your Library.`)) return;
+        setError('');
+        try {
+            const res = await fetch(getApiUrl(`/api/automations/${automationId}`), { method: 'DELETE' });
+            if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+            setDirty(false);
+            onBack();
+        } catch (e) {
+            setError(`${e.message}`);
+        }
+    };
+
     const generateHooks = async () => {
         setHooksBusy(true);
         setError('');
@@ -390,7 +661,6 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
     const generateNow = async () => {
         setGenerating(true);
         setError('');
-        setResult(null);
         try {
             if (dirty) await save();
             const res = await fetch(getApiUrl(`/api/automations/${automationId}/generate`), {
@@ -403,10 +673,12 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
             });
             if (!res.ok) throw new Error((await res.text()).slice(0, 200));
             const data = await res.json();
-            setResult(data);
-            setViewMode('latest');
-            setPreviewIndex(0);
-            fetchHistory();
+            const h = await fetchHistory();
+            const i = h.findIndex((c) => c.id === data.creation?.id);
+            if (h.length > 0) {
+                setViewerFresh(true);
+                setViewerIdx(i >= 0 ? i : 0);
+            }
         } catch (e) {
             setError(`Generation failed: ${e.message}`);
         } finally {
@@ -477,26 +749,24 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
     }
 
     const perWeek = (auto.schedule?.times || []).reduce((n, t) => n + (t.days?.length || 0), 0);
-    const previewImages = result?.images || [];
-    const showingResult = viewMode === 'latest' && previewImages.length > 0;
-    const slideCount = showingResult ? previewImages.length : planSlides.length;
+    const slideCount = planSlides.length;
     const connectedProfiles = (userProfiles || []).filter((p) => p.connected?.includes('tiktok'));
     const content = auto.content || {};
     const maxContent = content.count_mode === 'vary' ? (content.count_max ?? 6) : (content.slide_count ?? 4);
     const totalSlides = 1 + Number(maxContent || 4) + (auto.cta?.enabled ? 1 : 0);
     const slideNumbers = Array.from({ length: Math.max(totalSlides - 1, 1) }, (_, i) => i + 2);
     const countLabel = content.count_mode === 'vary'
-        ? `${content.count_min ?? 3}–${content.count_max ?? 6} content slides`
-        : `${content.slide_count ?? 4} content slides`;
+        ? `${content.count_min ?? 3}–${content.count_max ?? 6} slides`
+        : `${content.slide_count ?? 4} slides`;
     const textStyle = { style: 'outline', size: 'md', position: 'top', width: 80, ...(content.text_style || {}) };
     const setTextStyle = (patch) => setContent({ text_style: { ...textStyle, ...patch } });
 
     return (
         <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-10 animate-[fadeIn_0.3s_ease-out]">
-            <div className="max-w-6xl mx-auto space-y-6">
+            <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
                     <button
-                        onClick={onBack}
+                        onClick={handleBack}
                         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                         <ArrowLeft size={16} /> All automations
@@ -506,19 +776,19 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                         {error && <span className="text-xs font-medium text-red-700 max-w-xs truncate">{error}</span>}
                         <button
                             onClick={() => update({ status: auto.status === 'active' ? 'paused' : 'active' })}
-                            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                            className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border transition-colors ${
                                 auto.status === 'active'
                                     ? 'bg-green-500/10 text-green-700 border-green-500/20'
                                     : 'bg-muted text-muted-foreground border-border hover:text-foreground'
                             }`}
                         >
-                            {auto.status === 'active' ? <Pause size={12} /> : <Play size={12} />}
+                            {auto.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
                             {auto.status === 'active' ? 'Active' : 'Paused'}
                         </button>
                         <button
                             onClick={() => save()}
                             disabled={saving || !dirty}
-                            className="btn-primary text-sm px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="btn-primary text-sm px-7 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {saving ? 'Saving…' : 'Save'}
                         </button>
@@ -532,11 +802,22 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                     placeholder="Automation name"
                 />
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
-                    <div className="space-y-6">
-                        {/* Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_480px] gap-6 items-start">
+                    <div className="space-y-5">
+                        <TabBar
+                            value={tab}
+                            onChange={setTab}
+                            tabs={[
+                                { value: 'format', label: 'Format' },
+                                { value: 'style', label: 'Hooks & Style' },
+                                { value: 'history', label: 'History' },
+                                { value: 'settings', label: 'Settings' },
+                            ]}
+                        />
+
+                        {/* Hooks & Style — topic, voice, and the hook bank */}
+                        {tab === 'style' && (
                         <div className="bg-card border border-border rounded-xl p-5 space-y-5">
-                            <h2 className="text-lg font-semibold text-foreground">Content</h2>
                             <div>
                                 <label className={`${label} block mb-2`}>What&apos;s this series about?</label>
                                 <textarea
@@ -551,7 +832,13 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 <label className={`${label} block mb-2`}>Tone &amp; style</label>
                                 <select
                                     value={auto.tone_preset}
-                                    onChange={(e) => update({ tone_preset: e.target.value })}
+                                    onChange={(e) => update({
+                                        tone_preset: e.target.value,
+                                        // Seed the custom box with an editable example, not a blank stare
+                                        ...(e.target.value === 'custom' && !(auto.tone_prompt || '').trim()
+                                            ? { tone_prompt: CUSTOM_TONE_PREFILL }
+                                            : {}),
+                                    })}
                                     className="input-field w-full"
                                 >
                                     {TONE_OPTIONS.map((t) => (
@@ -589,16 +876,50 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 />
                             </div>
                         </div>
+                        )}
 
-                        {/* Slides */}
+                        {/* Format — what each slide is, organized Hook / Content / CTA */}
+                        {tab === 'format' && (
                         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-                            <div>
-                                <h2 className="text-lg font-semibold text-foreground">Slides</h2>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Slide 1 is always the intro (from your hook bank). The AI writes the rest
-                                    from your instructions — add an override only where a slide needs specifics.
-                                </p>
-                            </div>
+                            <TabBar
+                                small
+                                value={formatTab}
+                                onChange={setFormatTab}
+                                tabs={[
+                                    { value: 'hook', label: 'Hook' },
+                                    { value: 'content', label: 'Content' },
+                                    { value: 'cta', label: 'CTA', muted: !auto.cta?.enabled },
+                                ]}
+                            />
+
+                            {formatTab === 'hook' && (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        Slide 1 opens every post with a hook from your bank (edit the bank in
+                                        Hooks &amp; Style) over the image below.
+                                    </p>
+                                    <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong whitespace-nowrap shrink-0">Hook</span>
+                                            <span className="text-xs text-muted-foreground">Slide 1 image</span>
+                                        </div>
+                                        <ImageSourceControl
+                                            image={auto.hook_image}
+                                            collections={collections}
+                                            allowSpecific
+                                            onChange={(image) => update({ hook_image: image })}
+                                            onOpenPicker={() => setPickerTarget('hook')}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {formatTab === 'content' && (
+                            <>
+                            <p className="text-xs text-muted-foreground">
+                                The AI writes each content slide from your instructions — add an override only
+                                where a slide needs specifics.
+                            </p>
 
                             {/* Count / numbering / length row */}
                             <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
@@ -629,7 +950,7 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                                 className="input-field w-16 text-sm py-1.5"
                                             />
                                         )}
-                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap">
                                             <input
                                                 type="checkbox"
                                                 checked={content.count_mode === 'vary'}
@@ -687,7 +1008,7 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 <div key={i} className="bg-muted border border-border rounded-lg p-3 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Override</span>
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong whitespace-nowrap shrink-0">Override</span>
                                             <select
                                                 value={ov.slide_n}
                                                 onChange={(e) => setOverride(i, { slide_n: Number(e.target.value) })}
@@ -722,69 +1043,10 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 <Plus size={14} /> Add slide override
                             </button>
 
-                            {/* CTA */}
-                            <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs font-semibold text-foreground">CTA slide</span>
-                                        {auto.cta?.enabled && (
-                                            <select
-                                                value={auto.cta?.position ?? 'last'}
-                                                onChange={(e) => update({
-                                                    cta: { ...auto.cta, position: e.target.value === 'last' ? 'last' : Number(e.target.value) },
-                                                })}
-                                                className="input-field w-auto text-xs py-1"
-                                            >
-                                                <option value="last">Position: last</option>
-                                                {slideNumbers.map((n) => (
-                                                    <option key={n} value={n}>Position: slide {n}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                    </div>
-                                    <Toggle
-                                        on={!!auto.cta?.enabled}
-                                        onChange={() => update({ cta: { ...auto.cta, enabled: !auto.cta?.enabled } })}
-                                        title="Enable CTA slide"
-                                    />
-                                </div>
-                                {auto.cta?.enabled && (
-                                    <input
-                                        value={auto.cta?.direction || ''}
-                                        onChange={(e) => update({ cta: { ...auto.cta, direction: e.target.value } })}
-                                        placeholder="e.g. soft CTA to track your lifts with the Evex app"
-                                        className="input-field w-full text-sm"
-                                    />
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Images */}
-                        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-                            <div>
-                                <h2 className="text-lg font-semibold text-foreground">Images</h2>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    A default for every slide, plus per-slide overrides (AI prompt · collection · a specific pinned image).
-                                </p>
-                            </div>
-
+                            {/* Default image + per-slide image overrides */}
                             <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Hook</span>
-                                    <span className="text-xs text-muted-foreground">Slide 1 image</span>
-                                </div>
-                                <ImageSourceControl
-                                    image={auto.hook_image}
-                                    collections={collections}
-                                    allowSpecific
-                                    onChange={(image) => update({ hook_image: image })}
-                                    onOpenPicker={() => setPickerTarget('hook')}
-                                />
-                            </div>
-
-                            <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-foreground">Default for all other slides</span>
+                                    <span className="text-xs font-semibold text-foreground">Default image for content slides</span>
                                 </div>
                                 <ImageSourceControl
                                     image={auto.image_default}
@@ -798,7 +1060,7 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 <div key={i} className="bg-muted border border-border rounded-lg p-3 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong">Image override</span>
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong whitespace-nowrap shrink-0">Image override</span>
                                             <select
                                                 value={ov.slide_n}
                                                 onChange={(e) => setImageOverride(i, { slide_n: Number(e.target.value) })}
@@ -832,8 +1094,101 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                             >
                                 <Plus size={14} /> Add image override
                             </button>
-                        </div>
+                            </>
+                            )}
 
+                            {formatTab === 'cta' && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            Ends (or interrupts) each post with a call to action — e.g. a soft plug for your app.
+                                        </p>
+                                        <Toggle
+                                            on={!!auto.cta?.enabled}
+                                            onChange={() => update({ cta: { ...auto.cta, enabled: !auto.cta?.enabled } })}
+                                            title="Enable CTA slide"
+                                        />
+                                    </div>
+                                    {auto.cta?.enabled ? (
+                                        <div className="bg-muted border border-border rounded-lg p-3 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/20 text-primary-strong whitespace-nowrap shrink-0">CTA</span>
+                                                <select
+                                                    value={auto.cta?.position ?? 'last'}
+                                                    onChange={(e) => update({
+                                                        cta: { ...auto.cta, position: e.target.value === 'last' ? 'last' : Number(e.target.value) },
+                                                    })}
+                                                    className="input-field w-auto text-xs py-1"
+                                                >
+                                                    <option value="last">Position: last</option>
+                                                    {slideNumbers.map((n) => (
+                                                        <option key={n} value={n}>Position: slide {n}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <input
+                                                value={auto.cta?.direction || ''}
+                                                onChange={(e) => update({ cta: { ...auto.cta, direction: e.target.value } })}
+                                                placeholder="e.g. soft CTA to track your lifts with the Evex app"
+                                                className="input-field w-full text-sm"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Uses the default image unless an image override targets its slide.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground bg-muted border border-border rounded-lg p-3">
+                                            CTA slide is off — posts end on the last content slide.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        )}
+
+                        {/* History — past generations for this automation */}
+                        {tab === 'history' && (
+                            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-semibold text-foreground">Past generations</h2>
+                                    <p className="text-xs text-muted-foreground">{history.length} saved to Library</p>
+                                </div>
+                                {history.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground bg-muted border border-border rounded-lg p-4 text-center">
+                                        Nothing yet — hit &ldquo;Generate test post&rdquo; to make the first one.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                                        {history.map((c, i) => (
+                                            <button
+                                                key={c.id}
+                                                onClick={() => { setViewerFresh(false); setViewerIdx(i); }}
+                                                className="text-left border border-border rounded-xl p-2.5 hover:border-primary/60 transition-colors"
+                                            >
+                                                <div className="aspect-[9/16] rounded-lg overflow-hidden bg-black mb-2">
+                                                    {c.image_paths?.[0] && (
+                                                        <img src={getApiUrl(c.image_paths[0])} alt="" className="w-full h-full object-cover" />
+                                                    )}
+                                                </div>
+                                                <p className="text-xs font-medium text-foreground truncate">{c.title || 'Generation'}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                                    {c.created_at
+                                                        ? new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                                                        : ''}
+                                                    {c.status === 'published' && (
+                                                        <span className="font-medium px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-700">Posted</span>
+                                                    )}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Settings — schedule, posting account & copy, manage */}
+                        {tab === 'settings' && (
+                        <>
                         {/* Schedule */}
                         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                             <div className="flex items-start justify-between gap-3">
@@ -970,26 +1325,138 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 ))}
                             </div>
                         </div>
+
+                        {/* Manage */}
+                        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+                            <h2 className="text-lg font-semibold text-foreground">Manage</h2>
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={duplicateAutomation}
+                                    className="flex items-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5 text-sm font-medium transition-colors"
+                                >
+                                    <Copy size={14} /> Duplicate automation
+                                </button>
+                                <button
+                                    onClick={deleteAutomation}
+                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white rounded-xl px-5 py-2.5 text-sm font-medium transition-colors"
+                                >
+                                    <Trash2 size={14} /> Delete automation
+                                </button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Duplicating saves your edits and creates a paused copy. Deleting removes the
+                                automation and its schedule — generated slideshows stay in your Library.
+                            </p>
+                        </div>
+                        </>
+                        )}
                     </div>
 
                     {/* Preview / generate column */}
-                    <div className="lg:sticky lg:top-0 space-y-3">
+                    <div className="lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto custom-scrollbar space-y-3">
                         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-                            <button
-                                onClick={generateNow}
-                                disabled={generating}
-                                className="btn-primary w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-                            >
-                                {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                                {generating ? 'Generating…' : 'Generate now'}
-                            </button>
-                            {mock && (
-                                <p className="text-xs text-muted-foreground text-center">
-                                    Mock mode — placeholder images, no API cost.
-                                </p>
+                            {/* Preview header: filmstrip ↔ grid layout toggle */}
+                            <div className="flex items-center justify-between">
+                                <p className={label}>Preview</p>
+                                <div className="flex items-center gap-0.5 bg-muted border border-border rounded-lg p-0.5">
+                                    <button
+                                        onClick={() => setViewLayout('strip')}
+                                        className={`p-1.5 rounded-md transition-colors ${viewLayout === 'strip' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                        title="Slide view"
+                                    >
+                                        <GalleryHorizontal size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewLayout('grid')}
+                                        className={`p-1.5 rounded-md transition-colors ${viewLayout === 'grid' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                        title="Grid view"
+                                    >
+                                        <LayoutGrid size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {viewLayout === 'strip' ? (
+                                <div className="relative">
+                                    <div
+                                        ref={stripRef}
+                                        onScroll={onStripScroll}
+                                        className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide px-[11%]"
+                                    >
+                                        {planSlides.map((s, i) => (
+                                            <div key={i} className="w-[78%] shrink-0 snap-center">
+                                                <p className={`text-xs text-center mb-1.5 truncate transition-colors ${i === previewIndex ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                                                    {s.label}
+                                                </p>
+                                                <div
+                                                    onClick={() => setPreviewIndex(i)}
+                                                    className={`aspect-[9/16] rounded-xl overflow-hidden relative bg-black transition-opacity ${i === previewIndex ? '' : 'opacity-50 cursor-pointer hover:opacity-75'}`}
+                                                >
+                                                    <PlanSlide slide={s} textStyle={textStyle} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {slideCount > 1 && (
+                                        <>
+                                            <button
+                                                onClick={() => setPreviewIndex((p) => Math.max(0, p - 1))}
+                                                disabled={previewIndex === 0}
+                                                className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/90 border border-border text-foreground shadow-sm disabled:opacity-30"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setPreviewIndex((p) => Math.min(slideCount - 1, p + 1))}
+                                                disabled={previewIndex >= slideCount - 1}
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/90 border border-border text-foreground shadow-sm disabled:opacity-30"
+                                            >
+                                                <ChevronRight size={16} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {planSlides.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => { setPreviewIndex(i); setViewLayout('strip'); }}
+                                            title={s.label}
+                                            className={`aspect-[9/16] rounded-lg overflow-hidden relative bg-black border transition-colors ${
+                                                i === Math.min(previewIndex, slideCount - 1)
+                                                    ? 'border-primary ring-1 ring-primary/40'
+                                                    : 'border-border hover:border-primary/60'
+                                            }`}
+                                        >
+                                            <PlanSlide slide={s} textStyle={textStyle} compact />
+                                        </button>
+                                    ))}
+                                </div>
                             )}
 
-                            {/* Text style — reflected live in the preview below */}
+                            {viewLayout === 'strip' && (
+                                <div className="flex items-center justify-center gap-1.5">
+                                    {Array.from({ length: slideCount }, (_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setPreviewIndex(i)}
+                                            className={`w-1.5 h-1.5 rounded-full transition-colors ${i === Math.min(previewIndex, slideCount - 1) ? 'bg-primary' : 'bg-border'}`}
+                                            aria-label={`Slide ${i + 1}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            <p className="text-xs text-muted-foreground text-center truncate">
+                                Plan · {countLabel}
+                                {content.numbering ? ' · numbered' : ''}
+                                {auto.cta?.enabled
+                                    ? ` · CTA ${auto.cta?.position === 'last' || !auto.cta?.position ? 'last' : `#${auto.cta.position}`}`
+                                    : ''}
+                            </p>
+
+                            {/* Text style — reflected live in the preview above */}
                             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                                 <div>
                                     <label className={`${label} block mb-1`}>Style</label>
@@ -1041,98 +1508,32 @@ export default function AutomationEditor({ automationId, geminiApiKey, userProfi
                                 </div>
                             </div>
 
-                            {previewImages.length > 0 && (
-                                <SegmentedPair
-                                    value={viewMode}
-                                    options={[
-                                        { value: 'plan', label: 'Plan' },
-                                        { value: 'latest', label: 'Result' },
-                                    ]}
-                                    onChange={setViewMode}
-                                />
-                            )}
+                            <button
+                                onClick={generateNow}
+                                disabled={generating}
+                                className="btn-primary w-full flex items-center justify-center gap-2 text-sm py-2.5 disabled:opacity-50"
+                            >
+                                {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                {generating ? 'Generating…' : 'Generate test post'}
+                            </button>
+                            <p className="text-xs text-muted-foreground text-center">
+                                {mock
+                                    ? 'Mock mode — placeholder images, no API cost.'
+                                    : 'Runs this recipe once and saves the post to your Library. Doesn’t publish to TikTok.'}
+                            </p>
 
-                            <div className="aspect-[9/16] rounded-xl overflow-hidden relative bg-black">
-                                {showingResult ? (
-                                    <img
-                                        src={getApiUrl(previewImages[Math.min(previewIndex, previewImages.length - 1)])}
-                                        alt={`Slide ${previewIndex + 1}`}
-                                        className="w-full h-full object-contain"
-                                    />
-                                ) : planSlides[previewIndex] ? (
-                                    <PlanSlide slide={planSlides[previewIndex]} textStyle={textStyle} />
-                                ) : null}
-                                {slideCount > 1 && (
-                                    <>
-                                        <button
-                                            onClick={() => setPreviewIndex((p) => Math.max(0, p - 1))}
-                                            disabled={previewIndex === 0}
-                                            className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/80 text-foreground disabled:opacity-30"
-                                        >
-                                            <ChevronLeft size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setPreviewIndex((p) => Math.min(slideCount - 1, p + 1))}
-                                            disabled={previewIndex >= slideCount - 1}
-                                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-card/80 text-foreground disabled:opacity-30"
-                                        >
-                                            <ChevronRight size={16} />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-
-                            <div className="flex items-center justify-center gap-1.5">
-                                {Array.from({ length: slideCount }, (_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setPreviewIndex(i)}
-                                        className={`w-1.5 h-1.5 rounded-full transition-colors ${i === previewIndex ? 'bg-primary' : 'bg-border'}`}
-                                        aria-label={`Slide ${i + 1}`}
-                                    />
-                                ))}
-                            </div>
-
-                            {!showingResult && (
-                                <p className="text-xs text-muted-foreground text-center">
-                                    Plan preview · {countLabel}
-                                    {content.numbering ? ' · numbered' : ''}
-                                    {auto.cta?.enabled
-                                        ? ` + CTA (${auto.cta?.position === 'last' || !auto.cta?.position ? 'last' : `slide ${auto.cta.position}`})`
-                                        : ''}
-                                </p>
-                            )}
-                            {result && showingResult && (
-                                <p className="text-xs text-green-700 text-center">Saved to Library.</p>
-                            )}
-
-                            {history.length > 0 && (
-                                <div>
-                                    <p className={`${label} mb-1.5`}>Recent generations</p>
-                                    <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-                                        {history.map((c) => (
-                                            <button
-                                                key={c.id}
-                                                onClick={() => {
-                                                    setResult({ images: c.image_paths });
-                                                    setViewMode('latest');
-                                                    setPreviewIndex(0);
-                                                }}
-                                                className="w-12 aspect-[9/16] shrink-0 rounded-lg overflow-hidden border border-border hover:border-primary/60 transition-colors bg-black"
-                                                title={c.title}
-                                            >
-                                                {c.image_paths?.[0] && (
-                                                    <img src={getApiUrl(c.image_paths[0])} alt="" className="w-full h-full object-cover" />
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            <GenerationViewer
+                history={history}
+                index={viewerIdx}
+                fresh={viewerFresh}
+                onNavigate={(i) => { setViewerFresh(false); setViewerIdx(i); }}
+                onClose={() => setViewerIdx(null)}
+            />
 
             <CollectionPickerModal
                 open={pickerTarget !== null}

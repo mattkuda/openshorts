@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat, Sun, Moon } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
@@ -76,19 +76,20 @@ const UserProfileSelector = ({ profiles, selectedUserId, onSelect }) => {
     <div className="relative z-50">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between bg-surface border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors min-w-[180px]"
+        className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
+        title="Posting account"
       >
-        <span className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-[10px] font-bold text-foreground">
+        <span className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-[10px] font-bold text-foreground shrink-0">
             {selectedProfile?.username?.substring(0, 1).toUpperCase() || "U"}
           </div>
-          <span className="font-medium text-foreground truncate max-w-[100px]">{selectedProfile?.username || "Select User"}</span>
+          <span className="font-medium text-foreground truncate">{selectedProfile?.username || "Select User"}</span>
         </span>
-        <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`text-muted-foreground shrink-0 transition-transform ${isOpen ? '' : 'rotate-180'}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 right-0 w-64 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute bottom-full mb-2 left-0 right-0 bg-card border border-border rounded-xl shadow-md overflow-hidden z-50">
           <div className="max-h-60 overflow-y-auto custom-scrollbar">
             {profiles.map((profile) => (
               <button
@@ -184,6 +185,8 @@ function App() {
     return next;
   });
   const [showAccountModal, setShowAccountModal] = useState(false);
+  // Set by a view with unsaved changes (returns false to cancel navigation).
+  const navGuardRef = useRef(null);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('aishorts_theme') === 'dark');
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -550,7 +553,10 @@ function App() {
             return (
               <button
                 key={id}
-                onClick={() => setActiveTab(id)}
+                onClick={() => {
+                  if (navGuardRef.current && !navGuardRef.current()) return;
+                  setActiveTab(id);
+                }}
                 className={`group relative w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-colors ${active ? 'bg-primary/20 text-primary-strong' : 'text-foreground/70 hover:text-foreground hover:bg-muted'}`}
               >
                 <Icon size={20} className="shrink-0" />
@@ -611,6 +617,17 @@ function App() {
             </div>
           )}
 
+          {/* Posting account switcher (which social profile automations/posts use) */}
+          {!sidebarCollapsed && userProfiles.length > 0 && (
+            <div className="px-3 pt-3">
+              <UserProfileSelector
+                profiles={userProfiles}
+                selectedUserId={uploadUserId}
+                onSelect={setUploadUserId}
+              />
+            </div>
+          )}
+
           {/* User row → opens account modal */}
           <div className="p-3">
             <button
@@ -649,45 +666,19 @@ function App() {
           <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[120px]" />
         </div>
 
-        {/* Top Header */}
-        <header className="h-16 border-b border-border bg-background/50 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-10">
-          <div className="flex items-center gap-4">
-            {status !== 'idle' && (
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <PlusCircle size={16} />
-                <span className="hidden sm:inline">New Project</span>
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4">
-            {userProfiles.length > 0 && (
-              <UserProfileSelector
-                profiles={userProfiles}
-                selectedUserId={uploadUserId}
-                onSelect={setUploadUserId}
-              />
-            )}
-
-            {(!apiKey || !uploadPostKey) && !debug.mockAuth && (
-              <button
-                onClick={() => setActiveTab('settings')}
-                className="text-xs text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30 transition-colors flex items-center gap-1.5"
-                title="Click to configure your API keys"
-              >
-                <AlertTriangle size={12} />
-                {!apiKey && !uploadPostKey
-                  ? 'Gemini & Upload-Post keys missing'
-                  : !apiKey
-                    ? 'Gemini API Key Missing'
-                    : 'Upload-Post API Key Missing'}
-              </button>
-            )}
-          </div>
-        </header>
+        {/* Slim header — only shown mid-job in the legacy clip flow (its sole content
+            is the reset action). The account switcher lives in the sidebar footer. */}
+        {status !== 'idle' && (
+          <header className="h-12 border-b border-border bg-background/50 backdrop-blur-md flex items-center px-6 shrink-0 z-10">
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <PlusCircle size={16} />
+              <span className="hidden sm:inline">New Project</span>
+            </button>
+          </header>
+        )}
 
         {/* Persistent Missing Keys Banner — visible on every screen */}
         {(!apiKey || !uploadPostKey) && !debug.mockAuth && activeTab !== 'settings' && (
@@ -915,6 +906,7 @@ function App() {
               uploadUserId={uploadUserId}
               userProfiles={userProfiles}
               debug={debug}
+              navGuard={navGuardRef}
             />
           )}
 
