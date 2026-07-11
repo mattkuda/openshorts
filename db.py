@@ -87,7 +87,9 @@ class Creation(Base):
 
 
 class ScheduledPost(Base):
-    """A post handed to Upload-Post with a future scheduled_date."""
+    """A calendar entry: either a post handed to Upload-Post with a future
+    scheduled_date (method="upload_post") or a manual plan the user will post
+    themselves from the app after downloading (method="manual")."""
     __tablename__ = "scheduled_posts"
     id = Column(String(32), primary_key=True, default=_uuid)
     creation_id = Column(String(32), default="")
@@ -96,7 +98,10 @@ class ScheduledPost(Base):
     scheduled_at = Column(String(40), nullable=False)  # ISO-8601 (as sent to Upload-Post)
     timezone_name = Column(String(60), default="UTC")
     upload_post_ref = Column(Text, default="")         # raw Upload-Post response for tracing
-    status = Column(String(20), default="scheduled")   # scheduled | posted | failed | canceled
+    status = Column(String(20), default="scheduled")   # scheduled | posted | failed | canceled | planned
+    account = Column(String(120), default="")          # username/label the post goes out as
+    method = Column(String(20), default="upload_post") # upload_post | manual
+    note = Column(Text, default="")                    # free-form note on manual plans
     created_at = Column(DateTime(timezone=True), default=_now)
 
     def to_dict(self):
@@ -104,7 +109,8 @@ class ScheduledPost(Base):
             "id": self.id, "creation_id": self.creation_id, "title": self.title,
             "platforms": json.loads(self.platforms_json or "[]"),
             "scheduled_at": self.scheduled_at, "timezone": self.timezone_name,
-            "status": self.status,
+            "status": self.status, "account": self.account or "",
+            "method": self.method or "upload_post", "note": self.note or "",
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

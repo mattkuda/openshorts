@@ -2704,6 +2704,7 @@ async def api_schedule_create(req: ScheduleRequest):
             platforms_json=json.dumps(req.platforms),
             scheduled_at=req.scheduled_at, timezone_name=req.timezone or "UTC",
             upload_post_ref=upload_ref, status="scheduled",
+            account=req.user_id or "", method="upload_post",
         )
         s.add(row)
         c = s.get(Creation, req.creation_id)
@@ -2713,13 +2714,79 @@ async def api_schedule_create(req: ScheduleRequest):
         return {"scheduled": row.to_dict()}
 
 
-@app.delete("/api/schedule/{post_id}")
-async def api_schedule_cancel(post_id: str):
+class PlannedPostRequest(BaseModel):
+    """A manual plan: the user downloads the content and posts it themselves."""
+    creation_id: str
+    scheduled_at: str                      # ISO-8601 local time "2026-07-12T18:00:00"
+    account: Optional[str] = ""            # free-form label — which account it goes out on
+    platforms: Optional[List[str]] = None  # defaults to ["tiktok"]
+    timezone: Optional[str] = "UTC"
+    title: Optional[str] = None
+    note: Optional[str] = ""
+
+
+@app.post("/api/schedule/planned")
+async def api_schedule_plan(req: PlannedPostRequest):
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        row = ScheduledPost(
+            creation_id=req.creation_id,
+            title=req.title or creation.title or "Planned post",
+            platforms_json=json.dumps(req.platforms or ["tiktok"]),
+            scheduled_at=req.scheduled_at, timezone_name=req.timezone or "UTC",
+            upload_post_ref="", status="planned",
+            account=req.account or "", method="manual", note=req.note or "",
+        )
+        s.add(row)
+        s.commit()
+        return {"scheduled": row.to_dict()}
+
+
+class ScheduleUpdateRequest(BaseModel):
+    status: Optional[str] = None       # planned | posted | canceled
+    scheduled_at: Optional[str] = None
+    account: Optional[str] = None
+    note: Optional[str] = None
+    title: Optional[str] = None
+
+
+@app.patch("/api/schedule/{post_id}")
+async def api_schedule_update(post_id: str, req: ScheduleUpdateRequest):
+    allowed_status = {"planned", "posted", "scheduled", "canceled", "failed"}
     with get_session() as s:
         row = s.get(ScheduledPost, post_id)
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
-        row.status = "canceled"
+        if req.status is not None:
+            if req.status not in allowed_status:
+                raise HTTPException(status_code=400, detail=f"status must be one of {sorted(allowed_status)}")
+            row.status = req.status
+        if req.scheduled_at is not None:
+            row.scheduled_at = req.scheduled_at
+        if req.account is not None:
+            row.account = req.account
+        if req.note is not None:
+            row.note = req.note
+        if req.title is not None:
+            row.title = req.title
+        s.commit()
+        return {"scheduled": row.to_dict()}
+
+
+@app.delete("/api/schedule/{post_id}")
+async def api_schedule_cancel(post_id: str):
+    """Manual plans are just rows here — delete them outright. Upload-Post entries
+    are marked canceled instead (the handoff already happened; keep the trace)."""
+    with get_session() as s:
+        row = s.get(ScheduledPost, post_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="Not found")
+        if (row.method or "upload_post") == "manual":
+            s.delete(row)
+        else:
+            row.status = "canceled"
         s.commit()
     return {"ok": True}
 

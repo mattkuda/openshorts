@@ -922,7 +922,7 @@ function App() {
 
           {/* View: Calendar */}
           {activeTab === 'calendar' && (
-            <CalendarTab />
+            <CalendarTab userProfiles={userProfiles} />
           )}
 
           {/* View: SaaS Shorts */}
