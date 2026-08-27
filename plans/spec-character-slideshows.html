@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Character Slideshows — spec</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #a1a1aa;
+    --heading: #fff;
+    --line: rgba(255,255,255,0.1);
+    --surface: #0a0a0a;
+    --accent: #fff;
+    --comment: #7ee787;
+    --warn: #f0b429;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 32px 140px; }
+  h1 { color: var(--heading); font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { color: var(--heading); font-size: 20px; font-weight: 700; margin: 52px 0 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  h3 { color: var(--heading); font-size: 16px; font-weight: 600; margin: 28px 0 4px; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 17px; max-width: 680px; }
+  .q-help { font-size: 14px; margin: 2px 0 14px; }
+  strong { color: #d4d4d8; }
+  em { color: #d4d4d8; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; color: #d4d4d8; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+  pre { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.55; white-space: pre-wrap; color: var(--fg); overflow-x: auto; }
+  pre code { border: 0; background: none; padding: 0; }
+  .c { color: var(--comment); }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--heading); font-weight: 600; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; background: var(--surface); }
+  summary { color: var(--heading); font-weight: 600; cursor: pointer; }
+  details[open] summary { margin-bottom: 10px; }
+  .callout { border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 8px; background: var(--surface); padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 999px; padding: 2px 9px; margin-left: 6px; vertical-align: 1px; }
+  .tag.hi { background: rgba(126,231,135,0.12); color: #7ee787; }
+  .tag.med { background: rgba(240,180,41,0.12); color: #f0b429; }
+  .tag.folk { background: rgba(244,113,113,0.12); color: #f87171; }
+  .mockrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin: 18px 0 8px; }
+  .mock { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .mock figcaption { font-size: 13px; margin-top: 10px; }
+  .mock svg { width: 100%; height: auto; border-radius: 8px; display: block; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 20px; font-size: 13px; }
+  .flow span.step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; color: #d4d4d8; }
+  .flow span.arr { color: rgba(255,255,255,0.35); }
+
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .option { text-align: left; font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: border-color 120ms ease, background 120ms ease; }
+  .option:hover { border-color: rgba(255,255,255,0.35); }
+  .option.selected { border-color: var(--accent); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .opt-title { color: var(--heading); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .opt-title::before { content: ""; width: 14px; height: 14px; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; flex: 0 0 auto; transition: background 120ms ease, border-color 120ms ease; }
+  .decision[data-select="multi"] .opt-title::before { border-radius: 4px; }
+  .option.selected .opt-title::before { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 3px #000; }
+  .opt-desc { font-size: 13px; }
+  .rec { font-size: 11px; font-weight: 700; color: #7ee787; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  textarea { width: 100%; min-height: 120px; resize: vertical; font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 4px; }
+  textarea::placeholder { color: rgba(255,255,255,0.35); }
+  textarea:focus { outline: none; border-color: rgba(255,255,255,0.35); }
+  .bar { position: sticky; bottom: 0; margin: 40px -32px -140px; padding: 16px 32px; background: linear-gradient(to top, #000 70%, rgba(0,0,0,0)); display: flex; gap: 12px; align-items: center; }
+  button.action { font: inherit; font-weight: 600; background: var(--accent); color: #000; border: 0; border-radius: 8px; padding: 11px 18px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--heading); border: 1px solid var(--line); }
+  .hint { color: rgba(255,255,255,0.4); font-size: 13px; margin-left: auto; }
+  #out { display: none; margin-top: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Character Slideshows</h1>
+  <p class="lede">A new, isolated ClipZoo surface that generates "Gym Made Simple"-style TikTok photo carousels: a recurring cartoon character, huge typeset headlines, your app as the payoff. Local-only for now — the app generates and exports; you post from your iPhone. Decision blocks are at the bottom; pick, add notes, copy back.</p>
+
+  <h2>TL;DR / Recommendation</h2>
+  <p><strong>Build it as its own tab ("Slideshows"), not a new automation type.</strong> It reuses the good parts of the existing machinery (character generation, creations gallery, ZIP export, MP4 concat) but has its own config model, renderer, and DB table — zero changes to <code>automations.py</code>. Text is <strong>typeset by PIL, not AI-generated into the image</strong>. The character is generated once as a <strong>pose pack</strong> (~20 PNGs on white) and reused forever, so per-deck image cost is zero and identity never drifts.</p>
+  <p>Core unit is a <strong>Series</strong> — character + style preset + niche + CTA config. "Gym tips → EVEX" is Series #1. A second character or a second niche later is just another Series row, which covers your "switch it up" requirement without building anything speculative.</p>
+
+  <h2>1. Where it lives</h2>
+  <p>You asked: automation type, or its own tab? <strong>Own tab.</strong> Reasons:</p>
+  <table>
+    <tr><th></th><th>New automation type</th><th>Own tab (recommended)</th></tr>
+    <tr><td>Risk to existing flows</td><td>Touches <code>automations.py</code> + <code>AutomationEditor.jsx</code>, both tuned for the photo/outline style</td><td>Zero — new module, new component</td></tr>
+    <tr><td>Config fit</td><td>Automation config is scheduling-first (cron, tick, auto-post) — you don't want scheduling</td><td>Series config is generation-first: character, style, topics, batch size</td></tr>
+    <tr><td>Mental model</td><td>"An automation I never schedule" is awkward</td><td>"A slideshow studio I batch-generate from" matches your actual workflow</td></tr>
+    <tr><td>Reuse</td><td colspan="2">Identical either way — both paths reuse characters, creations gallery, ZIP, MP4 export</td></tr>
+  </table>
+  <p>Nav: new item <strong>Slideshows</strong> directly under Automations. If the automation editor's slideshow bits and this converge later, merge then — not now.</p>
+
+  <h2>2. Concepts (the flexibility model)</h2>
+  <table>
+    <tr><th>Concept</th><th>What it is</th><th>Lives</th></tr>
+    <tr><td><strong>Character</strong></td><td>Existing Characters-tab entity, extended with <code>style: "cartoon"</code>. One portrait + a generated <strong>pose pack</strong> (~20 full-body poses on pure white, via the existing <code>generate_look()</code> reference-image mechanism).</td><td><code>characters.py</code>, existing <code>Character</code>/<code>CharacterLook</code> tables</td></tr>
+    <tr><td><strong>Style preset</strong></td><td>Data, not code: font, casing, alignment, palette (bg / ink / accent), character placement, watermark slot, badge slot. Ship 2 presets (see mockups); adding a third is a dict.</td><td>New <code>charshow.py</code>, <code>STYLE_PRESETS</code></td></tr>
+    <tr><td><strong>Series</strong></td><td>The reusable config: name, character, style preset, niche/topic bank, tone, slide count range, plug config (app name + pitch + plug frequency), watermark text, caption settings. One Series ≈ one TikTok account's content lane.</td><td>New <code>SlideshowSeries</code> table</td></tr>
+    <tr><td><strong>Deck</strong></td><td>One generated carousel: N slides (roles: hook / content / plug / cta), editable texts, chosen poses, caption + first-comment text. Saved as a Creation (<code>kind="char_slideshow"</code>) → gallery, draft-edit, ZIP all work.</td><td>Existing <code>Creation</code> table</td></tr>
+  </table>
+  <p>"Multiple types of slideshows with multiple different characters" = Series A (Coach Rep, Impact style, gym tips) + Series B (new character, Minimal style, glute guides) + … Each is a row, not a feature.</p>
+
+  <h2>3. Text: typeset, not AI-generated <span class="tag hi">key decision</span></h2>
+  <p>You asked whether the text is part of the image generation. It <em>could</em> be — Gemini image gen renders legible text now — but I recommend <strong>no</strong>:</p>
+  <table>
+    <tr><th></th><th>Baked into AI generation</th><th>PIL typesetting (recommended)</th></tr>
+    <tr><td>Consistency</td><td>Font/weight/placement drifts every image — the "all over the place" problem you predicted</td><td>Pixel-identical branding across every deck, forever</td></tr>
+    <tr><td>Editing</td><td>Typo or weak line ⇒ regenerate the whole image, new drift</td><td>Edit text, re-composite in &lt;1s (the existing <code>rerender_slides</code> pattern)</td></tr>
+    <tr><td>Cost</td><td>1 image call per slide per deck, forever</td><td>0 after the pose pack exists</td></tr>
+    <tr><td>Failure modes</td><td>Misspellings, mangled glyphs, clipped words</td><td>None — it's a font file</td></tr>
+  </table>
+  <p>This is also what your reference accounts do — their type is too consistent post-to-post to be generated. AI draws the character; code draws the words. (Formal decision block below in case you want to override.)</p>
+
+  <h2>4. The two style presets (from your references)</h2>
+  <p>Your reference images were actually two different styles — this is the "couple different ones" you flagged. Both ship as presets:</p>
+  <div class="mockrow">
+    <figure class="mock">
+      <svg viewBox="0 0 270 480" xmlns="http://www.w3.org/2000/svg">
+        <rect width="270" height="480" fill="#ffffff"/>
+        <text x="18" y="34" font-family="Arial Black, sans-serif" font-size="11" font-weight="900" fill="#111">⚡ REP LAB</text>
+        <text x="18" y="92" font-family="Arial Black, sans-serif" font-size="34" font-weight="900" fill="#111">YOUR</text>
+        <text x="18" y="130" font-family="Arial Black, sans-serif" font-size="34" font-weight="900" fill="#e08a00">LOWER</text>
+        <text x="18" y="168" font-family="Arial Black, sans-serif" font-size="34" font-weight="900" fill="#e08a00">BELLY FAT</text>
+        <text x="18" y="206" font-family="Arial Black, sans-serif" font-size="34" font-weight="900" fill="#111">WILL BE</text>
+        <text x="18" y="244" font-family="Arial Black, sans-serif" font-size="34" font-weight="900" fill="#e08a00">GONE.</text>
+        <g>
+          <ellipse cx="195" cy="330" rx="46" ry="16" fill="#f0f0f0"/>
+          <circle cx="195" cy="232" r="20" fill="#e8e8e8" stroke="#111" stroke-width="2.5"/>
+          <path d="M175 260 q20 -18 40 0 l6 55 q-26 12 -52 0 z" fill="#e8e8e8" stroke="#111" stroke-width="2.5"/>
+          <path d="M172 262 l-14 40 M218 262 l14 40" stroke="#111" stroke-width="2.5" fill="none"/>
+          <path d="M183 318 l-6 30 M207 318 l6 30" stroke="#111" stroke-width="2.5" fill="none"/>
+        </g>
+        <rect x="18" y="420" width="120" height="30" rx="7" fill="#111"/>
+        <text x="32" y="440" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#fff">🔖 SAVE THIS</text>
+      </svg>
+      <figcaption><strong>Preset A — "Impact"</strong> (Gym Made Simple / vdrophealth): huge left-aligned condensed uppercase, accent-colored key words, character right/lower, watermark top-left, SAVE badge. Loud, save-bait, fitness-native.</figcaption>
+    </figure>
+    <figure class="mock">
+      <svg viewBox="0 0 270 480" xmlns="http://www.w3.org/2000/svg">
+        <rect width="270" height="480" fill="#fdfdfd"/>
+        <text x="135" y="80" text-anchor="middle" font-family="Georgia, serif" font-size="19" fill="#1a1a1a">How to get <tspan font-weight="bold">3x stronger</tspan></text>
+        <text x="135" y="106" text-anchor="middle" font-family="Georgia, serif" font-size="19" fill="#1a1a1a">in 1 month</text>
+        <g>
+          <ellipse cx="135" cy="360" rx="52" ry="14" fill="#f2f2f2"/>
+          <circle cx="135" cy="240" r="22" fill="#b9a3e0" stroke="#333" stroke-width="2"/>
+          <path d="M112 270 q23 -20 46 0 l7 60 q-30 14 -60 0 z" fill="#b9a3e0" stroke="#333" stroke-width="2"/>
+          <path d="M109 274 l-18 46 M161 274 l18 46" stroke="#333" stroke-width="2" fill="none"/>
+          <path d="M121 332 l-10 34 M149 332 l10 34" stroke="#333" stroke-width="2" fill="none"/>
+        </g>
+        <text x="135" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#999">( swipe )</text>
+      </svg>
+      <figcaption><strong>Preset B — "Minimal"</strong> (purple-runner / EcoGPT style): centered sentence-case headline with bold keywords, character large and centered, tons of whitespace, no badge. Calmer, works beyond fitness.</figcaption>
+    </figure>
+  </div>
+  <p>Both are the same renderer with different preset dicts — font, casing, alignment, accent behavior, character anchor, chrome (watermark/badge/swipe hint).</p>
+
+  <h2>5. Pipeline</h2>
+  <p><strong>One-time per character:</strong></p>
+  <div class="flow">
+    <span class="step">Describe character</span><span class="arr">→</span>
+    <span class="step">Gemini portrait (cartoon, white bg)</span><span class="arr">→</span>
+    <span class="step">~20 poses via generate_look()</span><span class="arr">→</span>
+    <span class="step">You cull bad ones</span><span class="arr">→</span>
+    <span class="step">Pose pack saved</span>
+  </div>
+  <p><strong>Per deck (batch of N):</strong></p>
+  <div class="flow">
+    <span class="step">Topic from Series bank (or Gemini fresh)</span><span class="arr">→</span>
+    <span class="step">1 LLM call: hook + slide headlines + plug + caption + first comment, accents marked *like this*</span><span class="arr">→</span>
+    <span class="step">Poses picked from pack (no repeats in a deck)</span><span class="arr">→</span>
+    <span class="step">PIL composite per slide</span><span class="arr">→</span>
+    <span class="step">PNG set + MP4 → Creation</span>
+  </div>
+  <p><strong>Your posting loop:</strong> review in gallery → edit any weak line (instant re-render) → ZIP (PNGs + <code>caption.txt</code>) → AirDrop → TikTok Photo Mode on iPhone → trending sound → post.</p>
+
+  <details>
+    <summary>Renderer details (the new code that matters)</summary>
+    <p><code>charshow.py</code> — sibling of <code>slideshow.py</code>, no shared state with <code>automations.py</code>:</p>
+    <pre><code><span class="c"># STYLE_PRESETS: data-only style definitions</span>
+STYLE_PRESETS = {
+  "impact": {
+    "font": "Anton",            <span class="c"># condensed display; fetched like hooks.py fetches its font</span>
+    "casing": "upper", "align": "left",
+    "bg": "#FFFFFF", "ink": "#111111", "accent": "#E08A00",  <span class="c"># accent per-Series override</span>
+    "char_anchor": "right",     <span class="c"># text column left, character right</span>
+    "chrome": ["watermark", "save_badge"],
+  },
+  "minimal": {
+    "font": "Inter-SemiBold", "casing": "sentence", "align": "center",
+    "bg": "#FDFDFD", "ink": "#1A1A1A", "accent": "bold",     <span class="c"># accent = bold weight, not color</span>
+    "char_anchor": "center_low",
+    "chrome": ["swipe_hint"],
+  },
+}
+
+<span class="c"># Headline engine — the part neither existing renderer has:</span>
+<span class="c"># 1. parse *accent* spans from the LLM text</span>
+<span class="c"># 2. auto-fit: binary-search font size so wrapped text fills its box</span>
+<span class="c">#    (Impact ~60% width beside character; Minimal full-width top third)</span>
+<span class="c"># 3. render runs word-by-word, accent words in accent color / bold weight</span>
+
+<span class="c"># Character placement: pose PNG is generated on pure white — pasted</span>
+<span class="c"># directly onto the white slide, scaled per anchor. No masking step.</span></code></pre>
+    <p>Pose-pack prompt via a new <code>CARTOON_STYLE_SUFFIX</code> in <code>characters.py</code> (parallel to the existing selfie suffix): flat-color comic illustration, thick clean linework, cel shading, full body, isolated on pure white, no text/watermark. Pose list is a fixed bank of ~20 fitness-relevant poses (sprinter start, pointing at abs, dumbbell curl, flexing, arms crossed, shrug, phone-in-hand…), each generated with the portrait as reference image — the mechanism <code>generate_look()</code> already implements.</p>
+  </details>
+
+  <details>
+    <summary>Data model, endpoints, files touched</summary>
+    <pre><code><span class="c"># db.py — one new table</span>
+class SlideshowSeries(Base):
+    id, name, character_id, style_key, accent_hex,
+    niche, tone, topic_bank (json), used_topics (json),
+    slide_min, slide_max,
+    plug (json: app_name, pitch, frequency, position),
+    watermark_text, caption_cfg (json), created_at
+
+<span class="c"># app.py — new endpoints (namespaced, nothing existing touched)</span>
+POST /api/charshow/series            <span class="c"># create/update series</span>
+GET  /api/charshow/series
+POST /api/charshow/character/poses   <span class="c"># generate pose pack for a character</span>
+POST /api/charshow/generate          <span class="c"># {series_id, count} → N decks as Creations</span>
+POST /api/charshow/rerender          <span class="c"># edited texts → recomposite (mirrors existing draft flow)</span>
+<span class="c"># ZIP download: existing creations ZIP endpoint + caption.txt added</span>
+
+<span class="c"># Files</span>
+charshow.py                          <span class="c"># NEW: presets, headline engine, deck orchestration</span>
+characters.py                        <span class="c"># EDIT: style param + CARTOON_STYLE_SUFFIX + pose bank</span>
+db.py                                <span class="c"># EDIT: SlideshowSeries</span>
+app.py                               <span class="c"># EDIT: /api/charshow/* section</span>
+dashboard/.../SlideshowsTab.jsx      <span class="c"># NEW: series editor + batch bar + deck grid</span>
+dashboard/src/App.jsx                <span class="c"># EDIT: nav entry under Automations</span>
+smoke_test_charshow.py               <span class="c"># NEW: mock-mode end-to-end</span></code></pre>
+    <p><strong>Not touched:</strong> <code>automations.py</code>, <code>AutomationEditor.jsx</code>, <code>slideshow.py</code>, scheduler, posting/Upload-Post code.</p>
+  </details>
+
+  <details>
+    <summary>UI flow (one tab, three zones)</summary>
+    <p><strong>Zone 1 — Series cards.</strong> Each card: character thumbnail, style preset, niche, "Generate 1 / Generate batch…" actions, edit. Empty state walks you through character → pose pack → series.</p>
+    <p><strong>Zone 2 — Batch bar.</strong> "Generate N decks" (default 7). Runs with live logs like existing generation flows; mock mode honored for free UI testing.</p>
+    <p><strong>Zone 3 — Deck grid.</strong> Newest decks, slide-strip thumbnails, status chip (Draft / Exported). Click → existing-style editor: slide texts as fields, per-slide pose re-roll, re-render, ZIP download (includes <code>caption.txt</code> with caption + first-comment). Follows STYLE_GUIDE tokens throughout.</p>
+  </details>
+
+  <h2>6. Posting playbook (your questions, answered in one place)</h2>
+  <p>From the two research passes (Buffer 11.4M-post dataset, Fanpage Karma 700K-post dataset, TikTok policy pages, practitioner case studies — Flamingo, Cal AI, Stronger Mobile). Tags = confidence.</p>
+  <table>
+    <tr><th>Question</th><th>Answer</th></tr>
+    <tr><td>How many posts/day?</td><td><strong>2/day, one account, spaced 3–4+ hours.</strong> Frequency raises the odds of an outlier, not the median — Buffer: 11+/week ⇒ up to 34% more views/post, median flat. <span class="tag med">medium-high</span> 2/day = 14/week, already the top band. Same-day spacing is convention, not measured. <span class="tag folk">folklore</span></td></tr>
+    <tr><td>Schedule 20 at once?</td><td><strong>No scheduling at all — and it's not really possible anyway.</strong> True Photo Mode carousels can only be created in the mobile app; TikTok Studio's scheduler is video-oriented and inconsistent for carousels. <span class="tag med">medium-high</span> Your loop: batch-generate ~7–14 decks weekly in ClipZoo, review once, AirDrop all, then post from your phone 2×/day (~90 sec each). Batch the <em>generation</em>, not the posting.</td></tr>
+    <tr><td>How many accounts?</td><td><strong>One.</strong> ToS has no account cap, but near-identical content posted in sync from one device/IP is the actual flag risk — exactly what a multi-account slideshow farm looks like. <span class="tag med">medium</span> Scale to a 2nd account only after the 1st has signal, with a different Series (different character/style/topics).</td></tr>
+    <tr><td>Warm up the account?</td><td><strong>No — folklore.</strong> <span class="tag folk">folklore</span> The real mechanism is a per-<em>video</em> cold-start test applied identically to new and old accounts. No evidence pre-post browsing changes anything. Create the account and post.</td></tr>
+    <tr><td>Burner vs official EVEX?</td><td><strong>Faceless niche/persona account</strong> (e.g. a gym-tips brand) that plugs EVEX as its own product — compliant; anonymous accounts are fine, and TikTok's own ~2M-video study found no reach penalty for the required "Promotional content" disclosure toggle. <span class="tag hi">high (policy)</span> The one line not to cross: the persona posing as an <em>independent</em> reviewer of EVEX. Keep @evex official as the brand surface.</td></tr>
+    <tr><td>Posting from Bali?</td><td>Account region (sticky, set at signup) ≠ content region (fast-moving: language, hashtags, engagement). English US-gym content gets tested into a US-leaning pool regardless of your IP; residual drag is unquantified by anyone. <span class="tag med">medium</span> <strong>Create the account with your US Apple ID / US-configured phone.</strong> No VPN games — detectable, ToS risk.</td></tr>
+    <tr><td>Desktop posting?</td><td><strong>iPhone required</strong> for the real swipeable carousel — desktop upload of the MP4 makes it a normal <em>video</em> post, a different (worse-performing) format. Carousels beat video on engagement in the only large dataset (Fanpage Karma: +81% engagement rate, −33% shares). <span class="tag med">medium</span></td></tr>
+    <tr><td>Links / CTA?</td><td>Personal accounts can't link app stores in bio (and no clickable bio link under ~1K followers). <span class="tag hi">high</span> Business account unlocks the link but locks you to the Commercial Music Library — worse sounds. Early CTA = app name on the plug slide + caption + your own first comment (comment links are clickable). Revisit at 1K followers.</td></tr>
+  </table>
+  <div class="callout"><strong>Weekly rhythm:</strong> Sunday: batch-generate 14 decks (~min of compute, $0 in image calls), cull/edit weak ones in the deck grid, ZIP + AirDrop. Mon–Sun: post 1 at breakfast, 1 in the evening, pick a trending sound each time, drop your first comment. That's the whole operation — ~15 min/day.</div>
+
+  <h2>7. Build order</h2>
+  <table>
+    <tr><th>Phase</th><th>What</th><th>Gate</th></tr>
+    <tr><td><strong>0 — Mascot spike</strong></td><td>Cartoon portrait + 6 poses through <code>generate_look()</code> with the new style suffix. Throwaway script, no UI.</td><td><strong>You eyeball the poses.</strong> If identity/style drifts, we adjust (stronger reference prompting, fewer poses, or you supply art) before building around the assumption.</td></tr>
+    <tr><td><strong>1 — Renderer + tab</strong></td><td><code>charshow.py</code> (both presets, headline engine), Series model + endpoints, SlideshowsTab, ZIP + caption.txt, smoke test. Mock mode throughout.</td><td>A generated deck side-by-side with your reference screenshots looks like it belongs on the same feed.</td></tr>
+    <tr><td><strong>2 — Volume polish</strong></td><td>Batch generate, per-slide pose re-roll, used-topic tracking so 14 decks/week don't repeat, Exported status chip.</td><td>You run a full weekly batch without touching code.</td></tr>
+  </table>
+
+  <h2>Decisions to make</h2>
+  <p class="q-help">Pick per block (single-select unless marked), add anything else in notes, then <em>Copy decisions as Markdown</em> and paste back to me.</p>
+
+  <section class="decision" data-select="multi">
+    <h3>1. Style presets for v1 (pick all you want built)</h3>
+    <p class="q-help">Your references mixed two looks. Both are cheap since they share the renderer — but the first one built is the one we tune hardest.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Impact <span class="rec">lead rec</span></span><span class="opt-desc">Bold condensed uppercase, accent-colored words, SAVE badge. The proven fitness-niche look.</span></button>
+      <button class="option"><span class="opt-title">Minimal</span><span class="opt-desc">Centered sentence-case, bold keywords, whitespace. Calmer; generalizes past fitness.</span></button>
+      <button class="option"><span class="opt-title">Numbered listicle variant</span><span class="opt-desc">Impact + big ghost number per slide ("5 must-do shoulder exercises" style). Small delta on Impact.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>2. Text rendering</h3>
+    <p class="q-help">Section 3 makes the case; this is your formal call.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">PIL typeset <span class="rec">recommended</span></span><span class="opt-desc">Code draws the words. Consistent, editable, free, no typos.</span></button>
+      <button class="option"><span class="opt-title">Baked into AI image</span><span class="opt-desc">Gemini renders text in-image. One aesthetic, but drift + regen cost + typos.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>3. First character direction</h3>
+    <p class="q-help">Generated once, then it IS the brand. Note: the purple guy in your reference is One Punch Man fan art — we should make an original.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Faceless athletic figure <span class="rec">recommended</span></span><span class="opt-desc">Muscular blank-faced mannequin in a distinctive color (EVEX brand color?). Closest to what's proven in the niche, original enough to own.</span></button>
+      <button class="option"><span class="opt-title">Character with a face/personality</span><span class="opt-desc">An actual mascot ("Coach" persona). More brandable + merch-able, more ways to look off.</span></button>
+      <button class="option"><span class="opt-title">I'll describe it in notes</span><span class="opt-desc">You have a specific vision — write it below.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="single">
+    <h3>4. EVEX plug frequency</h3>
+    <p class="q-help">Case-study accounts lead with value; the plug rides along. No measured penalty for always-plugging, but comment-section vibe differs.</p>
+    <div class="options">
+      <button class="option"><span class="opt-title">Every deck, late slide <span class="rec">recommended</span></span><span class="opt-desc">Value slides, then "the app that programs this for you" as slide N−1. Simple, consistent funnel.</span></button>
+      <button class="option"><span class="opt-title">Every 2nd–3rd deck</span><span class="opt-desc">Pure-value decks between plugs. Softer sell, slower funnel, per-Series toggle.</span></button>
+      <button class="option"><span class="opt-title">Caption/comment only at first</span><span class="opt-desc">No plug slide until the account has traction; EVEX lives only in caption + first comment.</span></button>
+    </div>
+  </section>
+
+  <section class="decision" data-select="multi">
+    <h3>5. Extras to include in v1 (pick all)</h3>
+    <div class="options">
+      <button class="option"><span class="opt-title">Caption + first-comment gen <span class="rec">rec</span></span><span class="opt-desc">LLM writes both per deck; lands in caption.txt in the ZIP.</span></button>
+      <button class="option"><span class="opt-title">MP4 export too</span><span class="opt-desc">For IG Reels / YT Shorts repurposing. Cheap — the concat code exists.</span></button>
+      <button class="option"><span class="opt-title">Watermark + SAVE badge</span><span class="opt-desc">Series watermark text (needs the account handle/name you'll use) + save-bait badge on slide 1.</span></button>
+      <button class="option"><span class="opt-title">Per-slide pose re-roll</span><span class="opt-desc">Swap one slide's character pose in the editor without regenerating the deck.</span></button>
+    </div>
+  </section>
+
+  <h2>Notes</h2>
+  <p class="q-help">Anything the options don't cover — character description, accent color, account-name ideas, topics you want in the first bank, objections.</p>
+  <textarea id="notes" placeholder="Type freely…"></textarea>
+
+  <div class="bar">
+    <button class="action" id="copy">Copy decisions as Markdown</button>
+    <button class="ghost" id="clear">Clear</button>
+    <span class="hint">Selections + notes are copied together.</span>
+  </div>
+
+  <pre id="out"></pre>
+</main>
+
+<script>
+  document.querySelectorAll('.decision').forEach(section => {
+    const multi = section.dataset.select === 'multi';
+    section.querySelectorAll('.option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!multi) section.querySelectorAll('.option').forEach(b => b.classList.remove('selected'));
+        btn.classList.toggle('selected');
+      });
+    });
+  });
+
+  function buildMarkdown() {
+    let md = '## Decisions\n';
+    document.querySelectorAll('.decision').forEach(section => {
+      const q = section.querySelector('h3').textContent.trim();
+      const chosen = [...section.querySelectorAll('.option.selected')]
+        .map(b => b.querySelector('.opt-title').textContent.replace(/lead rec|recommended|rec/gi, '').trim());
+      md += `\n### ${q}\n`;
+      md += chosen.length ? `- **Selected:** ${chosen.join(', ')}\n` : `- _(no selection yet)_\n`;
+    });
+    const notes = document.getElementById('notes').value.trim();
+    md += `\n## Notes\n${notes || '_(none)_'}\n`;
+    return md;
+  }
+
+  const copyBtn = document.getElementById('copy');
+  const out = document.getElementById('out');
+  copyBtn.addEventListener('click', async () => {
+    const md = buildMarkdown();
+    out.textContent = md;
+    out.style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(md);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 1500);
+    } catch {
+      copyBtn.textContent = 'Copy failed — select the text below';
+      setTimeout(() => copyBtn.textContent = 'Copy decisions as Markdown', 2500);
+    }
+  });
+  document.getElementById('clear').addEventListener('click', () => {
+    document.querySelectorAll('.option.selected').forEach(b => b.classList.remove('selected'));
+    document.getElementById('notes').value = '';
+    out.style.display = 'none';
+  });
+</script>
+</body>
+</html>

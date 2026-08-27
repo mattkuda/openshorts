@@ -229,6 +229,42 @@ class SlideshowAutomation(Base):
         }
 
 
+class SlideshowSeries(Base):
+    """A reusable Character Slideshows config: mascot character + style preset + niche/topic
+    bank + plug (app pitch + screenshots) + caption settings. One Series ~= one TikTok
+    account's content lane (see charshow.py)."""
+    __tablename__ = "slideshow_series"
+    id = Column(String(32), primary_key=True, default=_uuid)
+    name = Column(String(120), nullable=False, default="New series")
+    character_id = Column(String(32), nullable=False, default="")
+    style_key = Column(String(40), default="impact")
+    accent_hex = Column(String(20), default="#00C080")
+    niche = Column(String(200), default="")
+    tone = Column(String(40), default="conversational")
+    topic_bank_json = Column(Text, default="{}")    # {category: [topic, ...]}
+    used_topics_json = Column(Text, default="[]")   # [{category, topic}, ...] oldest-first
+    slide_min = Column(Integer, default=4)
+    slide_max = Column(Integer, default=7)
+    plug_json = Column(Text, default="{}")          # {app_name, pitch, screenshots: [paths], position}
+    caption_cfg_json = Column(Text, default="{}")
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "name": self.name, "character_id": self.character_id,
+            "style_key": self.style_key or "impact", "accent_hex": self.accent_hex or "#00C080",
+            "niche": self.niche, "tone": self.tone or "conversational",
+            "topic_bank": json.loads(self.topic_bank_json or "{}"),
+            "used_topics": json.loads(self.used_topics_json or "[]"),
+            "slide_min": self.slide_min or 4, "slide_max": self.slide_max or 7,
+            "plug": json.loads(self.plug_json or "{}"),
+            "caption_cfg": json.loads(self.caption_cfg_json or "{}"),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 def _ensure_columns():
     """create_all doesn't ALTER existing tables — add any columns models grew later.
     ADD COLUMN with a constant default is safe on both SQLite and Postgres."""

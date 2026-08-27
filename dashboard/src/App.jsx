@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat, Sun, Moon } from 'lucide-react';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Images, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat, Sun, Moon } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
@@ -13,6 +13,7 @@ import UGCGallery from './components/UGCGallery';
 import ScheduleWeekModal from './components/ScheduleWeekModal';
 import CreateTab from './components/CreateTab';
 import AutomationsTab from './components/AutomationsTab';
+import CharShowTab from './components/CharShowTab';
 import CharactersTab from './components/CharactersTab';
 import LibraryTab from './components/LibraryTab';
 import CalendarTab from './components/CalendarTab';
@@ -476,6 +477,7 @@ function App() {
     const navItems = [
       { id: 'create', label: 'Create', icon: Clapperboard },
       { id: 'automations', label: 'Automations', icon: Repeat },
+      { id: 'charshow', label: 'Slideshows', icon: Images },
       { id: 'characters', label: 'Characters', icon: Users },
       { id: 'library', label: 'Library', icon: Library },
       { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -908,6 +910,11 @@ function App() {
               debug={debug}
               navGuard={navGuardRef}
             />
+          )}
+
+          {/* View: Slideshows (Character Slideshows) */}
+          {activeTab === 'charshow' && (
+            <CharShowTab geminiApiKey={apiKey} debug={debug} />
           )}
 
           {/* View: Characters */}

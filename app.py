@@ -3462,3 +3462,334 @@ async def api_automations_rerender(req: RerenderRequest):
             if os.path.exists(fp):
                 os.remove(fp)
     return {"creation": updated}
+
+
+# =====================================================================
+# Character Slideshows — cartoon-mascot TikTok photo carousels.
+# Own tab, own DB table (SlideshowSeries), own renderer (charshow.py).
+# Reuses Character/CharacterLook (pose packs) and Creation (decks, kind=
+# "char_slideshow") — automations.py / slideshow.py / AutomationEditor
+# are untouched.
+# =====================================================================
+from db import SlideshowSeries
+from characters import generate_pose_pack, POSE_BANK, POSE_PROMPT_PREFIX
+from charshow import generate_deck, rerender_deck, export_batch
+
+
+def _seed_evex_mascot():
+    """One-time seed (idempotent): the approved EVEX mascot portrait as a cartoon
+    Character, so a fresh DB always has something to build a Series against."""
+    disk_path = os.path.join("creations", "avatars", "evex_mascot_a.png")
+    if not os.path.exists(disk_path):
+        return
+    with get_session() as s:
+        if s.query(Character).filter(Character.name == "EVEX Mascot").first():
+            return
+        s.add(Character(name="EVEX Mascot",
+                        attributes_json=json.dumps({"character_style": "cartoon"}),
+                        portrait_path="/creations/avatars/evex_mascot_a.png"))
+        s.commit()
+        print("🎭 Seeded EVEX Mascot character")
+
+
+_seed_evex_mascot()
+
+
+# ---- Series ------------------------------------------------------------
+
+class SeriesRequest(BaseModel):
+    id: Optional[str] = None
+    name: str
+    character_id: str
+    style_key: Optional[str] = "impact"
+    accent_hex: Optional[str] = "#00C080"
+    niche: Optional[str] = ""
+    tone: Optional[str] = "conversational"
+    topic_bank: Optional[dict] = None
+    slide_min: Optional[int] = 4
+    slide_max: Optional[int] = 7
+    plug: Optional[dict] = None
+    caption_cfg: Optional[dict] = None
+
+
+@app.get("/api/charshow/series")
+async def api_charshow_series_list():
+    with get_session() as s:
+        rows = s.query(SlideshowSeries).order_by(SlideshowSeries.created_at.desc()).all()
+        return {"series": [r.to_dict() for r in rows]}
+
+
+@app.post("/api/charshow/series")
+async def api_charshow_series_upsert(req: SeriesRequest):
+    """Create (no id) or update (id) a Series. Validates the character exists."""
+    with get_session() as s:
+        if not s.get(Character, req.character_id):
+            raise HTTPException(status_code=400, detail="Character not found")
+
+    with get_session() as s:
+        if req.id:
+            row = s.get(SlideshowSeries, req.id)
+            if not row:
+                raise HTTPException(status_code=404, detail="Series not found")
+        else:
+            row = SlideshowSeries()
+            s.add(row)
+        row.name = req.name or "New series"
+        row.character_id = req.character_id
+        row.style_key = req.style_key or "impact"
+        row.accent_hex = req.accent_hex or "#00C080"
+        row.niche = req.niche or ""
+        row.tone = req.tone or "conversational"
+        if req.topic_bank is not None:
+            row.topic_bank_json = json.dumps(req.topic_bank)
+        row.slide_min = req.slide_min or 4
+        row.slide_max = req.slide_max or 7
+        if req.plug is not None:
+            row.plug_json = json.dumps(req.plug)
+        if req.caption_cfg is not None:
+            row.caption_cfg_json = json.dumps(req.caption_cfg)
+        s.commit()
+        return {"series": row.to_dict()}
+
+
+@app.delete("/api/charshow/series/{sid}")
+async def api_charshow_series_delete(sid: str):
+    with get_session() as s:
+        row = s.get(SlideshowSeries, sid)
+        if not row:
+            raise HTTPException(status_code=404, detail="Series not found")
+        s.delete(row)
+        s.commit()
+    return {"ok": True}
+
+
+# ---- Long-op job tracking (mirrors saas_jobs / publish_jobs) ------------
+# {job_id: {status: processing|completed|failed, logs: [...], result, error}}
+charshow_jobs: Dict[str, Dict] = {}
+
+
+def _charshow_log(job_id):
+    def log(msg):
+        print(f"[Charshow Job {job_id[:8]}] {msg}")
+        if job_id in charshow_jobs:
+            charshow_jobs[job_id]["logs"].append(msg)
+    return log
+
+
+@app.get("/api/charshow/status/{job_id}")
+async def api_charshow_status(job_id: str):
+    """Poll a charshow pose-pack/generate job (mirrors /api/saasshorts/status)."""
+    if job_id not in charshow_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = charshow_jobs[job_id]
+    return {"status": job["status"], "logs": job["logs"], "result": job.get("result"), "error": job.get("error")}
+
+
+# ---- Pose packs ----------------------------------------------------------
+
+class CharshowPosesRequest(BaseModel):
+    character_id: str
+    mock: Optional[bool] = False
+
+
+@app.post("/api/charshow/poses")
+async def api_charshow_poses_generate(req: CharshowPosesRequest,
+                                      x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    """Generate (or resume) a character's ~20-pose bank. Long-running (≈20 image calls) —
+    returns a job_id immediately; poll GET /api/charshow/status/{job_id}."""
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    with get_session() as s:
+        if not s.get(Character, req.character_id):
+            raise HTTPException(status_code=404, detail="Character not found")
+
+    job_id = uuid.uuid4().hex
+    charshow_jobs[job_id] = {"status": "processing", "logs": ["Pose pack job started."],
+                             "result": None, "error": None}
+    log = _charshow_log(job_id)
+
+    async def run():
+        try:
+            created = await asyncio.to_thread(generate_pose_pack, x_gemini_key, req.character_id, bool(req.mock), log)
+            if job_id in charshow_jobs:
+                charshow_jobs[job_id]["result"] = {"created": created, "count": len(created)}
+                charshow_jobs[job_id]["status"] = "completed"
+        except Exception as e:
+            log(f"Error: {e}")
+            if job_id in charshow_jobs:
+                charshow_jobs[job_id]["status"] = "failed"
+                charshow_jobs[job_id]["error"] = str(e)
+
+    asyncio.create_task(run())
+    return {"job_id": job_id, "status": "processing"}
+
+
+@app.get("/api/charshow/poses/{character_id}")
+async def api_charshow_poses_list(character_id: str):
+    """Pose-bank status for a character (so the UI can show pack progress)."""
+    with get_session() as s:
+        rows = s.query(CharacterLook).filter(
+            CharacterLook.character_id == character_id,
+            CharacterLook.prompt.like(f"{POSE_PROMPT_PREFIX}%"),
+        ).order_by(CharacterLook.created_at.asc()).all()
+    have = {r.prompt[len(POSE_PROMPT_PREFIX):]: r.to_dict() for r in rows}
+    poses = [{"key": key, "description": desc, "generated": key in have, "look": have.get(key)}
+             for key, desc in POSE_BANK]
+    return {"poses": poses, "total": len(POSE_BANK), "generated_count": len(have)}
+
+
+# ---- Deck generation -------------------------------------------------
+
+def _save_charshow_creation(meta, pngs):
+    image_urls = [f"/creations/{os.path.basename(p)}" for p in pngs]
+    return _save_creation(
+        kind="char_slideshow", title=meta.get("topic") or "Deck",
+        template_key="char_slideshow",
+        slots={"texts": meta["texts"], "roles": meta["roles"], "poses_used": meta["poses_used"],
+               "plug_screenshot": meta.get("plug_screenshot"), "style_key": meta.get("style_key"),
+               "accent_hex": meta.get("accent_hex"), "caption": meta.get("caption", ""),
+               "first_comment": meta.get("first_comment", ""), "series_id": meta.get("series_id"),
+               "topic": meta.get("topic", ""), "category": meta.get("category", "")},
+        image_paths=image_urls,
+    )
+
+
+def _run_charshow_generate(series_id, gemini_key, count, mock, log=print):
+    """N decks for a series, carrying the topic round-robin state forward within the
+    batch, then persisting the final state back onto the Series row once."""
+    with get_session() as s:
+        row = s.get(SlideshowSeries, series_id)
+        if not row:
+            raise ValueError("Series not found")
+        series = row.to_dict()
+
+    creations = []
+    for i in range(count):
+        log(f"🎬 Deck {i + 1}/{count}…")
+        pngs, meta = generate_deck(series, gemini_key, mock=mock, log=log)
+        series = {**series, "topic_bank": meta.pop("topic_bank"), "used_topics": meta.pop("used_topics")}
+        creations.append(_save_charshow_creation(meta, pngs))
+
+    with get_session() as s:
+        row = s.get(SlideshowSeries, series_id)
+        if row:
+            row.topic_bank_json = json.dumps(series["topic_bank"])
+            row.used_topics_json = json.dumps(series["used_topics"])
+            s.commit()
+    return creations
+
+
+class CharshowGenerateRequest(BaseModel):
+    series_id: str
+    count: Optional[int] = 1
+    mock: Optional[bool] = False
+
+
+@app.post("/api/charshow/generate")
+async def api_charshow_generate(req: CharshowGenerateRequest,
+                                x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    """N decks for a series. Long-running (1 LLM call + PIL compositing per deck) —
+    returns a job_id immediately; poll GET /api/charshow/status/{job_id}. On completion,
+    result = {creations, count, creation} where 'creation' is the first deck (singular,
+    for a count=1 call) and 'creations' is the full list."""
+    if not req.mock and not x_gemini_key:
+        raise HTTPException(status_code=400, detail="X-Gemini-Key header required (or set mock=true)")
+    with get_session() as s:
+        if not s.get(SlideshowSeries, req.series_id):
+            raise HTTPException(status_code=404, detail="Series not found")
+    count = max(1, min(int(req.count or 1), 20))
+
+    job_id = uuid.uuid4().hex
+    charshow_jobs[job_id] = {"status": "processing", "logs": [f"Generating {count} deck(s)…"],
+                             "result": None, "error": None}
+    log = _charshow_log(job_id)
+
+    async def run():
+        try:
+            creations = await asyncio.to_thread(_run_charshow_generate, req.series_id, x_gemini_key, count, bool(req.mock), log)
+            if job_id in charshow_jobs:
+                charshow_jobs[job_id]["result"] = {
+                    "creations": creations, "count": len(creations),
+                    "creation": creations[0] if creations else None,
+                }
+                charshow_jobs[job_id]["status"] = "completed"
+        except Exception as e:
+            log(f"Error: {e}")
+            if job_id in charshow_jobs:
+                charshow_jobs[job_id]["status"] = "failed"
+                charshow_jobs[job_id]["error"] = str(e)
+
+    asyncio.create_task(run())
+    return {"job_id": job_id, "status": "processing"}
+
+
+# ---- Draft review: edit slide text on a generated deck ----------------
+
+class CharshowRerenderRequest(BaseModel):
+    creation_id: str
+    texts: List[str]
+
+
+@app.post("/api/charshow/rerender")
+async def api_charshow_rerender(req: CharshowRerenderRequest):
+    """Re-compose a deck's slides with edited text — no new AI calls (mirrors
+    /api/automations/rerender's instant-edit pattern)."""
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        slots = json.loads(creation.slots_json or "{}")
+    if not slots.get("roles"):
+        raise HTTPException(status_code=400, detail="This creation has no charshow render meta — regenerate instead")
+    if len(req.texts) != len(slots["roles"]):
+        raise HTTPException(status_code=400, detail=f"Expected {len(slots['roles'])} slide texts")
+
+    meta = {"roles": slots.get("roles") or [], "poses_used": slots.get("poses_used") or [],
+            "plug_screenshot": slots.get("plug_screenshot"), "style_key": slots.get("style_key"),
+            "accent_hex": slots.get("accent_hex")}
+    try:
+        pngs = await asyncio.to_thread(rerender_deck, meta, req.texts)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Re-render failed: {e}")
+
+    old_images = json.loads(creation.image_paths_json or "[]")
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        slots = json.loads(creation.slots_json or "{}")
+        slots["texts"] = req.texts
+        creation.slots_json = json.dumps(slots)
+        creation.image_paths_json = json.dumps([f"/creations/{os.path.basename(p)}" for p in pngs])
+        s.commit()
+        updated = creation.to_dict()
+
+    for web_path in old_images:
+        if web_path not in updated["image_paths"]:
+            fp = os.path.join(CREATIONS_DIR, os.path.basename(web_path))
+            if os.path.exists(fp):
+                os.remove(fp)
+    return {"creation": updated}
+
+
+# ---- Batch export ------------------------------------------------------
+
+class CharshowExportRequest(BaseModel):
+    creation_ids: List[str]
+
+
+@app.post("/api/charshow/export")
+async def api_charshow_export(req: CharshowExportRequest):
+    """Copies each deck's PNGs + writes captions.md, then flips each exported Creation's
+    status to 'published' so the UI can render a Draft/Exported chip off creation.status."""
+    if not req.creation_ids:
+        raise HTTPException(status_code=400, detail="creation_ids required")
+    try:
+        path = await asyncio.to_thread(export_batch, req.creation_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+    with get_session() as s:
+        for cid in req.creation_ids:
+            row = s.get(Creation, cid)
+            if row:
+                row.status = "published"
+        s.commit()
+    return {"path": path}

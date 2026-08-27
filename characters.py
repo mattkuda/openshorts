@@ -43,9 +43,11 @@ RANDOM_SCENES = [
 
 def _selfie_style_suffix():
     return (
-        "Shot like a genuine smartphone selfie/UGC video still: slightly imperfect framing, "
-        "natural skin texture, realistic lighting, no studio look, no text, no watermark. "
-        "Vertical 9:16 composition, subject fills the frame from the chest up."
+        "Shot like a genuine iPhone selfie/UGC still someone would actually post: slightly imperfect "
+        "framing, natural skin texture, available light only, true-to-life slightly muted colors, "
+        "a touch of sensor grain — no studio look, no cinematic color grading, no heavy saturation, "
+        "no professional-photography polish. No other people in frame besides the subject. "
+        "No text, no watermark. Vertical 9:16 composition, subject fills the frame from the chest up."
     )
 
 
@@ -141,3 +143,102 @@ def generate_look(api_key, portrait_web_path, scene_prompt, out_name, mock=False
 
 def random_scene():
     return random.choice(RANDOM_SCENES)
+
+
+# ---- Cartoon mascots (Character Slideshows) --------------------------
+# A "cartoon" character skips the photoreal selfie style entirely: one portrait,
+# then a fixed ~20-pose bank generated with the portrait as reference image so
+# identity/outfit/style stay locked. Poses are stored as CharacterLook rows with
+# a "pose:<key>" prompt prefix so they're distinguishable from scene looks and
+# the pack is resumable (already-generated poses are skipped on re-run).
+
+CARTOON_STYLE_SUFFIX = (
+    " Flat-color comic illustration: thick clean black outlines, cel shading with simple "
+    "two-tone shadows, bold readable shapes, slightly exaggerated athletic anatomy. The "
+    "character is ISOLATED on a pure solid white background (#FFFFFF) — no scenery, no props "
+    "unless specified, no floor shadow beyond a small soft ellipse. Full body visible head to "
+    "toe. No text anywhere in the image except where explicitly specified. No watermark. "
+    "Vertical 9:16 composition."
+)
+
+POSE_BANK = [
+    ("sprint_start", "sprint start crouch (side view)"),
+    ("point_abs", "pointing with both index fingers at his defined abs"),
+    ("dumbbell_curl", "dumbbell bicep curl with gray dumbbell"),
+    ("arms_crossed", "arms crossed confident"),
+    ("flex_double_biceps", "front double-biceps flex"),
+    ("show_phone", "holding a smartphone out toward the viewer"),
+    ("full_stride_run", "running at full stride side profile with motion lines"),
+    ("thumbs_up", "thumbs-up toward viewer"),
+    ("pull_up", "mid-rep pull-up on a bar"),
+    ("push_up", "push-up plank position"),
+    ("barbell_squat", "barbell back squat"),
+    ("overhead_press", "overhead barbell press"),
+    ("shaker_bottle", "drinking from a shaker bottle"),
+    ("towel_shoulders", "white towel over shoulders standing relaxed"),
+    ("shrug", "shrugging with palms up"),
+    ("facepalm", "facepalm"),
+    ("point_at_viewer", "pointing directly at the viewer"),
+    ("point_up_left", "pointing up and to the left as if at text"),
+    ("gym_bag_walk", "walking carrying a gym duffel bag"),
+    ("fist_pump", "celebratory fist pump"),
+]
+
+POSE_PROMPT_PREFIX = "pose:"
+
+
+def generate_pose(api_key, portrait_web_path, pose_description, out_name, mock=False):
+    """Portrait (reference image) + pose description → consistent-identity cartoon pose PNG."""
+    os.makedirs(AVATARS_DIR, exist_ok=True)
+    out_path = os.path.join(AVATARS_DIR, out_name)
+    if mock:
+        _mock_image(f"pose {pose_description[:20]}", out_path, seed=pose_description)
+        return f"/creations/avatars/{out_name}"
+
+    portrait_file = os.path.join(AVATARS_DIR, os.path.basename(portrait_web_path))
+    parts = []
+    if os.path.exists(portrait_file):
+        parts.append(Image.open(portrait_file))
+    parts.append(
+        "Generate a new image of THE SAME cartoon character shown in the reference image — "
+        "identical teal skin color, identical face (two white eyes only), identical outfit, "
+        f"identical illustration style — now {pose_description}." + CARTOON_STYLE_SUFFIX
+    )
+    _generate_image(api_key, parts, out_path)
+    return f"/creations/avatars/{out_name}"
+
+
+def generate_pose_pack(api_key, character_id, mock=False, log=print):
+    """Generate every POSE_BANK pose for a character, skipping ones already generated
+    (idempotent/resumable — safe to call again after a partial failure). Persists each
+    new pose as a CharacterLook row. Returns the list of newly-created look dicts."""
+    from db import get_session, Character, CharacterLook  # local import: characters.py stays DB-free otherwise
+
+    with get_session() as s:
+        char = s.get(Character, character_id)
+        if not char:
+            raise ValueError(f"Character not found: {character_id}")
+        portrait_path = char.portrait_path
+        existing = {l.prompt for l in s.query(CharacterLook)
+                    .filter(CharacterLook.character_id == character_id).all()}
+
+    created = []
+    for key, description in POSE_BANK:
+        tag = f"{POSE_PROMPT_PREFIX}{key}"
+        if tag in existing:
+            log(f"⏭️ Pose already generated: {key}")
+            continue
+        out_name = f"pose_{character_id[:8]}_{key}.png"
+        log(f"🎨 Generating pose: {key}…")
+        try:
+            image_path = generate_pose(api_key, portrait_path, description, out_name, mock=mock)
+        except Exception as e:
+            log(f"❌ Pose '{key}' failed: {e}")
+            continue
+        with get_session() as s:
+            look = CharacterLook(character_id=character_id, prompt=tag, image_path=image_path)
+            s.add(look)
+            s.commit()
+            created.append(look.to_dict())
+    log(f"✅ Pose pack: {len(created)} new pose(s) generated")
+    return created

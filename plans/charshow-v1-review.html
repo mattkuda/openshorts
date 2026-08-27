@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Character Slideshows v1 — review</title>
+<style>
+  :root { --bg:#000; --fg:#a1a1aa; --heading:#fff; --line:rgba(255,255,255,0.1); --surface:#0a0a0a; --accent:#fff; --pass:#7ee787; --warn:#f0b429; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width:1080px; margin:0 auto; padding:56px 32px 140px; }
+  h1 { color:var(--heading); font-size:32px; font-weight:800; letter-spacing:-0.02em; margin:0 0 8px; }
+  h2 { color:var(--heading); font-size:20px; font-weight:700; margin:52px 0 6px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  p { margin:0 0 12px; }
+  .lede { font-size:17px; max-width:700px; }
+  code { font-family:ui-monospace, "SF Mono", Menlo, monospace; font-size:13px; color:#d4d4d8; background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:14px; margin:18px 0; }
+  figure { margin:0; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:8px; }
+  figure img { width:100%; border-radius:8px; display:block; background:#fff; }
+  figcaption { font-size:12px; margin-top:6px; }
+  .badge { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border-radius:999px; padding:1px 8px; margin-right:5px; }
+  .badge.pass { background:rgba(126,231,135,.12); color:var(--pass); }
+  .badge.warn { background:rgba(240,180,41,.12); color:var(--warn); }
+  .callout { border:1px solid var(--line); border-left:3px solid var(--pass); border-radius:8px; background:var(--surface); padding:12px 16px; margin:16px 0; font-size:14px; }
+  .callout.w { border-left-color:var(--warn); }
+  table { border-collapse:collapse; width:100%; margin:12px 0 20px; font-size:14px; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--heading); font-weight:600; }
+  ul { margin:0 0 12px; padding-left:22px; }
+  li { margin-bottom:6px; }
+  .before { border:1px solid rgba(240,180,41,.3); border-radius:10px; padding:12px 16px; background:var(--surface); font-size:13.5px; margin:10px 0; }
+  textarea { width:100%; min-height:110px; resize:vertical; font:inherit; color:var(--heading); background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:4px; }
+  textarea:focus { outline:none; border-color:rgba(255,255,255,.35); }
+  .bar { position:sticky; bottom:0; margin:40px -32px -140px; padding:16px 32px; background:linear-gradient(to top, #000 70%, rgba(0,0,0,0)); display:flex; gap:12px; align-items:center; }
+  button.action { font:inherit; font-weight:600; background:var(--accent); color:#000; border:0; border-radius:8px; padding:11px 18px; cursor:pointer; }
+  pre#out { display:none; margin-top:20px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; font-family:ui-monospace, Menlo, monospace; font-size:13px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Character Slideshows v1 — review</h1>
+  <p class="lede">Phase 1 is built, integrated, and produced its first real decks. Below: the actual rendered slides (real Gemini pose pack + typeset headlines + real EVEX screenshot plug), the copy-quality iteration I made, and the checklist of what you should click through in the app.</p>
+
+  <h2>Real deck #2 — "how much protein you actually need" (after copy tuning)</h2>
+  <div class="grid">
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide01.png"><figcaption><span class="badge pass">hook</span>Bold claim, accent phrase</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide02.png"><figcaption>content</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide03.png"><figcaption>content</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide04.png"><figcaption>content — "1g per pound"</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide05.png"><figcaption>content — "25-40g over 4-5 meals"</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide06.png"><figcaption>content — food list</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_118162366d_slide07.png"><figcaption><span class="badge pass">plug</span>EVEX + real AI-coach screenshot in PIL phone frame</figcaption></figure>
+  </div>
+  <p><strong>Caption:</strong> <em>"i used to have no idea how much protein i needed for muscle… #proteingains #musclegrowth #gains #gymtips #protein"</em><br>
+  <strong>First comment:</strong> <em>"what's your favorite way to get more protein in? let me know 👇"</em></p>
+
+  <h2>The copy iteration (deck #1 → deck #2)</h2>
+  <p>Deck #1's renderer was right but its words were transcribed-speech mush:</p>
+  <div class="before">"SQUAT WEAK AT BOTTOM? HERE'S WHY I THINK" · "OR LIKE, YOUR GLUTES JUST AREN'T REALLY HELPING OUT DOWN THERE?"</div>
+  <p>Fix: rewrote the generation prompt in <code>charshow.py</code> — poster-copy rules (banned filler words, hedge ban, fragments encouraged), a specificity quota (half the slides must contain a number or exercise name), problem→why→fix ordering, and a few-shot example deck. Deck #2 above is the result — first try, no cherry-picking.</p>
+
+  <h2>What went right / what to know</h2>
+  <table>
+    <tr><th>Item</th><th>Status</th></tr>
+    <tr><td>Pose pack (20 poses, real Gemini)</td><td><span class="badge pass">done</span> Identity consistent across all 20; resumable job filled 2 initially-failed poses on rerun</td></tr>
+    <tr><td>Headline engine (auto-fit + accent words)</td><td><span class="badge pass">done</span> EVEX teal-dark #00C080 accents, Anton font, no overflow observed</td></tr>
+    <tr><td>Plug slide</td><td><span class="badge pass">done</span> Rotating real screenshots, PIL phone frame, pointing-pose bias</td></tr>
+    <tr><td>Topic round-robin</td><td><span class="badge pass">done</span> Deck 1 pulled "training", deck 2 pulled "nutrition" — categories rotating as designed</td></tr>
+    <tr><td>Export</td><td><span class="badge pass">done</span> <code>creations/exports/batch_*/deck_NN_slug/*.png</code> + one <code>captions.md</code>; decks flip to Exported</td></tr>
+    <tr><td>Smoke test</td><td><span class="badge pass">22/22</span> mock-mode end-to-end, idempotency, upsert, export status</td></tr>
+    <tr><td>Dashboard lint</td><td><span class="badge warn">note</span> New components clean under ESLint 9; the repo's own <code>npm run lint</code> was already broken (eslint 8/9 mismatch, pre-existing) — worth a later fix</td></tr>
+  </table>
+
+  <h2>What YOU should test (app is running)</h2>
+  <p>Open <a href="http://localhost:5173" style="color:#7ee787">localhost:5173</a> → <strong>Slideshows</strong> (left nav, under Automations):</p>
+  <ul>
+    <li><strong>Series card</strong> "EVEX Gym Tips" — pose pack chip should read 20/20.</li>
+    <li><strong>Generate 1</strong> — watch live logs; new deck lands in the grid (~30–60s with real key).</li>
+    <li><strong>Deck editor</strong> — click a deck, edit one slide's text, Save &amp; re-render; image should update in ~1s.</li>
+    <li><strong>Copy buttons</strong> on caption + first comment.</li>
+    <li><strong>Export</strong> — select decks → Export selected → open the returned path in Finder; check captions.md.</li>
+    <li><strong>Series editor</strong> — tweak the topic bank (add/remove topics per category), change accent color, save, regenerate.</li>
+    <li>The two test decks in the grid are disposable — delete or overwrite freely.</li>
+  </ul>
+
+  <h2>Known nits (not blockers — flag if any bothers you)</h2>
+  <ul>
+    <li>Some slides have a dead zone between the text block (top) and the mascot (bottom-right) — could scale the mascot up ~15% or pull text down. Matter of taste.</li>
+    <li>The shaker-bottle pose has stray letters ("PB") on the bottle — AI prop text. Easy to regenerate just that pose if it bugs you.</li>
+    <li>Hook-slide pose is random; a "pose per topic category" mapping (e.g. nutrition topics prefer shaker/towel poses) is a cheap later upgrade.</li>
+    <li>Caption style is lowercase-casual — intentional (native TikTok voice), but configurable via series tone if you want it cleaner.</li>
+  </ul>
+
+  <h2>Notes back to Claude</h2>
+  <textarea id="notes" placeholder="Verdicts, nits to fix, anything to change before you post deck #1 for real…"></textarea>
+  <div class="bar">
+    <button class="action" id="copy">Copy notes as Markdown</button>
+    <span class="hint" style="color:rgba(255,255,255,.4); font-size:13px; margin-left:auto;">Paste the result back into the chat.</span>
+  </div>
+  <pre id="out"></pre>
+</main>
+<script>
+  const out = document.getElementById('out');
+  document.getElementById('copy').addEventListener('click', async () => {
+    const md = "## Charshow v1 review notes\n" + (document.getElementById('notes').value.trim() || "_(none)_");
+    out.textContent = md; out.style.display = 'block';
+    try { await navigator.clipboard.writeText(md); } catch {}
+  });
+</script>
+</body>
+</html>
