@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Docker uses the compose service names; outside Docker fall back to localhost.
+import fs from 'node:fs'
+const inDocker = fs.existsSync('/.dockerenv')
+const backend = process.env.VITE_PROXY_TARGET || (inDocker ? 'http://backend:8000' : 'http://localhost:8000')
+const renderer = process.env.VITE_RENDER_TARGET || (inDocker ? 'http://renderer:3100' : 'http://localhost:3100')
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -11,43 +17,43 @@ export default defineConfig({
     ],
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/videos': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/thumbnails': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/creations': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/mocks': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/default-avatars': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/sounds': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/gallery': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/video': {
-        target: 'http://backend:8000',
+        target: backend,
         changeOrigin: true,
       },
       '/render': {
-        target: 'http://renderer:3100',
+        target: renderer,
         changeOrigin: true,
       }
     }

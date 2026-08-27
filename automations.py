@@ -213,8 +213,12 @@ Return ONLY a JSON object with:
 
 
 AI_PHOTO_SUFFIX = (
-    " Photorealistic, candid smartphone-photo aesthetic, natural lighting, "
-    "vertical 9:16 composition, no text, no watermark."
+    " Looks like a casual photo taken on an iPhone and posted to a TikTok story: "
+    "true-to-life muted colors, available light only, slight grain, imperfect framing — "
+    "NOT professional photography, no cinematic color grading, no studio lighting, "
+    "no heavy saturation or gray editorial filter. "
+    "Do not include any people or faces unless the prompt explicitly asks for a person. "
+    "Vertical 9:16 composition, no text, no watermark."
 )
 
 

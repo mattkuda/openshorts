@@ -48,3 +48,4 @@ data/
 !mocks/*.mp4
 .env.local
 sounds/uploads/
+.venv-lite/
