@@ -3473,7 +3473,7 @@ async def api_automations_rerender(req: RerenderRequest):
 # =====================================================================
 from db import SlideshowSeries
 from characters import generate_pose_pack, POSE_BANK, POSE_PROMPT_PREFIX
-from charshow import generate_deck, rerender_deck, export_batch
+from charshow import generate_deck, rerender_deck, rerender_deck_ai_full, export_batch
 
 
 def _seed_evex_mascot():
@@ -3495,6 +3495,53 @@ def _seed_evex_mascot():
 _seed_evex_mascot()
 
 
+_PLUG_SCREENSHOTS_SRC_DIR = "data/plug_screenshots"
+_PLUG_SCREENSHOTS_DST_DIR = os.path.join("creations", "plug_screenshots")
+
+
+def _rewrite_plug_screenshot_path(p):
+    """Legacy raw disk path ('data/plug_screenshots/evex/x.png') -> the web path that
+    's actually served ('/creations/plug_screenshots/evex/x.png'). New paths pass through."""
+    if isinstance(p, str) and p.startswith(f"{_PLUG_SCREENSHOTS_SRC_DIR}/"):
+        return "/creations/plug_screenshots/" + p[len(f"{_PLUG_SCREENSHOTS_SRC_DIR}/"):]
+    return p
+
+
+def _migrate_plug_screenshots():
+    """One-time fix (idempotent): plug screenshots were seeded pointing at
+    data/plug_screenshots/... which nothing serves over HTTP (only /creations is
+    mounted) — thumbnails were broken. Copies the source files under
+    creations/plug_screenshots/... and rewrites any SlideshowSeries.plug.screenshots
+    entries still on the old path to the new web path, persisting the fix."""
+    if os.path.isdir(_PLUG_SCREENSHOTS_SRC_DIR):
+        for root, _dirs, files in os.walk(_PLUG_SCREENSHOTS_SRC_DIR):
+            rel = os.path.relpath(root, _PLUG_SCREENSHOTS_SRC_DIR)
+            dst_root = os.path.join(_PLUG_SCREENSHOTS_DST_DIR, rel) if rel != "." else _PLUG_SCREENSHOTS_DST_DIR
+            os.makedirs(dst_root, exist_ok=True)
+            for fn in files:
+                dst_fp = os.path.join(dst_root, fn)
+                if not os.path.exists(dst_fp):
+                    shutil.copyfile(os.path.join(root, fn), dst_fp)
+
+    with get_session() as s:
+        rows = s.query(SlideshowSeries).all()
+        changed = 0
+        for row in rows:
+            plug = json.loads(row.plug_json or "{}")
+            shots = plug.get("screenshots") or []
+            rewritten = [_rewrite_plug_screenshot_path(p) for p in shots]
+            if rewritten != shots:
+                plug["screenshots"] = rewritten
+                row.plug_json = json.dumps(plug)
+                changed += 1
+        if changed:
+            s.commit()
+            print(f"🖼️ Migrated plug screenshots for {changed} series")
+
+
+_migrate_plug_screenshots()
+
+
 # ---- Series ------------------------------------------------------------
 
 class SeriesRequest(BaseModel):
@@ -3508,6 +3555,7 @@ class SeriesRequest(BaseModel):
     topic_bank: Optional[dict] = None
     slide_min: Optional[int] = 4
     slide_max: Optional[int] = 7
+    render_mode: Optional[str] = "typeset"
     plug: Optional[dict] = None
     caption_cfg: Optional[dict] = None
 
@@ -3544,6 +3592,7 @@ async def api_charshow_series_upsert(req: SeriesRequest):
             row.topic_bank_json = json.dumps(req.topic_bank)
         row.slide_min = req.slide_min or 4
         row.slide_max = req.slide_max or 7
+        row.render_mode = req.render_mode if req.render_mode in ("typeset", "ai_full") else "typeset"
         if req.plug is not None:
             row.plug_json = json.dumps(req.plug)
         if req.caption_cfg is not None:
@@ -3645,11 +3694,13 @@ def _save_charshow_creation(meta, pngs):
     return _save_creation(
         kind="char_slideshow", title=meta.get("topic") or "Deck",
         template_key="char_slideshow",
-        slots={"texts": meta["texts"], "roles": meta["roles"], "poses_used": meta["poses_used"],
+        slots={"slides": meta["slides"],
                "plug_screenshot": meta.get("plug_screenshot"), "style_key": meta.get("style_key"),
                "accent_hex": meta.get("accent_hex"), "caption": meta.get("caption", ""),
                "first_comment": meta.get("first_comment", ""), "series_id": meta.get("series_id"),
-               "topic": meta.get("topic", ""), "category": meta.get("category", "")},
+               "topic": meta.get("topic", ""), "category": meta.get("category", ""),
+               "render_mode": meta.get("render_mode", "typeset"),
+               "character_id": meta.get("character_id", "")},
         image_paths=image_urls,
     )
 
@@ -3727,36 +3778,66 @@ async def api_charshow_generate(req: CharshowGenerateRequest,
 
 class CharshowRerenderRequest(BaseModel):
     creation_id: str
-    texts: List[str]
+    slides: Optional[List[dict]] = None    # new structured format
+    texts: Optional[List[str]] = None      # legacy pre-v2 format (plain strings)
+    mock: Optional[bool] = False
 
 
 @app.post("/api/charshow/rerender")
-async def api_charshow_rerender(req: CharshowRerenderRequest):
-    """Re-compose a deck's slides with edited text — no new AI calls (mirrors
-    /api/automations/rerender's instant-edit pattern)."""
+async def api_charshow_rerender(req: CharshowRerenderRequest,
+                                x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    """Re-compose a deck's slides with edited content — no new AI calls (mirrors
+    /api/automations/rerender's instant-edit pattern). Accepts either 'slides'
+    (structured, current decks) or 'texts' (legacy, pre-v2 decks) — either way the
+    deck is stored back in the new structured 'slides' format."""
     with get_session() as s:
         creation = s.get(Creation, req.creation_id)
         if not creation:
             raise HTTPException(status_code=404, detail="Creation not found")
         slots = json.loads(creation.slots_json or "{}")
-    if not slots.get("roles"):
-        raise HTTPException(status_code=400, detail="This creation has no charshow render meta — regenerate instead")
-    if len(req.texts) != len(slots["roles"]):
-        raise HTTPException(status_code=400, detail=f"Expected {len(slots['roles'])} slide texts")
 
-    meta = {"roles": slots.get("roles") or [], "poses_used": slots.get("poses_used") or [],
-            "plug_screenshot": slots.get("plug_screenshot"), "style_key": slots.get("style_key"),
-            "accent_hex": slots.get("accent_hex")}
-    try:
-        pngs = await asyncio.to_thread(rerender_deck, meta, req.texts)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Re-render failed: {e}")
+    expected_n = len(slots.get("slides") or slots.get("roles") or [])
+    if not expected_n:
+        raise HTTPException(status_code=400, detail="This creation has no charshow render meta — regenerate instead")
+    if req.slides is not None:
+        if len(req.slides) != expected_n:
+            raise HTTPException(status_code=400, detail=f"Expected {expected_n} slides")
+    elif req.texts is not None:
+        if len(req.texts) != expected_n:
+            raise HTTPException(status_code=400, detail=f"Expected {expected_n} slide texts")
+    else:
+        raise HTTPException(status_code=400, detail="Provide either 'slides' or 'texts'")
 
     old_images = json.loads(creation.image_paths_json or "[]")
+    try:
+        if slots.get("render_mode") == "ai_full":
+            if req.slides is None:
+                raise HTTPException(status_code=400, detail="Full-AI decks require structured 'slides'")
+            api_key = x_gemini_key or os.environ.get("GEMINI_API_KEY")
+            meta = {"slides": slots.get("slides") or [], "old_images": old_images,
+                    "character_id": slots.get("character_id"),
+                    "plug_screenshot": slots.get("plug_screenshot"),
+                    "accent_hex": slots.get("accent_hex")}
+            pngs, new_slides = await asyncio.to_thread(
+                rerender_deck_ai_full, meta, req.slides, api_key, bool(req.mock))
+        else:
+            meta = {"roles": slots.get("roles") or [], "poses_used": slots.get("poses_used") or [],
+                    "plug_screenshot": slots.get("plug_screenshot"), "style_key": slots.get("style_key"),
+                    "accent_hex": slots.get("accent_hex")}
+            pngs, new_slides = await asyncio.to_thread(rerender_deck, meta, req.slides, req.texts)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Re-render failed: {e}")
     with get_session() as s:
         creation = s.get(Creation, req.creation_id)
         slots = json.loads(creation.slots_json or "{}")
-        slots["texts"] = req.texts
+        slots["slides"] = new_slides
+        slots.pop("texts", None)
+        slots.pop("roles", None)
+        slots.pop("poses_used", None)
         creation.slots_json = json.dumps(slots)
         creation.image_paths_json = json.dumps([f"/creations/{os.path.basename(p)}" for p in pngs])
         s.commit()
@@ -3770,6 +3851,59 @@ async def api_charshow_rerender(req: CharshowRerenderRequest):
     return {"creation": updated}
 
 
+# ---- Deck lifecycle: status/schedule + delete --------------------------
+
+class CharshowDeckPatchRequest(BaseModel):
+    status: Optional[str] = None
+    scheduled_for: Optional[str] = None
+
+
+@app.patch("/api/charshow/deck/{creation_id}")
+async def api_charshow_deck_patch(creation_id: str, req: CharshowDeckPatchRequest):
+    """Update a deck's publish status and/or scheduled date. 'scheduled' requires
+    scheduled_for; setting status to draft/published clears scheduled_for unless a new
+    value is provided alongside it."""
+    if req.status is not None and req.status not in ("draft", "scheduled", "published"):
+        raise HTTPException(status_code=400, detail="status must be one of: draft, scheduled, published")
+    if req.status == "scheduled" and not req.scheduled_for:
+        raise HTTPException(status_code=400, detail="scheduled_for is required when status='scheduled'")
+
+    with get_session() as s:
+        creation = s.get(Creation, creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        if req.status is not None:
+            creation.status = req.status
+            creation.scheduled_for = req.scheduled_for
+        elif req.scheduled_for is not None:
+            creation.scheduled_for = req.scheduled_for
+        s.commit()
+        return {"creation": creation.to_dict()}
+
+
+@app.delete("/api/charshow/deck/{creation_id}")
+async def api_charshow_deck_delete(creation_id: str):
+    """Delete a deck and its slide PNGs from disk (shared assets — the character's pose
+    pack and the series' plug screenshots — are never touched)."""
+    with get_session() as s:
+        creation = s.get(Creation, creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        slots = json.loads(creation.slots_json or "{}")
+        web_paths = list(json.loads(creation.image_paths_json or "[]"))
+        for raw in (slots.get("raws") or []):
+            if isinstance(raw, str):
+                web_paths.append(raw)
+        for web_path in web_paths:
+            if (web_path or "").startswith("/creations/"):
+                fp = os.path.join(CREATIONS_DIR, os.path.basename(web_path))
+                if os.path.exists(fp):
+                    os.remove(fp)
+        s.delete(creation)
+        s.commit()
+    return {"ok": True}
+
+
 # ---- Batch export ------------------------------------------------------
 
 class CharshowExportRequest(BaseModel):
@@ -3778,18 +3912,12 @@ class CharshowExportRequest(BaseModel):
 
 @app.post("/api/charshow/export")
 async def api_charshow_export(req: CharshowExportRequest):
-    """Copies each deck's PNGs + writes captions.md, then flips each exported Creation's
-    status to 'published' so the UI can render a Draft/Exported chip off creation.status."""
+    """Copies each deck's PNGs + writes captions.md. Publish status is managed
+    separately (PATCH /api/charshow/deck/{id}) — export no longer touches it."""
     if not req.creation_ids:
         raise HTTPException(status_code=400, detail="creation_ids required")
     try:
         path = await asyncio.to_thread(export_batch, req.creation_ids)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {e}")
-    with get_session() as s:
-        for cid in req.creation_ids:
-            row = s.get(Creation, cid)
-            if row:
-                row.status = "published"
-        s.commit()
     return {"path": path}

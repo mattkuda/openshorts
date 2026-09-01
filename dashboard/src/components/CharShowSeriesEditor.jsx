@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Plus, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Image as ImageIcon, Layers, Terminal, Check, Trash2 } from 'lucide-react';
 import { getApiUrl } from '../config';
 
 const label = 'text-xs font-bold uppercase tracking-wider text-muted-foreground';
@@ -16,6 +16,11 @@ const TONE_OPTIONS = [
 const STYLE_PRESETS = [
     { key: 'impact', label: 'Impact', desc: 'Bold condensed uppercase, accent-colored key words, SAVE badge. Loud, save-bait, fitness-native.' },
     { key: 'minimal', label: 'Minimal', desc: 'Centered sentence-case, bold keywords, lots of whitespace. Calmer, generalizes past fitness.' },
+];
+
+const RENDER_MODE_OPTIONS = [
+    { key: 'typeset', label: 'Typeset' },
+    { key: 'ai_full', label: 'Full AI' },
 ];
 
 const ACCENT_PRESETS = ['#00C080', '#E08A00', '#7C3AED', '#EF4444', '#2563EB', '#111111'];
@@ -55,6 +60,7 @@ function makeDefaultSeries() {
         name: 'New series',
         character_id: '',
         style_key: 'impact',
+        render_mode: 'typeset',
         accent_hex: '#00C080',
         niche: '',
         tone: 'conversational',
@@ -67,8 +73,15 @@ function makeDefaultSeries() {
     };
 }
 
-export default function CharShowSeriesEditor({ initialSeries, characters, onSave, onCancel }) {
-    const [draft, setDraft] = useState(() => ({ ...makeDefaultSeries(), ...(initialSeries || {}) }));
+export default function CharShowSeriesEditor({
+    initialSeries, characters, onSave, onCancel,
+    onGenerateOne, onDeleteSeries, jobBusyForSeries, job, onDismissJob,
+}) {
+    const [draft, setDraft] = useState(() => ({
+        ...makeDefaultSeries(),
+        ...(initialSeries || {}),
+        render_mode: initialSeries?.render_mode || 'typeset',
+    }));
     const [sections, setSections] = useState(() => topicBankToSections(initialSeries?.topic_bank));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -105,11 +118,56 @@ export default function CharShowSeriesEditor({ initialSeries, characters, onSave
                     </button>
                     <div className="flex items-center gap-3">
                         {error && <span className="text-xs font-medium text-red-700 max-w-xs truncate">{error}</span>}
+                        {initialSeries?.id && (
+                            <>
+                                <button
+                                    onClick={() => onGenerateOne(initialSeries)}
+                                    disabled={jobBusyForSeries}
+                                    className="flex items-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {jobBusyForSeries ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
+                                    Generate 1
+                                </button>
+                                <button
+                                    onClick={() => onDeleteSeries(initialSeries)}
+                                    className="p-2.5 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    title="Delete series"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </>
+                        )}
                         <button onClick={save} disabled={saving} className="btn-primary text-sm px-7 py-2.5 disabled:opacity-50">
                             {saving ? 'Saving…' : 'Save series'}
                         </button>
                     </div>
                 </div>
+
+                {job && (
+                    <div className="bg-muted rounded-xl border border-border overflow-hidden">
+                        <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted">
+                            <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
+                                <Terminal size={12} />
+                                {job.kind === 'poses' ? 'Pose pack generation' : 'Deck generation'}
+                                {job.status === 'processing' && <Loader2 size={11} className="animate-spin" />}
+                                {job.status === 'completed' && <Check size={11} className="text-green-700" />}
+                            </span>
+                            {job.status !== 'processing' && (
+                                <button onClick={onDismissJob} className="text-muted-foreground hover:text-foreground transition-colors" title="Dismiss">
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="p-4 max-h-48 overflow-y-auto font-mono text-xs space-y-1 custom-scrollbar">
+                            {job.logs.map((log, i) => (
+                                <div key={i} className={log.toLowerCase().includes('error') ? 'text-red-600' : 'text-muted-foreground'}>
+                                    {log}
+                                </div>
+                            ))}
+                            {job.status === 'processing' && <div className="animate-pulse text-primary-strong/70">_</div>}
+                        </div>
+                    </div>
+                )}
 
                 <input
                     value={draft.name}
@@ -164,6 +222,25 @@ export default function CharShowSeriesEditor({ initialSeries, characters, onSave
                                 </button>
                             ))}
                         </div>
+                    </div>
+                    <div>
+                        <label className={`${label} block mb-2`}>Render mode</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {RENDER_MODE_OPTIONS.map((m) => (
+                                <button
+                                    key={m.key}
+                                    onClick={() => update({ render_mode: m.key })}
+                                    className={`text-left rounded-xl border p-3 transition-colors ${
+                                        (draft.render_mode || 'typeset') === m.key ? 'border-primary bg-primary/10' : 'border-border bg-card hover:bg-muted'
+                                    }`}
+                                >
+                                    <p className={`text-sm font-semibold ${(draft.render_mode || 'typeset') === m.key ? 'text-primary-strong' : 'text-foreground'}`}>{m.label}</p>
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Typeset = code-drawn text (pixel-consistent, instant edits) · Full AI = Gemini renders the whole slide (better spacing, risk of typos, edits regenerate).
+                        </p>
                     </div>
                     <div>
                         <label className={`${label} block mb-2`}>Accent color</label>
@@ -283,6 +360,16 @@ export default function CharShowSeriesEditor({ initialSeries, characters, onSave
                                 className="input-field w-full"
                             />
                         </div>
+                    </div>
+                    <div>
+                        <label className="text-xs text-muted-foreground block mb-1.5">CTA text (optional)</label>
+                        <input
+                            value={draft.plug?.cta_text || ''}
+                            onChange={(e) => updatePlug({ cta_text: e.target.value })}
+                            placeholder="Try EVEX free for 7 days"
+                            className="input-field w-full"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Shown as an accent pill on the plug slide; leave empty for no pill.</p>
                     </div>
                     <div>
                         <label className="text-xs text-muted-foreground block mb-1.5">Screenshot pool</label>

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-    Plus, Trash2, Pencil, Loader2, Sparkles, Layers, Terminal,
-    Copy, Check, X, Download,
+    Plus, Trash2, Loader2, Sparkles, Layers, Terminal,
+    Copy, Check, X, Download, ChevronDown,
 } from 'lucide-react';
 import { getApiUrl } from '../config';
 import CharShowSeriesEditor from './CharShowSeriesEditor';
@@ -9,16 +9,113 @@ import CharShowDeckModal from './CharShowDeckModal';
 
 const POSE_PACK_TARGET = 20;
 
-function StatusChip({ status }) {
-    const exported = status === 'published';
+const STATUS_LABELS = { draft: 'Unpublished', scheduled: 'Scheduled', published: 'Published' };
+
+// Parses either a full ISO timestamp (created_at) or a plain "YYYY-MM-DD" date
+// (scheduled_for) into a local "M/D" string, avoiding UTC-midnight shift for
+// date-only values.
+function formatShortDate(value) {
+    if (!value) return '';
+    let d;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [y, m, day] = value.split('-').map(Number);
+        d = new Date(y, m - 1, day);
+    } else {
+        d = new Date(value);
+    }
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+}
+
+function statusMeta(status, scheduledFor) {
+    if (status === 'published') {
+        return { label: STATUS_LABELS.published, classes: 'bg-green-500/10 text-green-700 border-green-500/20', dot: 'bg-green-500' };
+    }
+    if (status === 'scheduled') {
+        const label = scheduledFor ? `Publish on ${formatShortDate(scheduledFor)}` : STATUS_LABELS.scheduled;
+        return { label, classes: 'bg-amber-500/10 text-amber-700 border-amber-500/20', dot: 'bg-amber-500' };
+    }
+    return { label: STATUS_LABELS.draft, classes: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground/40' };
+}
+
+function DeckStatusControl({ deck, onUpdate }) {
+    const [open, setOpen] = useState(false);
+    const [pickingDate, setPickingDate] = useState(false);
+    const [dateVal, setDateVal] = useState(deck.scheduled_for || '');
+    const ref = useRef(null);
+
+    useEffect(() => {
+        function handleClick(e) {
+            if (ref.current && !ref.current.contains(e.target)) {
+                setOpen(false);
+                setPickingDate(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    const meta = statusMeta(deck.status, deck.scheduled_for);
+
+    const choose = (status) => {
+        if (status === 'scheduled') {
+            setDateVal(deck.scheduled_for || '');
+            setPickingDate(true);
+            return;
+        }
+        setOpen(false);
+        onUpdate(deck.id, { status, scheduled_for: null });
+    };
+
+    const confirmDate = () => {
+        if (!dateVal) return;
+        onUpdate(deck.id, { status: 'scheduled', scheduled_for: dateVal });
+        setPickingDate(false);
+        setOpen(false);
+    };
+
     return (
-        <span
-            className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                exported ? 'bg-green-500/10 text-green-700' : 'bg-muted text-muted-foreground border border-border'
-            }`}
-        >
-            {exported ? 'Exported' : 'Draft'}
-        </span>
+        <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
+            <button
+                onClick={() => setOpen((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${meta.classes}`}
+            >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+                {meta.label}
+                <ChevronDown size={11} />
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 z-20 bg-card border border-border rounded-xl shadow-md p-1 w-40">
+                    {!pickingDate ? (
+                        ['draft', 'scheduled', 'published'].map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => choose(s)}
+                                className={`w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
+                                    deck.status === s ? 'bg-primary/10 text-primary-strong' : 'text-foreground hover:bg-muted'
+                                }`}
+                            >
+                                {STATUS_LABELS[s]}
+                            </button>
+                        ))
+                    ) : (
+                        <div className="p-1.5 space-y-1.5">
+                            <input
+                                type="date"
+                                value={dateVal}
+                                onChange={(e) => setDateVal(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') confirmDate(); }}
+                                className="input-field w-full text-xs py-1.5"
+                                autoFocus
+                            />
+                            <button onClick={confirmDate} disabled={!dateVal} className="btn-primary w-full text-xs py-1.5 disabled:opacity-50">
+                                Set date
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -29,7 +126,10 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchC
     const poseCount = (poses || []).filter((p) => p.generated).length;
     const posesReady = poseCount > 0;
     return (
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div
+            onClick={() => onEdit(series)}
+            className="bg-card border border-border rounded-xl p-5 space-y-4 cursor-pointer transition-colors hover:border-primary/60"
+        >
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-muted shrink-0">
@@ -42,10 +142,7 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchC
                         <p className="text-xs text-muted-foreground truncate">{character?.name || 'No character'} · {series.niche || 'No niche set'}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => onEdit(series)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Edit series">
-                        <Pencil size={14} />
-                    </button>
+                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => onDelete(series)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Delete series">
                         <Trash2 size={14} />
                     </button>
@@ -68,7 +165,7 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchC
 
             {!posesReady ? (
                 <button
-                    onClick={() => onGeneratePoses(series)}
+                    onClick={(e) => { e.stopPropagation(); onGeneratePoses(series); }}
                     disabled={jobBusyForSeries || !series.character_id}
                     className="w-full flex items-center justify-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                 >
@@ -76,7 +173,7 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchC
                     Generate poses
                 </button>
             ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                         onClick={() => onGenerate(series, 1)}
                         disabled={jobBusyForSeries}
@@ -251,9 +348,10 @@ export default function CharShowTab({ geminiApiKey, debug }) {
     };
 
     const deleteSeries = async (s) => {
-        if (!window.confirm(`Delete "${s.name}"? Generated decks stay in your Library.`)) return;
+        if (!window.confirm(`Delete "${s.name}"? Generated decks stay in your Library.`)) return false;
         await fetch(getApiUrl(`/api/charshow/series/${s.id}`), { method: 'DELETE' });
         fetchSeries();
+        return true;
     };
 
     const toggleDeckSelected = (id) => {
@@ -262,6 +360,40 @@ export default function CharShowTab({ geminiApiKey, debug }) {
             if (next.has(id)) next.delete(id); else next.add(id);
             return next;
         });
+    };
+
+    const updateDeckStatus = async (id, patch) => {
+        const prevCreations = creations;
+        setCreations((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+        try {
+            const res = await fetch(getApiUrl(`/api/charshow/deck/${id}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patch),
+            });
+            if (!res.ok) throw new Error((await res.text()).slice(0, 200));
+            const data = await res.json();
+            if (data.creation) setCreations((prev) => prev.map((c) => (c.id === id ? { ...c, ...data.creation } : c)));
+        } catch (e) {
+            setError(`Status update failed: ${e.message}`);
+            setCreations(prevCreations);
+        }
+    };
+
+    const deleteDeck = async (c) => {
+        if (!window.confirm(`Delete "${c.title || 'this deck'}"? This can't be undone.`)) return;
+        try {
+            const res = await fetch(getApiUrl(`/api/charshow/deck/${c.id}`), { method: 'DELETE' });
+            if (!res.ok) throw new Error((await res.text()).slice(0, 200));
+            setCreations((prev) => prev.filter((d) => d.id !== c.id));
+            setSelectedDeckIds((prev) => {
+                const next = new Set(prev);
+                next.delete(c.id);
+                return next;
+            });
+        } catch (e) {
+            setError(`Delete failed: ${e.message}`);
+        }
     };
 
     const exportSelected = async () => {
@@ -296,6 +428,14 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                 characters={characters}
                 onSave={saveSeries}
                 onCancel={() => setEditingSeries(null)}
+                onGenerateOne={(s) => startGenerate(s, 1)}
+                onDeleteSeries={async (s) => {
+                    const ok = await deleteSeries(s);
+                    if (ok) setEditingSeries(null);
+                }}
+                jobBusyForSeries={jobBusy && job?.seriesId === editingSeries.id}
+                job={job}
+                onDismissJob={() => setJob(null)}
             />
         );
     }
@@ -444,7 +584,16 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                                 />
                                                 Select
                                             </label>
-                                            <StatusChip status={c.status} />
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <DeckStatusControl deck={c} onUpdate={updateDeckStatus} />
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); deleteDeck(c); }}
+                                                    className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                    title="Delete deck"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-0.5">
                                             {(c.image_paths || []).map((img, i) => (
@@ -453,7 +602,10 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                                 </div>
                                             ))}
                                         </div>
-                                        <p className="text-sm font-medium text-foreground truncate">{c.title || 'Untitled deck'}</p>
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground truncate">{c.title || 'Untitled deck'}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">Created {formatShortDate(c.created_at)}</p>
+                                        </div>
                                     </div>
                                 );
                             })}

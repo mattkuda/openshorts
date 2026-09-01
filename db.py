@@ -71,6 +71,7 @@ class Creation(Base):
     video_path = Column(String(500), default="")       # web path under /videos or /mocks
     image_paths_json = Column(Text, default="[]")      # slideshow PNG set (web paths)
     status = Column(String(20), default="draft")       # draft | scheduled | published
+    scheduled_for = Column(String(20), nullable=True, default=None)  # "YYYY-MM-DD" or None
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -82,7 +83,9 @@ class Creation(Base):
             "video_path": self.video_path,
             "image_paths": json.loads(self.image_paths_json or "[]"),
             "status": self.status,
+            "scheduled_for": self.scheduled_for,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
@@ -245,6 +248,7 @@ class SlideshowSeries(Base):
     used_topics_json = Column(Text, default="[]")   # [{category, topic}, ...] oldest-first
     slide_min = Column(Integer, default=4)
     slide_max = Column(Integer, default=7)
+    render_mode = Column(String(20), default="typeset")  # "typeset" (PIL) | "ai_full" (Gemini renders whole slide)
     plug_json = Column(Text, default="{}")          # {app_name, pitch, screenshots: [paths], position}
     caption_cfg_json = Column(Text, default="{}")
     created_at = Column(DateTime(timezone=True), default=_now)
@@ -258,6 +262,7 @@ class SlideshowSeries(Base):
             "topic_bank": json.loads(self.topic_bank_json or "{}"),
             "used_topics": json.loads(self.used_topics_json or "[]"),
             "slide_min": self.slide_min or 4, "slide_max": self.slide_max or 7,
+            "render_mode": self.render_mode or "typeset",
             "plug": json.loads(self.plug_json or "{}"),
             "caption_cfg": json.loads(self.caption_cfg_json or "{}"),
             "created_at": self.created_at.isoformat() if self.created_at else None,
