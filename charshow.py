@@ -715,12 +715,21 @@ def pick_topic(series, api_key, mock=False, log=print):
     for entry in used_topics:
         used_by_cat.setdefault(entry.get("category"), set()).add(entry.get("topic"))
 
+    # optional batch-level audience filter ("men"/"women"): only tagged topics qualify
+    aud_filter = (series.get("_audience_filter") or "").lower() or None
+
     chosen_cat, chosen_topic = None, None
     for cat in categories:
         unused = [t for t in (topic_bank.get(cat) or []) if t not in used_by_cat.get(cat, set())]
+        if aud_filter:
+            unused = [t for t in unused if _parse_audience_tag(t)[1] == aud_filter]
         if unused:
             chosen_cat, chosen_topic = cat, random.choice(unused)
             break
+
+    if chosen_topic is None and aud_filter:
+        raise ValueError(f"No unused @{aud_filter}-tagged topics left in the bank — "
+                         f"add more @{aud_filter} topics or generate without the audience filter")
 
     if chosen_topic is None:
         refill_cat = categories[0] if categories else niche
@@ -788,7 +797,7 @@ def _normalize_llm_slides(raw_slides, n_content):
     return out
 
 
-def _deck_texts(series, topic, n_content, api_key, mock=False):
+def _deck_texts(series, topic, n_content, api_key, mock=False, audience=None):
     plug = series.get("plug") or {}
     app_name = plug.get("app_name") or "EVEX"
     pitch = plug.get("pitch") or "the AI app that programs your workouts for you"
@@ -804,6 +813,11 @@ def _deck_texts(series, topic, n_content, api_key, mock=False):
             "first_comment": MOCK_DECK_TEMPLATE["first_comment"],
         }
 
+    audience_line = ""
+    if audience:
+        audience_line = (f"\nTarget audience: {audience} — write specifically for "
+                         f"{audience} lifters (their goals, their language), "
+                         'without saying "for women"/"for men" on the slides.')
     tone_text = TONE_PRESETS.get(series.get("tone") or "conversational", TONE_PRESETS["conversational"])
     niche = series.get("niche") or "fitness"
     prompt = f"""You write the on-image text for a cartoon-mascot TikTok slideshow (photo carousel)
@@ -811,7 +825,7 @@ in the style of top fitness carousel accounts: BIG bold statements, written like
 never like transcribed speech.
 
 Series niche: {niche}
-Topic for this deck: {topic}
+Topic for this deck: {topic}{audience_line}
 Voice & style: {tone_text}
 
 HARD RULES for hook and slides (violating any of these is a failure):
@@ -884,6 +898,19 @@ Return ONLY a JSON object with keys: hook, slides, plug_headline, caption, first
 
 # ---- Deck orchestration --------------------------------------------------
 
+AUDIENCE_TAG = re.compile(r"\s*@(men|women)\s*$", re.IGNORECASE)
+
+
+def _parse_audience_tag(topic):
+    """'5 glute tips no one tells you @women' -> ('5 glute tips no one tells you', 'women').
+    No tag -> (topic, None). Tags let one series hold men- and women-targeted topics; the
+    audience picks the mascot variant and flavors the copy."""
+    m = AUDIENCE_TAG.search(str(topic or ""))
+    if not m:
+        return str(topic or "").strip(), None
+    return AUDIENCE_TAG.sub("", topic).strip(), m.group(1).lower()
+
+
 def _screenshot_disk_path(p):
     """A series plug screenshot entry may be a web path ('/creations/...', the current
     format) or a legacy raw disk path ('data/plug_screenshots/...', pre-migration) —
@@ -908,8 +935,8 @@ AI_SLIDE_STYLE = (
     "uppercase black sans-serif (Anton/impact style); the specific words called out as ACCENT "
     "words are rendered in the accent color {accent}, all other text near-black. Body/secondary "
     "text smaller, dark, highly legible. The cartoon character from the FIRST reference image: "
-    "copy its identity EXACTLY (teal skin, two plain white eyes, no other facial features, black "
-    "shorts) in the same flat cel-shaded comic style with thick clean outlines. "
+    "copy its identity EXACTLY — teal skin, two plain white eyes, no other facial features, and the "
+    "same outfit as the reference — in the same flat cel-shaded comic style with thick clean outlines. "
     "COMPOSITION: fill the frame with purposeful content — big type, large character art, tight "
     "but breathable margins (~60px), NO large empty white regions and no cramped overlaps. The "
     "character may appear MULTIPLE TIMES in different poses when it serves the layout. Allowed "
@@ -953,7 +980,8 @@ def _ai_slide_prompt(slide, accent_hex):
             f'ONLY the giant scroll-stopping headline, on clean white: {_quoted(text)}. BOTTOM ZONE '
             f'(lower ~60%): the character, large and dynamic{f", {hint}" if hint else ""}. The '
             'character\'s head may rise slightly into the headline zone BEHIND the text, but every '
-            'letter of every word must remain fully readable — no letter may be hidden.')
+            'letter of every word must remain fully readable — no letter may be hidden, and the '
+            'character must never sit IN FRONT of any text.')
     elif role == "plug":
         lines.append(
             f'FINAL APP-PROMO SLIDE. Headline at the top: {_quoted(text)}. Below it, ONE instance of the '
@@ -980,6 +1008,28 @@ def _ai_slide_prompt(slide, accent_hex):
             + (f': {hint}.' if hint else '.'))
     lines.append(AI_SLIDE_STYLE.replace("{accent}", accent_hex or "#00C080"))
     return "\n".join(lines)
+
+
+QC_PROMPT = (
+    "You are checking a social-media slide image for text defects. Answer with EXACTLY one word: "
+    "OK or BAD. Answer BAD if any letters or words are partially covered by artwork, cut off at "
+    "an edge, overlapped so they are hard to read, visibly misspelled, or duplicated. Small "
+    "stylistic overlap where every letter is still clearly readable is OK. Empty decorative "
+    "shapes are OK. Otherwise answer OK."
+)
+
+
+def _qc_slide_text(image_path, api_key, log=print):
+    """One cheap vision check per AI-rendered slide: is the text clean? True = OK.
+    Any API failure counts as OK (QC must never block generation)."""
+    try:
+        client = genai.Client(api_key=api_key)
+        resp = client.models.generate_content(
+            model=TEXT_MODEL, contents=[Image.open(image_path), QC_PROMPT])
+        return "BAD" not in (resp.text or "").strip().upper()
+    except Exception as e:
+        log(f"⚠️ QC check skipped ({e})")
+        return True
 
 
 def _character_portrait_disk(character_id):
@@ -1025,8 +1075,20 @@ def generate_deck(series, api_key, mock=False, log=print):
     n_content = max(1, random.randint(lo, hi))
 
     topic, category, topic_bank, used_topics = pick_topic(series, api_key, mock=mock, log=log)
+    topic, audience = _parse_audience_tag(topic)
+    if audience == "women" and series.get("female_character_id"):
+        # women-targeted topics render with the female mascot (portrait ref in ai_full;
+        # typeset falls back to the default mascot if the female has no pose pack)
+        if series.get("render_mode") == "ai_full" or _all_poses(series["female_character_id"]):
+            character_id = series["female_character_id"]
+            log("👩 Audience: women → female mascot")
+        else:
+            log("⚠️ Women-targeted topic but female mascot has no pose pack — using default mascot")
+    elif audience:
+        log(f"🎯 Audience: {audience}")
+    series = {**series, "character_id": character_id}
     log(f"✍️ Writing deck text ({n_content} content slides)…")
-    texts = _deck_texts(series, topic, n_content, api_key, mock=mock)
+    texts = _deck_texts(series, topic, n_content, api_key, mock=mock, audience=audience)
 
     preset = dict(STYLE_PRESETS.get(series.get("style_key") or "impact", STYLE_PRESETS["impact"]))
     preset["accent"] = series.get("accent_hex") or preset.get("accent")
@@ -1038,7 +1100,7 @@ def generate_deck(series, api_key, mock=False, log=print):
     render_mode = series.get("render_mode") or "typeset"
     if render_mode == "ai_full":
         return _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=mock, log=log,
-                                      topic=topic, category=category,
+                                      topic=topic, category=category, audience=audience,
                                       topic_bank=topic_bank, used_topics=used_topics)
 
     used_pose_keys = set()
@@ -1112,7 +1174,7 @@ def generate_deck(series, api_key, mock=False, log=print):
 
     meta = {
         "series_id": series.get("id"), "character_id": series.get("character_id"),
-        "render_mode": "typeset",
+        "render_mode": "typeset", "audience": audience,
         "topic": topic, "category": category,
         "slides": slides,
         "plug_screenshot": screenshot_path,
@@ -1127,7 +1189,7 @@ def generate_deck(series, api_key, mock=False, log=print):
 
 
 def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, log=print,
-                           topic=None, category=None, topic_bank=None, used_topics=None):
+                           topic=None, category=None, audience=None, topic_bank=None, used_topics=None):
     """Full-AI branch of generate_deck: every slide image is Gemini-rendered whole.
     Slides keep the same structured shape as the typeset path (pose fields empty)."""
     accent = series.get("accent_hex") or "#00C080"
@@ -1155,12 +1217,17 @@ def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, 
     for i, slide in enumerate(slides, start=1):
         out = os.path.join(CHARSHOW_DIR, f"{base}_slide{i:02d}.png")
         log(f"🎨 Slide {i}/{len(slides)} — full-AI render ({slide['role']}/{slide['layout']})…")
-        pngs.append(_ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                                     screenshot_disk=screenshot_disk, log=log))
+        _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
+                         screenshot_disk=screenshot_disk, log=log)
+        if not mock and not _qc_slide_text(out, api_key, log=log):
+            log(f"🔁 QC flagged slide {i} (covered/garbled text) — regenerating once…")
+            _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
+                             screenshot_disk=screenshot_disk, log=log)
+        pngs.append(out)
 
     meta = {
         "series_id": series.get("id"), "character_id": series.get("character_id"),
-        "render_mode": "ai_full",
+        "render_mode": "ai_full", "audience": audience,
         "topic": topic, "category": category,
         "slides": slides,
         "plug_screenshot": screenshot_disk,
@@ -1203,8 +1270,13 @@ def rerender_deck_ai_full(meta, new_slides, api_key, mock=False, out_dir=CHARSHO
             continue
         out = os.path.join(out_dir, f"{base}_slide{i:02d}.png")
         log(f"🎨 Slide {i}/{len(new_slides)} — full-AI regenerate…")
-        pngs.append(_ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                                     screenshot_disk=screenshot_disk, log=log))
+        _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
+                         screenshot_disk=screenshot_disk, log=log)
+        if not mock and not _qc_slide_text(out, api_key, log=log):
+            log(f"🔁 QC flagged slide {i} — regenerating once…")
+            _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
+                             screenshot_disk=screenshot_disk, log=log)
+        pngs.append(out)
     return pngs, new_slides
 
 

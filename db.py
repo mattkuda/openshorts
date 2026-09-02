@@ -240,6 +240,7 @@ class SlideshowSeries(Base):
     id = Column(String(32), primary_key=True, default=_uuid)
     name = Column(String(120), nullable=False, default="New series")
     character_id = Column(String(32), nullable=False, default="")
+    female_character_id = Column(String(32), default="")  # mascot for @women-tagged topics
     style_key = Column(String(40), default="impact")
     accent_hex = Column(String(20), default="#00C080")
     niche = Column(String(200), default="")
@@ -257,6 +258,7 @@ class SlideshowSeries(Base):
     def to_dict(self):
         return {
             "id": self.id, "name": self.name, "character_id": self.character_id,
+            "female_character_id": self.female_character_id or "",
             "style_key": self.style_key or "impact", "accent_hex": self.accent_hex or "#00C080",
             "niche": self.niche, "tone": self.tone or "conversational",
             "topic_bank": json.loads(self.topic_bank_json or "{}"),

@@ -20,6 +20,8 @@ function formatShortDate(value) {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
+const AUDIENCE_LABELS = { men: '♂ men', women: '♀ women' };
+
 function statusMeta(status, scheduledFor) {
     if (status === 'published') {
         return { label: 'Published', classes: 'bg-green-500/10 text-green-700 border-green-500/20', dot: 'bg-green-500' };
@@ -206,11 +208,12 @@ function Lightbox({ slides, index, onClose, onNavigate }) {
     );
 }
 
-export default function CharShowDeckModal({ creation, onClose, onSaved }) {
+export default function CharShowDeckModal({ creation, onClose, onSaved, seriesList, onOpenSeries }) {
     const slots = creation.slots || {};
     const roles = slots.roles || [];
     const isStructured = Array.isArray(slots.slides);
     const isAiFull = slots.render_mode === 'ai_full';
+    const sourceSeries = slots.series_id ? (seriesList || []).find((s) => s.id === slots.series_id) || null : null;
 
     const [slidesBase, setSlidesBase] = useState(() => (isStructured ? slots.slides : null));
     const [textDrafts, setTextDrafts] = useState(() => (
@@ -310,6 +313,26 @@ export default function CharShowDeckModal({ creation, onClose, onSaved }) {
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                                     FULL AI
                                 </span>
+                            )}
+                            {slots.audience && AUDIENCE_LABELS[slots.audience] && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                    {AUDIENCE_LABELS[slots.audience]}
+                                </span>
+                            )}
+                            {slots.series_id && (
+                                <>
+                                    <span className="text-border">·</span>
+                                    {sourceSeries ? (
+                                        <button
+                                            onClick={() => { onOpenSeries?.(sourceSeries); onClose(); }}
+                                            className="text-primary-strong hover:underline"
+                                        >
+                                            Series: {sourceSeries.name}
+                                        </button>
+                                    ) : (
+                                        <span>series deleted</span>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

@@ -3548,6 +3548,7 @@ class SeriesRequest(BaseModel):
     id: Optional[str] = None
     name: str
     character_id: str
+    female_character_id: Optional[str] = ""
     style_key: Optional[str] = "impact"
     accent_hex: Optional[str] = "#00C080"
     niche: Optional[str] = ""
@@ -3584,6 +3585,7 @@ async def api_charshow_series_upsert(req: SeriesRequest):
             s.add(row)
         row.name = req.name or "New series"
         row.character_id = req.character_id
+        row.female_character_id = req.female_character_id or ""
         row.style_key = req.style_key or "impact"
         row.accent_hex = req.accent_hex or "#00C080"
         row.niche = req.niche or ""
@@ -3700,26 +3702,51 @@ def _save_charshow_creation(meta, pngs):
                "first_comment": meta.get("first_comment", ""), "series_id": meta.get("series_id"),
                "topic": meta.get("topic", ""), "category": meta.get("category", ""),
                "render_mode": meta.get("render_mode", "typeset"),
-               "character_id": meta.get("character_id", "")},
+               "character_id": meta.get("character_id", ""),
+               "audience": meta.get("audience")},
         image_paths=image_urls,
     )
 
 
-def _run_charshow_generate(series_id, gemini_key, count, mock, log=print):
+def _charshow_schedule_date(schedule, deck_index):
+    """Deck i of a batch → its publish date under {start_date, per_day} (per_day decks
+    share a date, consecutive days)."""
+    from datetime import date as _date, timedelta
+    start = _date.fromisoformat(schedule["start_date"])
+    per_day = max(1, min(int(schedule.get("per_day") or 1), 6))
+    return (start + timedelta(days=deck_index // per_day)).isoformat()
+
+
+def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audience=None, schedule=None):
     """N decks for a series, carrying the topic round-robin state forward within the
-    batch, then persisting the final state back onto the Series row once."""
+    batch, then persisting the final state back onto the Series row once. Optionally
+    filters topics to one audience and/or schedules each deck's publish date."""
     with get_session() as s:
         row = s.get(SlideshowSeries, series_id)
         if not row:
             raise ValueError("Series not found")
         series = row.to_dict()
+    if audience in ("men", "women"):
+        series["_audience_filter"] = audience
+        log(f"🎯 Batch audience filter: {audience}")
 
     creations = []
     for i in range(count):
         log(f"🎬 Deck {i + 1}/{count}…")
         pngs, meta = generate_deck(series, gemini_key, mock=mock, log=log)
-        series = {**series, "topic_bank": meta.pop("topic_bank"), "used_topics": meta.pop("used_topics")}
-        creations.append(_save_charshow_creation(meta, pngs))
+        series = {**series, "topic_bank": meta.pop("topic_bank"), "used_topics": meta.pop("used_topics"),
+                  "_audience_filter": series.get("_audience_filter")}
+        creation = _save_charshow_creation(meta, pngs)
+        if schedule and schedule.get("start_date"):
+            when = _charshow_schedule_date(schedule, i)
+            with get_session() as s:
+                row = s.get(Creation, creation["id"])
+                row.status = "scheduled"
+                row.scheduled_for = when
+                s.commit()
+                creation = row.to_dict()
+            log(f"🗓️ Scheduled for {when}")
+        creations.append(creation)
 
     with get_session() as s:
         row = s.get(SlideshowSeries, series_id)
@@ -3734,6 +3761,8 @@ class CharshowGenerateRequest(BaseModel):
     series_id: str
     count: Optional[int] = 1
     mock: Optional[bool] = False
+    audience: Optional[str] = None       # None/"any" = bank round-robin; "men"/"women" = only tagged topics
+    schedule: Optional[dict] = None      # {start_date: "YYYY-MM-DD", per_day: 1-3} → decks saved as scheduled
 
 
 @app.post("/api/charshow/generate")
@@ -3757,7 +3786,10 @@ async def api_charshow_generate(req: CharshowGenerateRequest,
 
     async def run():
         try:
-            creations = await asyncio.to_thread(_run_charshow_generate, req.series_id, x_gemini_key, count, bool(req.mock), log)
+            audience = req.audience if req.audience in ("men", "women") else None
+            schedule = req.schedule if (req.schedule or {}).get("start_date") else None
+            creations = await asyncio.to_thread(_run_charshow_generate, req.series_id, x_gemini_key,
+                                                count, bool(req.mock), log, audience, schedule)
             if job_id in charshow_jobs:
                 charshow_jobs[job_id]["result"] = {
                     "creations": creations, "count": len(creations),

@@ -39,6 +39,44 @@ function Toggle({ on, onChange, title }) {
     );
 }
 
+// Shared thumbnail-grid picker used for both the primary character and the
+// optional female-mascot override below it.
+function CharacterGrid({ characters, selectedId, onSelect, allowNone }) {
+    return (
+        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+            {allowNone && (
+                <button
+                    onClick={() => onSelect('')}
+                    className={`rounded-xl border p-1.5 flex flex-col items-center gap-1.5 transition-colors ${
+                        !selectedId ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/60'
+                    }`}
+                    title="None"
+                >
+                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                        <X size={16} className="text-muted-foreground" />
+                    </div>
+                    <span className="text-[10px] text-foreground truncate w-full text-center">None</span>
+                </button>
+            )}
+            {characters.map((c) => (
+                <button
+                    key={c.id}
+                    onClick={() => onSelect(c.id)}
+                    className={`rounded-xl border p-1.5 flex flex-col items-center gap-1.5 transition-colors ${
+                        selectedId === c.id ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/60'
+                    }`}
+                    title={c.name}
+                >
+                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted">
+                        {c.portrait_path && <img src={getApiUrl(c.portrait_path)} alt={c.name} className="w-full h-full object-cover" />}
+                    </div>
+                    <span className="text-[10px] text-foreground truncate w-full text-center">{c.name}</span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
 function topicBankToSections(bank) {
     const entries = Object.entries(bank || {});
     if (entries.length === 0) return [{ category: 'General', text: '' }];
@@ -59,6 +97,7 @@ function makeDefaultSeries() {
     return {
         name: 'New series',
         character_id: '',
+        female_character_id: '',
         style_key: 'impact',
         render_mode: 'typeset',
         accent_hex: '#00C080',
@@ -75,7 +114,7 @@ function makeDefaultSeries() {
 
 export default function CharShowSeriesEditor({
     initialSeries, characters, onSave, onCancel,
-    onGenerateOne, onDeleteSeries, jobBusyForSeries, job, onDismissJob,
+    onOpenGenerate, onDeleteSeries, jobBusyForSeries, job, onDismissJob,
 }) {
     const [draft, setDraft] = useState(() => ({
         ...makeDefaultSeries(),
@@ -121,12 +160,12 @@ export default function CharShowSeriesEditor({
                         {initialSeries?.id && (
                             <>
                                 <button
-                                    onClick={() => onGenerateOne(initialSeries)}
+                                    onClick={() => onOpenGenerate(initialSeries)}
                                     disabled={jobBusyForSeries}
                                     className="flex items-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                                 >
                                     {jobBusyForSeries ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
-                                    Generate 1
+                                    Generate
                                 </button>
                                 <button
                                     onClick={() => onDeleteSeries(initialSeries)}
@@ -184,23 +223,23 @@ export default function CharShowSeriesEditor({
                             No characters yet — create one in the Characters tab first.
                         </p>
                     ) : (
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                            {characters.map((c) => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => update({ character_id: c.id })}
-                                    className={`rounded-xl border p-1.5 flex flex-col items-center gap-1.5 transition-colors ${
-                                        draft.character_id === c.id ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/60'
-                                    }`}
-                                    title={c.name}
-                                >
-                                    <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted">
-                                        {c.portrait_path && <img src={getApiUrl(c.portrait_path)} alt={c.name} className="w-full h-full object-cover" />}
-                                    </div>
-                                    <span className="text-[10px] text-foreground truncate w-full text-center">{c.name}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <>
+                            <CharacterGrid
+                                characters={characters}
+                                selectedId={draft.character_id}
+                                onSelect={(id) => update({ character_id: id })}
+                            />
+                            <div className="pt-3 border-t border-border">
+                                <label className={`${label} block mb-2`}>Female mascot (optional)</label>
+                                <CharacterGrid
+                                    characters={characters}
+                                    selectedId={draft.female_character_id || ''}
+                                    onSelect={(id) => update({ female_character_id: id })}
+                                    allowNone
+                                />
+                                <p className="text-xs text-muted-foreground mt-2">Topics tagged @women render with this mascot.</p>
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -312,6 +351,7 @@ export default function CharShowSeriesEditor({
                         </button>
                     </div>
                     <p className="text-xs text-muted-foreground">One topic per line. Each generated deck pulls a fresh topic from these categories.</p>
+                    <p className="text-xs text-muted-foreground">End a topic line with @men or @women to target it — targeted topics pick the matching mascot and flavor the copy.</p>
                     <div className="space-y-3">
                         {sections.map((s, i) => (
                             <div key={i} className="bg-muted border border-border rounded-lg p-3 space-y-2">

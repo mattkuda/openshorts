@@ -6,6 +6,7 @@ import {
 import { getApiUrl } from '../config';
 import CharShowSeriesEditor from './CharShowSeriesEditor';
 import CharShowDeckModal from './CharShowDeckModal';
+import CharShowGenerateModal from './CharShowGenerateModal';
 
 const POSE_PACK_TARGET = 20;
 
@@ -36,6 +37,17 @@ function statusMeta(status, scheduledFor) {
         return { label, classes: 'bg-amber-500/10 text-amber-700 border-amber-500/20', dot: 'bg-amber-500' };
     }
     return { label: STATUS_LABELS.draft, classes: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground/40' };
+}
+
+const AUDIENCE_LABELS = { men: '♂ men', women: '♀ women' };
+
+function AudiencePill({ audience }) {
+    if (!audience || !AUDIENCE_LABELS[audience]) return null;
+    return (
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+            {AUDIENCE_LABELS[audience]}
+        </span>
+    );
 }
 
 function DeckStatusControl({ deck, onUpdate }) {
@@ -119,7 +131,7 @@ function DeckStatusControl({ deck, onUpdate }) {
     );
 }
 
-function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchCount, onChangeBatchCount, onGenerate, onGeneratePoses, onEdit, onDelete }) {
+function SeriesCard({ series, character, poses, jobBusyForSeries, onOpenGenerate, onGeneratePoses, onEdit, onDelete }) {
     // `poses` is the full fixed pose bank (~20 slots), each flagged `generated` —
     // count only the ones actually rendered, not the bank size.
     const poseTotal = poses?.length || POSE_PACK_TARGET;
@@ -173,29 +185,14 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, generateBatchC
                     Generate poses
                 </button>
             ) : (
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                        onClick={() => onGenerate(series, 1)}
-                        disabled={jobBusyForSeries}
-                        className="flex-1 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                        Generate 1
-                    </button>
-                    <input
-                        type="number" min={1} max={30}
-                        value={generateBatchCount}
-                        onChange={(e) => onChangeBatchCount(series.id, Number(e.target.value))}
-                        className="input-field w-14 text-xs py-2 text-center"
-                    />
-                    <button
-                        onClick={() => onGenerate(series, generateBatchCount)}
-                        disabled={jobBusyForSeries}
-                        className="flex-1 btn-primary text-xs py-2 disabled:opacity-50 flex items-center justify-center gap-1.5"
-                    >
-                        {jobBusyForSeries ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}
-                        Generate batch
-                    </button>
-                </div>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onOpenGenerate(series); }}
+                    disabled={jobBusyForSeries}
+                    className="w-full btn-primary text-sm py-2.5 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                    {jobBusyForSeries ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
+                    Generate
+                </button>
             )}
         </div>
     );
@@ -209,7 +206,7 @@ export default function CharShowTab({ geminiApiKey, debug }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [editingSeries, setEditingSeries] = useState(null); // null | series object | {} (new)
-    const [batchCounts, setBatchCounts] = useState({});
+    const [generatingSeries, setGeneratingSeries] = useState(null); // series object the GenerateModal is open for
     const [selectedDeckIds, setSelectedDeckIds] = useState(() => new Set());
     const [viewingDeckId, setViewingDeckId] = useState(null);
     const [exporting, setExporting] = useState(false);
@@ -319,14 +316,14 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         }
     };
 
-    const startGenerate = async (s, count) => {
+    const startGenerate = async (s, { count, audience, schedule }) => {
         setError('');
         setJob({ kind: 'generate', seriesId: s.id, jobId: null, status: 'processing', logs: [`Generating ${count} deck${count === 1 ? '' : 's'}…`] });
         try {
             const res = await fetch(getApiUrl('/api/charshow/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(geminiApiKey ? { 'X-Gemini-Key': geminiApiKey } : {}) },
-                body: JSON.stringify({ series_id: s.id, count, mock }),
+                body: JSON.stringify({ series_id: s.id, count, audience: audience || null, schedule: schedule || null, mock }),
             });
             if (!res.ok) throw new Error((await res.text()).slice(0, 200));
             const data = await res.json();
@@ -421,26 +418,41 @@ export default function CharShowTab({ geminiApiKey, debug }) {
     const viewingDeck = creations.find((c) => c.id === viewingDeckId) || null;
     const jobBusy = job && job.status === 'processing';
 
+    const generateModal = generatingSeries && (
+        <CharShowGenerateModal
+            series={generatingSeries}
+            onClose={() => setGeneratingSeries(null)}
+            onGenerate={(opts) => {
+                startGenerate(generatingSeries, opts);
+                setGeneratingSeries(null);
+            }}
+        />
+    );
+
     if (editingSeries) {
         return (
-            <CharShowSeriesEditor
-                initialSeries={editingSeries.id ? editingSeries : null}
-                characters={characters}
-                onSave={saveSeries}
-                onCancel={() => setEditingSeries(null)}
-                onGenerateOne={(s) => startGenerate(s, 1)}
-                onDeleteSeries={async (s) => {
-                    const ok = await deleteSeries(s);
-                    if (ok) setEditingSeries(null);
-                }}
-                jobBusyForSeries={jobBusy && job?.seriesId === editingSeries.id}
-                job={job}
-                onDismissJob={() => setJob(null)}
-            />
+            <>
+                <CharShowSeriesEditor
+                    initialSeries={editingSeries.id ? editingSeries : null}
+                    characters={characters}
+                    onSave={saveSeries}
+                    onCancel={() => setEditingSeries(null)}
+                    onOpenGenerate={setGeneratingSeries}
+                    onDeleteSeries={async (s) => {
+                        const ok = await deleteSeries(s);
+                        if (ok) setEditingSeries(null);
+                    }}
+                    jobBusyForSeries={jobBusy && job?.seriesId === editingSeries.id}
+                    job={job}
+                    onDismissJob={() => setJob(null)}
+                />
+                {generateModal}
+            </>
         );
     }
 
     return (
+        <>
         <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-10 animate-[fadeIn_0.3s_ease-out]">
             <div className="space-y-8">
                 {/* Zone 1: Series */}
@@ -480,9 +492,7 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                     character={characters.find((c) => c.id === s.character_id)}
                                     poses={posesByCharacter[s.character_id]}
                                     jobBusyForSeries={jobBusy && job.seriesId === s.id}
-                                    generateBatchCount={batchCounts[s.id] ?? 7}
-                                    onChangeBatchCount={(id, v) => setBatchCounts((prev) => ({ ...prev, [id]: v }))}
-                                    onGenerate={startGenerate}
+                                    onOpenGenerate={setGeneratingSeries}
                                     onGeneratePoses={startPoseGeneration}
                                     onEdit={setEditingSeries}
                                     onDelete={deleteSeries}
@@ -603,7 +613,10 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                             ))}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-foreground truncate">{c.title || 'Untitled deck'}</p>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <p className="text-sm font-medium text-foreground truncate">{c.title || 'Untitled deck'}</p>
+                                                <AudiencePill audience={c.slots?.audience} />
+                                            </div>
                                             <p className="text-xs text-muted-foreground mt-0.5">Created {formatShortDate(c.created_at)}</p>
                                         </div>
                                     </div>
@@ -617,6 +630,8 @@ export default function CharShowTab({ geminiApiKey, debug }) {
             {viewingDeck && (
                 <CharShowDeckModal
                     creation={viewingDeck}
+                    seriesList={series}
+                    onOpenSeries={setEditingSeries}
                     onClose={() => setViewingDeckId(null)}
                     onSaved={(updated) => {
                         setCreations((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
@@ -624,5 +639,7 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                 />
             )}
         </div>
+        {generateModal}
+        </>
     );
 }
