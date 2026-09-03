@@ -719,6 +719,11 @@ export default function CharShowDeckModal({ creation, onClose, onSaved, onDelete
                                     FULL AI
                                 </span>
                             )}
+                            {slots.image_model === 'openai' && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                    GPT-IMG-2
+                                </span>
+                            )}
                             {slots.audience && AUDIENCE_LABELS[slots.audience] && (
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                                     {AUDIENCE_LABELS[slots.audience]}

@@ -24,6 +24,11 @@ const RENDER_MODE_OPTIONS = [
     { key: 'ai_full', label: 'Full AI' },
 ];
 
+const IMAGE_MODEL_OPTIONS = [
+    { key: 'gemini', label: 'Gemini' },
+    { key: 'openai', label: 'OpenAI' },
+];
+
 const ACCENT_PRESETS = ['#00C080', '#E08A00', '#7C3AED', '#EF4444', '#2563EB', '#111111'];
 
 function Toggle({ on, onChange, title }) {
@@ -101,6 +106,7 @@ function makeDefaultSeries() {
         female_character_id: '',
         style_key: 'impact',
         render_mode: 'typeset',
+        image_model: 'gemini',
         accent_hex: '#00C080',
         niche: '',
         tone: 'conversational',
@@ -123,6 +129,7 @@ export default function CharShowSeriesEditor({
         ...makeDefaultSeries(),
         ...(initialSeries || {}),
         render_mode: initialSeries?.render_mode || 'typeset',
+        image_model: initialSeries?.image_model || 'gemini',
     }));
     const [sections, setSections] = useState(() => topicBankToSections(initialSeries?.topic_bank));
     const [saving, setSaving] = useState(false);
@@ -264,6 +271,25 @@ export default function CharShowSeriesEditor({
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
                             Typeset = code-drawn text (pixel-consistent, instant edits) · Full AI = Gemini renders the whole slide (better spacing, risk of typos, edits regenerate).
+                        </p>
+                    </div>
+                    <div>
+                        <label className={`${label} block mb-2`}>Image model</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {IMAGE_MODEL_OPTIONS.map((m) => (
+                                <button
+                                    key={m.key}
+                                    onClick={() => update({ image_model: m.key })}
+                                    className={`text-left rounded-xl border p-3 transition-colors ${
+                                        (draft.image_model || 'gemini') === m.key ? 'border-primary bg-primary/10' : 'border-border bg-card hover:bg-muted'
+                                    }`}
+                                >
+                                    <p className={`text-sm font-semibold ${(draft.image_model || 'gemini') === m.key ? 'text-primary-strong' : 'text-foreground'}`}>{m.label}</p>
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Gemini = Nano Banana Pro (~$0.13/slide) · OpenAI = GPT Image 2 high (~$0.17/slide, strongest text rendering; needs OPENAI_API_KEY in .env.local).
                         </p>
                     </div>
                     <div>

@@ -1234,6 +1234,40 @@ def _character_portrait_disk(character_id):
 # boundary is real pixels, not a soft prompt instruction. Nano Banana Pro
 # (gemini-3-pro-image) is the tier documented/benchmarked to preserve existing text
 # during edits; we fall back down the family if the account lacks access.
+OPENAI_IMAGE_MODEL = "gpt-image-2"
+OPENAI_IMAGE_COST = 0.165   # high quality @ 1024x1536 (per-token derived; ~3rd-party estimate)
+
+
+def _openai_render(prompt, ref_paths, out_path, log=print):
+    """Render a whole slide with OpenAI gpt-image-2 via /v1/images/edits (reference
+    images, no mask). 1024x1536 output is center-cropped to 3:4 then resized to the
+    slide dims. Requires OPENAI_API_KEY in the environment (.env.local)."""
+    import httpx, base64
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY not set — add it to .env.local to use the OpenAI image model")
+    files = [("image", (os.path.basename(p), open(p, "rb").read(), "image/png"))
+             for p in ref_paths if p and os.path.exists(p)]
+    data = {"model": OPENAI_IMAGE_MODEL, "prompt": prompt[:32000], "size": "1024x1536",
+            "quality": "high", "input_fidelity": "high", "n": "1"}
+    with httpx.Client(timeout=300.0) as client:
+        r = client.post("https://api.openai.com/v1/images/edits",
+                        headers={"Authorization": f"Bearer {key}"}, data=data, files=files)
+    if r.status_code != 200:
+        raise RuntimeError(f"OpenAI image error {r.status_code}: {r.text[:300]}")
+    b64 = r.json()["data"][0]["b64_json"]
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(b64))
+    with Image.open(out_path) as im:
+        w, h = im.size
+        target_h = int(w * H / W)
+        if h > target_h:
+            top = (h - target_h) // 2
+            im = im.crop((0, top, w, top + target_h))
+        im.resize((W, H)).save(out_path)
+    return out_path
+
+
 SLIDE_MODEL_CANDIDATES = ["gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview"]
 SLIDE_MODEL_COST = {"gemini-3-pro-image": 0.134, "gemini-3.1-flash-image": 0.045,
                     "gemini-3.1-flash-image-preview": 0.045}
@@ -1289,10 +1323,9 @@ def _hybrid_edit_prompt(slide, zone):
 
 
 def _ai_render_slide(slide, accent_hex, portrait_disk, out_path, api_key, mock=False,
-                     screenshot_disk=None, log=print, preset=None):
-    """PURE full-AI slide render (whole slide incl. text) on the Pro image tier —
-    reserved for SHORT-TEXT slides (hook/statement/plug), where Pro's text rendering
-    is reliable; list slides never come through here (dense text ⇒ typeset)."""
+                     screenshot_disk=None, log=print, preset=None, image_model="gemini"):
+    """PURE full-AI slide render (whole slide incl. text). image_model picks the
+    provider: "gemini" (Nano Banana Pro w/ tier fallback) or "openai" (gpt-image-2)."""
     if mock:
         from characters import _mock_image
         _mock_image(f"AI {slide.get('role')}", out_path, seed=str(slide)[:40])
@@ -1306,7 +1339,17 @@ def _ai_render_slide(slide, accent_hex, portrait_disk, out_path, api_key, mock=F
         parts.append(Image.open(portrait_disk))
     if slide.get("role") == "plug" and screenshot_disk and os.path.exists(screenshot_disk):
         parts.append(Image.open(screenshot_disk))
-    parts.append(_ai_slide_prompt(slide, accent_hex))
+    prompt = _ai_slide_prompt(slide, accent_hex)
+    if (slide.get("regen_guidance") or "").strip():
+        prompt += f"\nUSER ADJUSTMENT (mandatory): {slide['regen_guidance'].strip()}"
+    if image_model == "openai":
+        refs = [portrait_disk]
+        if slide.get("role") == "plug" and screenshot_disk:
+            refs.append(screenshot_disk)
+        _tally("image", OPENAI_IMAGE_COST)
+        _openai_render(prompt, refs, out_path, log=log)
+        return out_path
+    parts.append(prompt)
     models = [_slide_model["id"]] if _slide_model["id"] else SLIDE_MODEL_CANDIDATES
     last_err = None
     for model in models:
@@ -1460,13 +1503,13 @@ def generate_deck(series, api_key, mock=False, log=print):
 
 
 def _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, slide_no, mock=False,
-                          screenshot_disk=None, log=print, max_attempts=3):
+                          screenshot_disk=None, log=print, max_attempts=3, image_model="gemini"):
     """Render an ai_full slide, QC-check it, regenerate up to max_attempts total —
     re-checking EACH attempt (a bad retry must not ship silently). If every attempt
     fails QC, keep the last and warn loudly so the user reviews it."""
     for attempt in range(1, max_attempts + 1):
         _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                         screenshot_disk=screenshot_disk, log=log)
+                         screenshot_disk=screenshot_disk, log=log, image_model=image_model)
         if mock or _qc_slide_text(out, api_key, log=log, expected=_expected_slide_text(slide)):
             return out, True
         if attempt < max_attempts:
@@ -1511,12 +1554,13 @@ def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, 
     # ai_full deck. QC (transcription-compare) retries up to 3x; if all attempts fail
     # the BEST-EFFORT AI slide ships with a loud review warning (never a typeset swap).
     total = len(slides)
-    log(f"🎨 Rendering {total} slides — full-AI on Pro (QC-guarded)…")
+    image_model = series.get("image_model") or "gemini"
+    log(f"🎨 Rendering {total} slides — full-AI on {'gpt-image-2' if image_model == 'openai' else 'Gemini Pro'} (QC-guarded)…")
 
     def _one(job):
         i, slide, out = job
         _out, ok = _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, i, mock=mock,
-                                         screenshot_disk=screenshot_disk, log=log)
+                                         screenshot_disk=screenshot_disk, log=log, image_model=image_model)
         if not ok:
             log(f"⚠️ Slide {i} shipped from the best AI attempt — REVIEW IT (or hit Regenerate image)")
         log(f"✓ Slide {i}/{total} rendered ({slide['role']}/{slide.get('layout') or 'statement'})")
@@ -1539,6 +1583,7 @@ def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, 
     meta = {
         "series_id": series.get("id"), "character_id": series.get("character_id"),
         "render_mode": "ai_full", "audience": audience,
+        "image_model": image_model,
         "deck_type": texts.get("deck_type", "info"),
         "topic": topic, "category": category,
         "slides": slides,
@@ -1599,6 +1644,21 @@ def regen_slide_art(slots, slide_index, guidance, api_key, mock=False, out_dir=C
     character_id = slots.get("character_id")
     if not character_id:
         raise ValueError("This deck predates character tracking — regenerate the whole deck instead")
+
+    if slots.get("render_mode") == "ai_full":
+        # pure-AI deck: re-render the whole slide through the AI pipeline (never typeset),
+        # with the user's guidance folded into the prompt
+        slide["regen_guidance"] = (guidance or "").strip()
+        portrait_disk = _character_portrait_disk(character_id)
+        screenshot_disk = _screenshot_disk_path(slots.get("plug_screenshot")) or slots.get("plug_screenshot")
+        accent = slots.get("accent_hex") or "#00C080"
+        out = os.path.join(out_dir, f"charshow_rg_{uuid.uuid4().hex[:12]}_slide{slide_index:02d}.png")
+        _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, slide_index, mock=mock,
+                              screenshot_disk=screenshot_disk, log=log,
+                              image_model=slots.get("image_model") or "gemini")
+        slide.pop("regen_guidance", None)
+        slides[slide_index - 1] = slide
+        return out, slides
 
     from db import get_session, Character, CharacterLook
     from characters import generate_pose, POSE_PROMPT_PREFIX

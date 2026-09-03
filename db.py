@@ -254,6 +254,7 @@ class SlideshowSeries(Base):
     render_mode = Column(String(20), default="typeset")  # "typeset" (PIL) | "ai_full" (Gemini renders whole slide)
     copy_rules = Column(Text, default="")           # free-text series-specific rules appended to the copy prompt
     save_badge = Column(Integer, default=1)         # 1 = "SAVE THIS FOR LATER" badge on the cover slide
+    image_model = Column(String(20), default="gemini")  # "gemini" | "openai" — slide image provider (ai_full)
     plug_json = Column(Text, default="{}")          # {app_name, pitch, screenshots: [paths], position}
     caption_cfg_json = Column(Text, default="{}")
     created_at = Column(DateTime(timezone=True), default=_now)
@@ -271,6 +272,7 @@ class SlideshowSeries(Base):
             "render_mode": self.render_mode or "typeset",
             "copy_rules": self.copy_rules or "",
             "save_badge": bool(1 if self.save_badge is None else self.save_badge),
+            "image_model": self.image_model or "gemini",
             "plug": json.loads(self.plug_json or "{}"),
             "caption_cfg": json.loads(self.caption_cfg_json or "{}"),
             "created_at": self.created_at.isoformat() if self.created_at else None,

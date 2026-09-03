@@ -76,13 +76,15 @@ export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
     const isAiFull = series?.render_mode === 'ai_full';
     const preview = scheduleOn ? computeSchedulePreview(count, startDate, perDay) : '';
 
-    // Role-split pipeline: hook/statement/plug slides are pure full-AI on the Pro
-    // image tier (with QC + retries), so cost is per-deck and multiplied by count.
+    // Role-split pipeline: hook/statement/plug slides are pure full-AI on the chosen
+    // image model (with QC + retries), so cost is per-deck and multiplied by count.
+    const isOpenAiImage = series?.image_model === 'openai';
     let costLabel;
     if (isAiFull) {
-        const estPerDeck = 0.95;
+        const estPerDeck = isOpenAiImage ? 1.35 : 0.95;
         const totalCost = estPerDeck * count;
-        costLabel = `Estimated cost: ≈$${totalCost.toFixed(2)} for ${count} deck${count === 1 ? '' : 's'} (Pro image model + QC)`;
+        const modelLabel = isOpenAiImage ? 'GPT Image 2 + QC' : 'Gemini Pro + QC';
+        costLabel = `Estimated cost: ≈$${totalCost.toFixed(2)} for ${count} deck${count === 1 ? '' : 's'} (${modelLabel})`;
     } else {
         // One text call per deck; on-the-fly poses can add ~$0.04 each but aren't counted here.
         costLabel = 'Estimated cost: ≈$0.01 — typeset mode is nearly free';

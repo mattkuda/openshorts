@@ -3560,6 +3560,7 @@ class SeriesRequest(BaseModel):
     render_mode: Optional[str] = "typeset"
     copy_rules: Optional[str] = ""
     save_badge: Optional[bool] = True
+    image_model: Optional[str] = "gemini"
     plug: Optional[dict] = None
     caption_cfg: Optional[dict] = None
 
@@ -3600,6 +3601,7 @@ async def api_charshow_series_upsert(req: SeriesRequest):
         row.render_mode = req.render_mode if req.render_mode in ("typeset", "ai_full") else "typeset"
         row.copy_rules = req.copy_rules or ""
         row.save_badge = 1 if (req.save_badge is None or req.save_badge) else 0
+        row.image_model = req.image_model if req.image_model in ("gemini", "openai") else "gemini"
         if req.plug is not None:
             row.plug_json = json.dumps(req.plug)
         if req.caption_cfg is not None:
@@ -3708,6 +3710,7 @@ def _save_charshow_creation(meta, pngs):
                "topic": meta.get("topic", ""), "category": meta.get("category", ""),
                "render_mode": meta.get("render_mode", "typeset"),
                "deck_type": meta.get("deck_type", "info"),
+               "image_model": meta.get("image_model", "gemini"),
                "character_id": meta.get("character_id", ""),
                "audience": meta.get("audience"),
                "gen_stats": meta.get("gen_stats")},
