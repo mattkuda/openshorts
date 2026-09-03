@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Plus, X, Loader2, Image as ImageIcon, Layers, Terminal, Check, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Image as ImageIcon, Layers, Trash2 } from 'lucide-react';
 import { getApiUrl } from '../config';
+import CharShowJobLogBar from './CharShowJobLogBar';
 
 const label = 'text-xs font-bold uppercase tracking-wider text-muted-foreground';
 
@@ -103,18 +104,20 @@ function makeDefaultSeries() {
         accent_hex: '#00C080',
         niche: '',
         tone: 'conversational',
+        copy_rules: '',
         topic_bank: {},
         used_topics: [],
         slide_min: 4,
         slide_max: 6,
         plug: { app_name: '', pitch: '', frequency: 'every_deck', position: 'late', screenshots: [] },
         caption_cfg: { enabled: true },
+        save_badge: true,
     };
 }
 
 export default function CharShowSeriesEditor({
     initialSeries, characters, onSave, onCancel,
-    onOpenGenerate, onDeleteSeries, jobBusyForSeries, job, onDismissJob,
+    onOpenGenerate, onOpenDeck, onDeleteSeries, jobBusyForSeries, jobs, onDismissJob,
 }) {
     const [draft, setDraft] = useState(() => ({
         ...makeDefaultSeries(),
@@ -182,29 +185,11 @@ export default function CharShowSeriesEditor({
                     </div>
                 </div>
 
-                {job && (
-                    <div className="bg-muted rounded-xl border border-border overflow-hidden">
-                        <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted">
-                            <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
-                                <Terminal size={12} />
-                                {job.kind === 'poses' ? 'Pose pack generation' : 'Deck generation'}
-                                {job.status === 'processing' && <Loader2 size={11} className="animate-spin" />}
-                                {job.status === 'completed' && <Check size={11} className="text-green-700" />}
-                            </span>
-                            {job.status !== 'processing' && (
-                                <button onClick={onDismissJob} className="text-muted-foreground hover:text-foreground transition-colors" title="Dismiss">
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="p-4 max-h-48 overflow-y-auto font-mono text-xs space-y-1 custom-scrollbar">
-                            {job.logs.map((log, i) => (
-                                <div key={i} className={log.toLowerCase().includes('error') ? 'text-red-600' : 'text-muted-foreground'}>
-                                    {log}
-                                </div>
-                            ))}
-                            {job.status === 'processing' && <div className="animate-pulse text-primary-strong/70">_</div>}
-                        </div>
+                {jobs && jobs.length > 0 && (
+                    <div className="space-y-3">
+                        {jobs.map((j) => (
+                            <CharShowJobLogBar key={j.clientId} job={j} onDismiss={() => onDismissJob(j.clientId)} onOpenDeck={onOpenDeck} />
+                        ))}
                     </div>
                 )}
 
@@ -340,6 +325,19 @@ export default function CharShowSeriesEditor({
                             </div>
                         </div>
                     </div>
+                    <div>
+                        <label className={`${label} block mb-2`}>Copy rules</label>
+                        <textarea
+                            value={draft.copy_rules || ''}
+                            onChange={(e) => update({ copy_rules: e.target.value })}
+                            rows={3}
+                            placeholder="e.g. hooks must clearly be about the gym"
+                            className="input-field w-full resize-y text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                            Series-specific writing rules appended to every deck's prompt (e.g. "hooks must clearly be about the gym").
+                        </p>
+                    </div>
                 </div>
 
                 {/* Topic bank */}
@@ -439,6 +437,19 @@ export default function CharShowSeriesEditor({
                         on={draft.caption_cfg?.enabled !== false}
                         onChange={() => update({ caption_cfg: { ...draft.caption_cfg, enabled: !(draft.caption_cfg?.enabled !== false) } })}
                         title="Generate caption + first comment"
+                    />
+                </div>
+
+                {/* SAVE badge toggle */}
+                <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-foreground">SAVE badge on cover</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Adds a "SAVE THIS FOR LATER" badge to every deck's cover slide.</p>
+                    </div>
+                    <Toggle
+                        on={draft.save_badge !== false}
+                        onChange={() => update({ save_badge: !(draft.save_badge !== false) })}
+                        title="SAVE badge on cover"
                     />
                 </div>
 

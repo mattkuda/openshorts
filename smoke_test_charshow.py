@@ -88,7 +88,7 @@ with TestClient(appmod.app) as client:
     check("2 decks generated", len(creations) == 2, str(len(creations)))
     check("result.creation is the first deck", result.get("creation") == (creations[0] if creations else None))
 
-    # ---- slide PNGs are 1080x1920; slide count within series range +hook+plug
+    # ---- slide PNGs are 1080x1440 (3:4); slide count within series range +hook+plug
     dims_ok, counts_ok = True, True
     lo, hi = 1 + series["slide_min"] + 1, 1 + series["slide_max"] + 1
     for c in creations:
@@ -101,9 +101,9 @@ with TestClient(appmod.app) as client:
                 dims_ok = False
                 continue
             with Image.open(fp) as im:
-                if im.size != (1080, 1920):
+                if im.size != (1080, 1440):
                     dims_ok = False
-    check("slide PNGs are 1080x1920", dims_ok)
+    check("slide PNGs are 1080x1440 (3:4)", dims_ok)
     check("slide count within series range + hook + plug", counts_ok, f"expected {lo}-{hi}")
 
     # ---- deck payloads carry lifecycle fields -------------------------------

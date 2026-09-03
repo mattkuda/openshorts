@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useMatch } from 'react-router-dom';
 import {
-    Plus, Trash2, Loader2, Sparkles, Layers, Terminal,
-    Copy, Check, X, Download, ChevronDown,
+    Plus, Loader2, Sparkles, Layers,
+    Copy, Check, X, Download,
 } from 'lucide-react';
 import { getApiUrl } from '../config';
 import CharShowSeriesEditor from './CharShowSeriesEditor';
 import CharShowDeckModal from './CharShowDeckModal';
 import CharShowGenerateModal from './CharShowGenerateModal';
+import CharShowJobLogBar from './CharShowJobLogBar';
 
 const POSE_PACK_TARGET = 20;
 
@@ -28,13 +30,32 @@ function formatShortDate(value) {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
-function statusMeta(status, scheduledFor) {
+// Formats a "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" value into "M/D" or "M/D h:MM AM/PM".
+function formatDateTime(value) {
+    if (!value) return '';
+    const [datePart, timePart] = value.split('T');
+    const [y, m, d] = datePart.split('-').map(Number);
+    if (!timePart) {
+        const dt = new Date(y, m - 1, d);
+        if (Number.isNaN(dt.getTime())) return '';
+        return dt.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    }
+    const [hh, mm] = timePart.split(':').map(Number);
+    const dt = new Date(y, m - 1, d, hh, mm);
+    if (Number.isNaN(dt.getTime())) return '';
+    const dateStr = dt.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    const timeStr = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
+}
+
+function statusMeta(status, scheduledFor, publishedAt) {
     if (status === 'published') {
-        return { label: STATUS_LABELS.published, classes: 'bg-green-500/10 text-green-700 border-green-500/20', dot: 'bg-green-500' };
+        const dt = formatDateTime(publishedAt);
+        return { label: dt ? `Published ${dt}` : STATUS_LABELS.published, classes: 'bg-green-500/10 text-green-700 border-green-500/20', dot: 'bg-green-500' };
     }
     if (status === 'scheduled') {
-        const label = scheduledFor ? `Publish on ${formatShortDate(scheduledFor)}` : STATUS_LABELS.scheduled;
-        return { label, classes: 'bg-amber-500/10 text-amber-700 border-amber-500/20', dot: 'bg-amber-500' };
+        const dt = formatDateTime(scheduledFor);
+        return { label: dt ? `Scheduled ${dt}` : STATUS_LABELS.scheduled, classes: 'bg-amber-500/10 text-amber-700 border-amber-500/20', dot: 'bg-amber-500' };
     }
     return { label: STATUS_LABELS.draft, classes: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground/40' };
 }
@@ -50,88 +71,7 @@ function AudiencePill({ audience }) {
     );
 }
 
-function DeckStatusControl({ deck, onUpdate }) {
-    const [open, setOpen] = useState(false);
-    const [pickingDate, setPickingDate] = useState(false);
-    const [dateVal, setDateVal] = useState(deck.scheduled_for || '');
-    const ref = useRef(null);
-
-    useEffect(() => {
-        function handleClick(e) {
-            if (ref.current && !ref.current.contains(e.target)) {
-                setOpen(false);
-                setPickingDate(false);
-            }
-        }
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
-
-    const meta = statusMeta(deck.status, deck.scheduled_for);
-
-    const choose = (status) => {
-        if (status === 'scheduled') {
-            setDateVal(deck.scheduled_for || '');
-            setPickingDate(true);
-            return;
-        }
-        setOpen(false);
-        onUpdate(deck.id, { status, scheduled_for: null });
-    };
-
-    const confirmDate = () => {
-        if (!dateVal) return;
-        onUpdate(deck.id, { status: 'scheduled', scheduled_for: dateVal });
-        setPickingDate(false);
-        setOpen(false);
-    };
-
-    return (
-        <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
-            <button
-                onClick={() => setOpen((v) => !v)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${meta.classes}`}
-            >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
-                {meta.label}
-                <ChevronDown size={11} />
-            </button>
-            {open && (
-                <div className="absolute right-0 top-full mt-1 z-20 bg-card border border-border rounded-xl shadow-md p-1 w-40">
-                    {!pickingDate ? (
-                        ['draft', 'scheduled', 'published'].map((s) => (
-                            <button
-                                key={s}
-                                onClick={() => choose(s)}
-                                className={`w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
-                                    deck.status === s ? 'bg-primary/10 text-primary-strong' : 'text-foreground hover:bg-muted'
-                                }`}
-                            >
-                                {STATUS_LABELS[s]}
-                            </button>
-                        ))
-                    ) : (
-                        <div className="p-1.5 space-y-1.5">
-                            <input
-                                type="date"
-                                value={dateVal}
-                                onChange={(e) => setDateVal(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') confirmDate(); }}
-                                className="input-field w-full text-xs py-1.5"
-                                autoFocus
-                            />
-                            <button onClick={confirmDate} disabled={!dateVal} className="btn-primary w-full text-xs py-1.5 disabled:opacity-50">
-                                Set date
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function SeriesCard({ series, character, poses, jobBusyForSeries, onOpenGenerate, onGeneratePoses, onEdit, onDelete }) {
+function SeriesCard({ series, character, poses, jobBusyForSeries, onOpenGenerate, onGeneratePoses, onEdit }) {
     // `poses` is the full fixed pose bank (~20 slots), each flagged `generated` —
     // count only the ones actually rendered, not the bank size.
     const poseTotal = poses?.length || POSE_PACK_TARGET;
@@ -142,22 +82,15 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, onOpenGenerate
             onClick={() => onEdit(series)}
             className="bg-card border border-border rounded-xl p-5 space-y-4 cursor-pointer transition-colors hover:border-primary/60"
         >
-            <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-muted shrink-0">
-                        {character?.portrait_path && (
-                            <img src={getApiUrl(character.portrait_path)} alt={character.name} className="w-full h-full object-cover" />
-                        )}
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{series.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{character?.name || 'No character'} · {series.niche || 'No niche set'}</p>
-                    </div>
+            <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-muted shrink-0">
+                    {character?.portrait_path && (
+                        <img src={getApiUrl(character.portrait_path)} alt={character.name} className="w-full h-full object-cover" />
+                    )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => onDelete(series)} className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors" title="Delete series">
-                        <Trash2 size={14} />
-                    </button>
+                <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{series.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{character?.name || 'No character'} · {series.niche || 'No niche set'}</p>
                 </div>
             </div>
 
@@ -198,22 +131,35 @@ function SeriesCard({ series, character, poses, jobBusyForSeries, onOpenGenerate
     );
 }
 
-export default function CharShowTab({ geminiApiKey, debug }) {
+export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
+    const navigate = useNavigate();
+    // The series editor and deck modal are URL-driven (/slideshows/series/:id,
+    // /slideshows/decks/:id) so they're deep-linkable and back/forward-navigable.
+    // "New series" has no id yet, so it stays local, ephemeral client state instead.
+    const seriesRouteMatch = useMatch('/slideshows/series/:id');
+    const deckRouteMatch = useMatch('/slideshows/decks/:id');
+    const [newSeriesDraft, setNewSeriesDraft] = useState(null); // {} sentinel while creating, else null
+
     const [series, setSeries] = useState([]);
     const [characters, setCharacters] = useState([]);
     const [creations, setCreations] = useState([]);
     const [posesByCharacter, setPosesByCharacter] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [editingSeries, setEditingSeries] = useState(null); // null | series object | {} (new)
     const [generatingSeries, setGeneratingSeries] = useState(null); // series object the GenerateModal is open for
     const [selectedDeckIds, setSelectedDeckIds] = useState(() => new Set());
-    const [viewingDeckId, setViewingDeckId] = useState(null);
     const [exporting, setExporting] = useState(false);
     const [exportResult, setExportResult] = useState(null);
     const [exportCopied, setExportCopied] = useState(false);
 
-    const [job, setJob] = useState(null); // { kind: 'poses'|'generate', seriesId, jobId, status, logs }
+    // Multiple concurrent jobs (one per series, generate or pose-pack) — each entry:
+    // { clientId, jobId, kind, seriesId, seriesName, characterId, status, logs, result,
+    //   startedAt, lastPolledAt, dismissed }. clientId is assigned at creation (before
+    // the POST resolves with a real jobId) and is the stable key used to update/find
+    // an entry for the rest of its life.
+    const [jobs, setJobs] = useState([]);
+    const jobsRef = useRef(jobs);
+    useEffect(() => { jobsRef.current = jobs; }, [jobs]);
 
     const mock = !!debug?.mockAI || !geminiApiKey;
 
@@ -269,39 +215,66 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [series]);
 
-    // Job polling — mirrors the SaaShortsTab generation-status pattern.
+    // Job polling — one persistent interval (not one-per-job) that reads the latest
+    // jobs off jobsRef each tick and polls every still-processing one concurrently.
+    // Reading from the ref instead of closing over `jobs` means the interval never
+    // needs to be torn down and recreated just because a new job started or one
+    // finished — it always sees the current set.
     useEffect(() => {
-        let interval;
-        if (job && job.status === 'processing') {
-            interval = setInterval(async () => {
+        const interval = setInterval(async () => {
+            const active = jobsRef.current.filter((j) => j.status === 'processing' && j.jobId);
+            if (active.length === 0) return;
+            await Promise.all(active.map(async (j) => {
                 try {
-                    const res = await fetch(getApiUrl(`/api/charshow/status/${job.jobId}`));
+                    const res = await fetch(getApiUrl(`/api/charshow/status/${j.jobId}`));
                     if (!res.ok) return;
                     const data = await res.json();
-                    setJob((prev) => (prev ? { ...prev, logs: data.logs || prev.logs } : prev));
+                    const now = Date.now();
                     if (data.status === 'completed') {
-                        setJob((prev) => (prev ? { ...prev, status: 'completed' } : prev));
-                        clearInterval(interval);
-                        if (job.kind === 'poses') {
-                            fetchPoses(job.characterId);
+                        setJobs((prev) => prev.map((x) => (x.clientId === j.clientId
+                            ? { ...x, status: 'completed', logs: data.logs || x.logs, result: data.result, lastPolledAt: now }
+                            : x)));
+                        if (j.kind === 'poses') {
+                            fetchPoses(j.characterId);
                         } else {
+                            // Merge the just-generated decks in immediately so the log bar's
+                            // "Open: <title>" links work the instant they render, without
+                            // waiting on fetchCreations' round trip.
+                            if (data.result?.creations?.length) {
+                                setCreations((prev) => {
+                                    const existingIds = new Set(prev.map((c) => c.id));
+                                    const fresh = data.result.creations.filter((c) => !existingIds.has(c.id));
+                                    return [...fresh, ...prev];
+                                });
+                            }
                             fetchCreations();
                             fetchSeries();
                         }
                     } else if (data.status === 'failed') {
-                        setJob((prev) => (prev ? { ...prev, status: 'failed', logs: [...(data.logs || prev.logs), data.error || 'Job failed'] } : prev));
-                        clearInterval(interval);
+                        setJobs((prev) => prev.map((x) => (x.clientId === j.clientId
+                            ? { ...x, status: 'failed', logs: [...(data.logs || x.logs), data.error || 'Job failed'], lastPolledAt: now }
+                            : x)));
+                    } else {
+                        setJobs((prev) => prev.map((x) => (x.clientId === j.clientId
+                            ? { ...x, logs: data.logs || x.logs, lastPolledAt: now }
+                            : x)));
                     }
                 } catch { /* keep polling */ }
-            }, 2000);
-        }
+            }));
+        }, 2000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [job?.jobId, job?.status]);
+    }, [fetchPoses, fetchCreations, fetchSeries]);
+
+    const makeClientId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const startPoseGeneration = async (s) => {
         setError('');
-        setJob({ kind: 'poses', seriesId: s.id, characterId: s.character_id, jobId: null, status: 'processing', logs: ['Starting pose pack generation…'] });
+        const clientId = makeClientId();
+        const startedAt = Date.now();
+        setJobs((prev) => [...prev, {
+            clientId, jobId: null, kind: 'poses', seriesId: s.id, seriesName: s.name, characterId: s.character_id,
+            status: 'processing', logs: ['Starting pose pack generation…'], result: null, startedAt, lastPolledAt: startedAt, dismissed: false,
+        }]);
         try {
             const res = await fetch(getApiUrl('/api/charshow/poses'), {
                 method: 'POST',
@@ -310,28 +283,36 @@ export default function CharShowTab({ geminiApiKey, debug }) {
             });
             if (!res.ok) throw new Error((await res.text()).slice(0, 200));
             const data = await res.json();
-            setJob((prev) => (prev ? { ...prev, jobId: data.job_id } : prev));
+            setJobs((prev) => prev.map((j) => (j.clientId === clientId ? { ...j, jobId: data.job_id } : j)));
         } catch (e) {
-            setJob((prev) => (prev ? { ...prev, status: 'failed', logs: [...prev.logs, `Error: ${e.message}`] } : prev));
+            setJobs((prev) => prev.map((j) => (j.clientId === clientId ? { ...j, status: 'failed', logs: [...j.logs, `Error: ${e.message}`] } : j)));
         }
     };
 
-    const startGenerate = async (s, { count, audience, schedule }) => {
+    const startGenerate = async (s, { count, audience, topic, schedule }) => {
         setError('');
-        setJob({ kind: 'generate', seriesId: s.id, jobId: null, status: 'processing', logs: [`Generating ${count} deck${count === 1 ? '' : 's'}…`] });
+        const clientId = makeClientId();
+        const startedAt = Date.now();
+        setJobs((prev) => [...prev, {
+            clientId, jobId: null, kind: 'generate', seriesId: s.id, seriesName: s.name, characterId: s.character_id,
+            status: 'processing', logs: [`Generating ${count} deck${count === 1 ? '' : 's'}…`], result: null, startedAt, lastPolledAt: startedAt, dismissed: false,
+        }]);
         try {
             const res = await fetch(getApiUrl('/api/charshow/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(geminiApiKey ? { 'X-Gemini-Key': geminiApiKey } : {}) },
-                body: JSON.stringify({ series_id: s.id, count, audience: audience || null, schedule: schedule || null, mock }),
+                body: JSON.stringify({ series_id: s.id, count, audience: audience || null, topic: topic || null, schedule: schedule || null, mock }),
             });
             if (!res.ok) throw new Error((await res.text()).slice(0, 200));
             const data = await res.json();
-            setJob((prev) => (prev ? { ...prev, jobId: data.job_id } : prev));
+            setJobs((prev) => prev.map((j) => (j.clientId === clientId ? { ...j, jobId: data.job_id } : j)));
         } catch (e) {
-            setJob((prev) => (prev ? { ...prev, status: 'failed', logs: [...prev.logs, `Error: ${e.message}`] } : prev));
+            setJobs((prev) => prev.map((j) => (j.clientId === clientId ? { ...j, status: 'failed', logs: [...j.logs, `Error: ${e.message}`] } : j)));
         }
     };
+
+    const dismissJob = (clientId) => setJobs((prev) => prev.map((j) => (j.clientId === clientId ? { ...j, dismissed: true } : j)));
+    const seriesJobBusy = (seriesId) => jobs.some((j) => j.seriesId === seriesId && j.status === 'processing');
 
     const saveSeries = async (draft) => {
         const res = await fetch(getApiUrl('/api/charshow/series'), {
@@ -341,7 +322,8 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         });
         if (!res.ok) throw new Error((await res.text()).slice(0, 200));
         await fetchSeries();
-        setEditingSeries(null);
+        setNewSeriesDraft(null);
+        navigate('/slideshows');
     };
 
     const deleteSeries = async (s) => {
@@ -359,40 +341,6 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         });
     };
 
-    const updateDeckStatus = async (id, patch) => {
-        const prevCreations = creations;
-        setCreations((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-        try {
-            const res = await fetch(getApiUrl(`/api/charshow/deck/${id}`), {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(patch),
-            });
-            if (!res.ok) throw new Error((await res.text()).slice(0, 200));
-            const data = await res.json();
-            if (data.creation) setCreations((prev) => prev.map((c) => (c.id === id ? { ...c, ...data.creation } : c)));
-        } catch (e) {
-            setError(`Status update failed: ${e.message}`);
-            setCreations(prevCreations);
-        }
-    };
-
-    const deleteDeck = async (c) => {
-        if (!window.confirm(`Delete "${c.title || 'this deck'}"? This can't be undone.`)) return;
-        try {
-            const res = await fetch(getApiUrl(`/api/charshow/deck/${c.id}`), { method: 'DELETE' });
-            if (!res.ok) throw new Error((await res.text()).slice(0, 200));
-            setCreations((prev) => prev.filter((d) => d.id !== c.id));
-            setSelectedDeckIds((prev) => {
-                const next = new Set(prev);
-                next.delete(c.id);
-                return next;
-            });
-        } catch (e) {
-            setError(`Delete failed: ${e.message}`);
-        }
-    };
-
     const exportSelected = async () => {
         if (selectedDeckIds.size === 0) return;
         setExporting(true);
@@ -401,7 +349,7 @@ export default function CharShowTab({ geminiApiKey, debug }) {
             const res = await fetch(getApiUrl('/api/charshow/export'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ creation_ids: [...selectedDeckIds] }),
+                body: JSON.stringify({ creation_ids: [...selectedDeckIds], reveal: true }),
             });
             if (!res.ok) throw new Error((await res.text()).slice(0, 200));
             const data = await res.json();
@@ -415,8 +363,14 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         }
     };
 
+    const editingSeriesId = seriesRouteMatch?.params?.id || null;
+    const editingSeries = newSeriesDraft || (editingSeriesId ? (series.find((s) => s.id === editingSeriesId) || null) : null);
+    const viewingDeckId = deckRouteMatch?.params?.id || null;
     const viewingDeck = creations.find((c) => c.id === viewingDeckId) || null;
-    const jobBusy = job && job.status === 'processing';
+    const visibleJobs = jobs.filter((j) => !j.dismissed);
+
+    const goToSeries = (s) => navigate(`/slideshows/series/${s.id}`);
+    const goToDeck = (id) => navigate(`/slideshows/decks/${id}`);
 
     const generateModal = generatingSeries && (
         <CharShowGenerateModal
@@ -429,6 +383,22 @@ export default function CharShowTab({ geminiApiKey, debug }) {
         />
     );
 
+    const deckModal = viewingDeck && (
+        <CharShowDeckModal
+            creation={viewingDeck}
+            seriesList={series}
+            onOpenSeries={goToSeries}
+            onClose={() => navigate(-1)}
+            onSaved={(updated) => {
+                setCreations((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+            }}
+            onDeleted={(id) => setCreations((prev) => prev.filter((c) => c.id !== id))}
+            geminiApiKey={geminiApiKey}
+            mock={mock}
+            uploadPostKey={uploadPostKey}
+        />
+    );
+
     if (editingSeries) {
         return (
             <>
@@ -436,17 +406,19 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                     initialSeries={editingSeries.id ? editingSeries : null}
                     characters={characters}
                     onSave={saveSeries}
-                    onCancel={() => setEditingSeries(null)}
+                    onCancel={() => { setNewSeriesDraft(null); navigate('/slideshows'); }}
                     onOpenGenerate={setGeneratingSeries}
+                    onOpenDeck={goToDeck}
                     onDeleteSeries={async (s) => {
                         const ok = await deleteSeries(s);
-                        if (ok) setEditingSeries(null);
+                        if (ok) { setNewSeriesDraft(null); navigate('/slideshows'); }
                     }}
-                    jobBusyForSeries={jobBusy && job?.seriesId === editingSeries.id}
-                    job={job}
-                    onDismissJob={() => setJob(null)}
+                    jobBusyForSeries={seriesJobBusy(editingSeries.id)}
+                    jobs={visibleJobs.filter((j) => j.seriesId === editingSeries.id)}
+                    onDismissJob={dismissJob}
                 />
                 {generateModal}
+                {deckModal}
             </>
         );
     }
@@ -457,19 +429,21 @@ export default function CharShowTab({ geminiApiKey, debug }) {
             <div className="space-y-8">
                 {/* Zone 1: Series */}
                 <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-foreground">Character Slideshows</h1>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                A recurring cartoon character, typeset headlines, your app as the payoff. Generate here, post from your phone.
-                            </p>
-                        </div>
-                        <button onClick={() => setEditingSeries({})} className="btn-primary flex items-center gap-2 text-sm">
-                            <Plus size={16} /> New series
-                        </button>
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">Character Slideshows</h1>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            A recurring cartoon character, typeset headlines, your app as the payoff. Generate here, post from your phone.
+                        </p>
                     </div>
 
                     {error && <p className="text-sm text-red-700">{error}</p>}
+
+                    <div className="flex items-center justify-between gap-4">
+                        <h2 className="text-lg font-semibold text-foreground">Series</h2>
+                        <button onClick={() => setNewSeriesDraft({})} className="btn-primary flex items-center gap-2 text-sm">
+                            <Plus size={16} /> New series
+                        </button>
+                    </div>
 
                     {loading ? (
                         <div className="flex justify-center py-16">
@@ -491,41 +465,22 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                     series={s}
                                     character={characters.find((c) => c.id === s.character_id)}
                                     poses={posesByCharacter[s.character_id]}
-                                    jobBusyForSeries={jobBusy && job.seriesId === s.id}
+                                    jobBusyForSeries={seriesJobBusy(s.id)}
                                     onOpenGenerate={setGeneratingSeries}
                                     onGeneratePoses={startPoseGeneration}
-                                    onEdit={setEditingSeries}
-                                    onDelete={deleteSeries}
+                                    onEdit={goToSeries}
                                 />
                             ))}
                         </div>
                     )}
                 </div>
 
-                {/* Zone 2: Batch bar / live logs */}
-                {job && (
-                    <div className="bg-muted rounded-xl border border-border overflow-hidden">
-                        <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted">
-                            <span className="text-xs font-mono text-muted-foreground flex items-center gap-2">
-                                <Terminal size={12} />
-                                {job.kind === 'poses' ? 'Pose pack generation' : 'Deck generation'}
-                                {job.status === 'processing' && <Loader2 size={11} className="animate-spin" />}
-                                {job.status === 'completed' && <Check size={11} className="text-green-700" />}
-                            </span>
-                            {job.status !== 'processing' && (
-                                <button onClick={() => setJob(null)} className="text-muted-foreground hover:text-foreground transition-colors" title="Dismiss">
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="p-4 max-h-48 overflow-y-auto font-mono text-xs space-y-1 custom-scrollbar">
-                            {job.logs.map((log, i) => (
-                                <div key={i} className={log.toLowerCase().includes('error') ? 'text-red-600' : 'text-muted-foreground'}>
-                                    {log}
-                                </div>
-                            ))}
-                            {job.status === 'processing' && <div className="animate-pulse text-primary-strong/70">_</div>}
-                        </div>
+                {/* Zone 2: Batch bar / live logs — one per active job, any series */}
+                {visibleJobs.length > 0 && (
+                    <div className="space-y-3">
+                        {visibleJobs.map((j) => (
+                            <CharShowJobLogBar key={j.clientId} job={j} onDismiss={() => dismissJob(j.clientId)} onOpenDeck={goToDeck} />
+                        ))}
                     </div>
                 )}
 
@@ -573,13 +528,14 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                             {creations.map((c) => {
                                 const selected = selectedDeckIds.has(c.id);
+                                const meta = statusMeta(c.status, c.scheduled_for, c.published_at);
                                 return (
                                     <div
                                         key={c.id}
                                         className={`bg-card border rounded-xl p-3 space-y-2.5 cursor-pointer transition-colors ${
                                             selected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/60'
                                         }`}
-                                        onClick={() => setViewingDeckId(c.id)}
+                                        onClick={() => goToDeck(c.id)}
                                     >
                                         <div className="flex items-center justify-between gap-2">
                                             <label
@@ -594,16 +550,10 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                                                 />
                                                 Select
                                             </label>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <DeckStatusControl deck={c} onUpdate={updateDeckStatus} />
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); deleteDeck(c); }}
-                                                    className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors"
-                                                    title="Delete deck"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
+                                            <span className={`inline-flex items-center gap-1.5 shrink-0 text-xs font-medium px-2 py-0.5 rounded-full border ${meta.classes}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+                                                {meta.label}
+                                            </span>
                                         </div>
                                         <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-0.5">
                                             {(c.image_paths || []).map((img, i) => (
@@ -626,20 +576,9 @@ export default function CharShowTab({ geminiApiKey, debug }) {
                     )}
                 </div>
             </div>
-
-            {viewingDeck && (
-                <CharShowDeckModal
-                    creation={viewingDeck}
-                    seriesList={series}
-                    onOpenSeries={setEditingSeries}
-                    onClose={() => setViewingDeckId(null)}
-                    onSaved={(updated) => {
-                        setCreations((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
-                    }}
-                />
-            )}
         </div>
         {generateModal}
+        {deckModal}
         </>
     );
 }

@@ -92,14 +92,14 @@ def _mock_image(label, out_path, seed=None):
     return out_path
 
 
-def _generate_image(api_key, prompt_parts, out_path):
+def _generate_image(api_key, prompt_parts, out_path, model=None, aspect_ratio="9:16"):
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model=IMAGE_MODEL,
+        model=model or IMAGE_MODEL,
         contents=prompt_parts,
         config=types.GenerateContentConfig(
             response_modalities=["TEXT", "IMAGE"],
-            image_config=types.ImageConfig(aspect_ratio="9:16"),
+            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
         ),
     )
     for part in response.parts:

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dense Slides Upgrade — status</title>
+<style>
+  :root { --bg:#000; --fg:#a1a1aa; --heading:#fff; --line:rgba(255,255,255,0.1); --surface:#0a0a0a; --pass:#7ee787; --warn:#f0b429; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width:1020px; margin:0 auto; padding:56px 32px 140px; }
+  h1 { color:var(--heading); font-size:32px; font-weight:800; letter-spacing:-0.02em; margin:0 0 8px; }
+  h2 { color:var(--heading); font-size:20px; font-weight:700; margin:50px 0 6px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  p { margin:0 0 12px; }
+  .lede { font-size:17px; max-width:700px; }
+  code { font-family:ui-monospace, Menlo, monospace; font-size:13px; color:#d4d4d8; background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+  table { border-collapse:collapse; width:100%; margin:12px 0 20px; font-size:14px; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--heading); font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; margin:18px 0; }
+  figure { margin:0; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  figure img { width:100%; border-radius:8px; display:block; background:#fff; }
+  figcaption { font-size:12.5px; margin-top:8px; line-height:1.45; }
+  .badge { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border-radius:999px; padding:1px 8px; margin-right:5px; }
+  .badge.pass { background:rgba(126,231,135,.12); color:var(--pass); }
+  .badge.warn { background:rgba(240,180,41,.12); color:var(--warn); }
+  .callout { border:1px solid var(--line); border-left:3px solid var(--pass); border-radius:8px; background:var(--surface); padding:12px 16px; margin:16px 0; font-size:14px; }
+  ul { margin:0 0 12px; padding-left:22px; } li { margin-bottom:6px; }
+  textarea { width:100%; min-height:110px; resize:vertical; font:inherit; color:var(--heading); background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:4px; }
+  .bar { position:sticky; bottom:0; margin:40px -32px -140px; padding:16px 32px; background:linear-gradient(to top,#000 70%,rgba(0,0,0,0)); display:flex; gap:12px; align-items:center; }
+  button.action { font:inherit; font-weight:600; background:#fff; color:#000; border:0; border-radius:8px; padding:11px 18px; cursor:pointer; }
+  pre#out { display:none; margin-top:20px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; font-family:ui-monospace, Menlo, monospace; font-size:13px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dense Slides Upgrade</h1>
+  <p class="lede">The Gym Made Simple references are now encoded as a design system in the Full-AI prompts, with a new <strong>workout vs info</strong> deck split. Three real decks generated sequentially as tests — results below, all in your deck grid ready to QA.</p>
+
+  <h2>What changed</h2>
+  <table>
+    <tr><th>Piece</th><th>Detail</th></tr>
+    <tr><td>Design system (every AI slide)</td><td>Mixed-scale typography (key words 2–3x + accent color), small <strong>EVEX brand chip</strong> top-left, info chips (accent icon square + bold label + value), <strong>muscle-glow</strong> in accent on working muscles, dense-but-breathing composition rules.</td></tr>
+    <tr><td>Unique cover slide</td><td>Stacked mixed-scale/mixed-color poster title, hero mascot, black <strong>"SAVE THIS FOR LATER"</strong> bookmark badge.</td></tr>
+    <tr><td>Deck flavor: <code>workout</code></td><td>LLM detects exercise/routine topics → 3–5 <strong>exercise slides</strong>: exercise name headline, character demonstrating in <strong>A/B motion states with accent arrow</strong>, TARGETS / REPS / SETS chips, FORM cue callout. Plug is the follow-along CTA: <em>"Follow along and track your workouts free in the EVEX app."</em></td></tr>
+    <tr><td>Deck flavor: <code>info</code></td><td>Statement slides can carry 1–3 <strong>info chips</strong> (WHY: / ALSO: facts); list slides stay typeset (dense text is still unsafe to AI-render).</td></tr>
+    <tr><td>QC</td><td>Expected-text now covers chips/targets/reps/sets/badges; big standalone design numerals no longer false-positive as duplicates. Typeset fallback still guarantees no broken deck.</td></tr>
+  </table>
+
+  <div class="callout"><strong>Reference images we pass to Gemini (your question):</strong> (1) the mascot portrait — identity reference on every AI slide (female portrait for @women topics); (2) the real EVEX screenshot — plug slide only. The Gym Made Simple <em>style</em> is described in the prompt, not passed as an image. A possible next lever: pass one of their actual slides as a third style-reference image — see next steps.</div>
+
+  <h2>Test results — QA these three decks</h2>
+  <table>
+    <tr><th>Deck (in your grid)</th><th>Type</th><th>Outcome</th></tr>
+    <tr><td>"the only 3 exercises you need for bigger arms" <span class="badge">♂ men</span></td><td>workout</td><td><span class="badge pass">clean</span> 93s · $0.81 · zero QC flags. Cover + 3 exercise slides + frequency tip + follow-along plug.</td></tr>
+    <tr><td>"signs you are overtraining"</td><td>info</td><td><span class="badge pass">clean</span> 164s · $0.72 · chips on 2 slides (WHY/ALSO), typeset list slide, EVEX recovery plug.</td></tr>
+    <tr><td>"the 3 best glute exercises for a stronger butt" <span class="badge">♀ women</span></td><td>workout</td><td><span class="badge warn">1 fallback</span> 175s · $1.24 · female mascot; slide 2 fell back to typeset after QC (a false-positive on a design numeral — <strong>now fixed</strong>, so regenerate that slide's art from the deck modal).</td></tr>
+  </table>
+
+  <div class="grid">
+    <figure><img src="../creations/charshow_c27a5011_6040558961_slide01.png"><figcaption><span class="badge pass">cover</span>Arms deck — mixed-scale title, arm glow, SAVE badge, brand chip</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_6040558961_slide02.png"><figcaption><span class="badge pass">exercise</span>Close-grip bench — A/B states, arrow, chips, FORM cue</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_7ec875f793_slide03.png"><figcaption><span class="badge pass">info+chips</span>Overtraining — WHY/ALSO chips, weary deadlift scene</figcaption></figure>
+    <figure><img src="../creations/charshow_c27a5011_e87e810f04_slide03.png"><figcaption><span class="badge pass">exercise ♀</span>Hip thrust — female mascot, bench + barbell, glute glow</figcaption></figure>
+  </div>
+
+  <h2>Known nits (regen candidates, not blockers)</h2>
+  <ul>
+    <li>Exercise anatomy is occasionally imperfect (the close-grip bench has no bench under the character; hip-thrust B position reads slightly off). The per-slide <strong>Regenerate image</strong> button with guidance ("show him lying on a flat bench") is the tool for these.</li>
+    <li>The brand chip's rendering varies slightly slide-to-slide (plain text vs chip vs tiny icon). Consistent enough to read as branding; pixel-identical would require compositing it in code — cheap future tweak.</li>
+    <li>Glute deck slide 2 is the typeset fallback (plainer than its siblings) — regenerate its art now that the numeral false-positive is fixed.</li>
+  </ul>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li><strong>You:</strong> QA the three decks above in the app (they're the newest three in the grid). The two workout decks are the posting-ready candidates; check every slide's text (QC passed them, but your eyes are the final gate).</li>
+    <li><strong>Optional experiment:</strong> pass a Gym Made Simple slide as a third style-reference image for even tighter fidelity (risk: style borrowing looks derivative; your call).</li>
+    <li><strong>Code-composited brand chip</strong> if you want it pixel-identical on every slide.</li>
+    <li><strong>Commit</strong> — the whole block since <code>e3fb20d</code> (role-split pipeline, QC transcription, per-slide regen, routing, Generate modal, dense-slide system) is uncommitted. Say the word.</li>
+  </ul>
+
+  <h2>Notes back to Claude</h2>
+  <textarea id="notes" placeholder="Verdicts per deck, nits to fix, style tweaks…"></textarea>
+  <div class="bar">
+    <button class="action" id="copy">Copy notes as Markdown</button>
+    <span style="color:rgba(255,255,255,.4); font-size:13px; margin-left:auto;">Paste the result back into the chat.</span>
+  </div>
+  <pre id="out"></pre>
+</main>
+<script>
+  const out = document.getElementById('out');
+  document.getElementById('copy').addEventListener('click', async () => {
+    const md = "## Dense slides QA notes\n" + (document.getElementById('notes').value.trim() || "_(none)_");
+    out.textContent = md; out.style.display = 'block';
+    try { await navigator.clipboard.writeText(md); } catch {}
+  });
+</script>
+</body>
+</html>

@@ -11,6 +11,12 @@ const AUDIENCE_OPTIONS = [
 
 const PER_DAY_OPTIONS = [1, 2, 3];
 
+const TOPIC_MODE_OPTIONS = [
+    { value: 'random', label: 'Random (bank round-robin)' },
+    { value: 'bank', label: 'Pick from bank' },
+    { value: 'custom', label: 'Custom' },
+];
+
 // Local Toggle — mirrors CharShowSeriesEditor's, duplicated per this codebase's
 // convention of not sharing small UI bits across sibling component files.
 function Toggle({ on, onChange, title }) {
@@ -60,20 +66,42 @@ function computeSchedulePreview(count, startDate, perDay) {
 export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
     const [count, setCount] = useState(1);
     const [audience, setAudience] = useState('auto');
+    const [topicMode, setTopicMode] = useState('random');
+    const [bankTopic, setBankTopic] = useState('');
+    const [customTopic, setCustomTopic] = useState('');
     const [scheduleOn, setScheduleOn] = useState(false);
     const [startDate, setStartDate] = useState(() => tomorrowISO());
     const [perDay, setPerDay] = useState(2);
 
     const isAiFull = series?.render_mode === 'ai_full';
-    const estimateText = isAiFull ? '≈1 min + ~7 image generations per deck' : 'fast, no image cost';
     const preview = scheduleOn ? computeSchedulePreview(count, startDate, perDay) : '';
-    const canGenerate = count >= 1 && (!scheduleOn || !!startDate);
+
+    // Role-split pipeline: hook/statement/plug slides are pure full-AI on the Pro
+    // image tier (with QC + retries), so cost is per-deck and multiplied by count.
+    let costLabel;
+    if (isAiFull) {
+        const estPerDeck = 0.95;
+        const totalCost = estPerDeck * count;
+        costLabel = `Estimated cost: ≈$${totalCost.toFixed(2)} for ${count} deck${count === 1 ? '' : 's'} (Pro image model + QC)`;
+    } else {
+        // One text call per deck; on-the-fly poses can add ~$0.04 each but aren't counted here.
+        costLabel = 'Estimated cost: ≈$0.01 — typeset mode is nearly free';
+    }
+
+    const chosenTopic = topicMode === 'bank' ? bankTopic.trim() : topicMode === 'custom' ? customTopic.trim() : '';
+    const topicBank = series?.topic_bank || {};
+
+    const canGenerate = count >= 1
+        && (!scheduleOn || !!startDate)
+        && (topicMode !== 'bank' || !!bankTopic)
+        && (topicMode !== 'custom' || customTopic.trim().length > 0);
 
     const submit = () => {
         if (!canGenerate) return;
         onGenerate({
             count,
-            audience: audience === 'auto' ? null : audience,
+            audience: chosenTopic ? null : (audience === 'auto' ? null : audience),
+            topic: chosenTopic || null,
             schedule: scheduleOn ? { start_date: startDate, per_day: perDay } : null,
         });
     };
@@ -119,6 +147,49 @@ export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
                         </div>
                     </div>
 
+                    {/* Topic */}
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Topic</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {TOPIC_MODE_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setTopicMode(opt.value)}
+                                    className={`text-xs font-medium px-2 py-2 rounded-lg border leading-tight transition-colors ${
+                                        topicMode === opt.value ? 'border-primary bg-primary/10 text-primary-strong' : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                        {topicMode === 'bank' && (
+                            <select
+                                value={bankTopic}
+                                onChange={(e) => setBankTopic(e.target.value)}
+                                className="input-field w-full text-sm mt-2"
+                            >
+                                <option value="">Select a topic…</option>
+                                {Object.entries(topicBank).map(([category, topics]) => (
+                                    <optgroup key={category} label={category}>
+                                        {(topics || []).map((t) => <option key={t} value={t}>{t}</option>)}
+                                    </optgroup>
+                                ))}
+                            </select>
+                        )}
+                        {topicMode === 'custom' && (
+                            <input
+                                value={customTopic}
+                                onChange={(e) => setCustomTopic(e.target.value)}
+                                placeholder="e.g. how to build a wider back @men"
+                                className="input-field w-full text-sm mt-2"
+                            />
+                        )}
+                        {chosenTopic && count > 1 && (
+                            <p className="text-xs text-amber-700 mt-2">All {count} decks will use this same topic.</p>
+                        )}
+                    </div>
+
                     {/* Audience */}
                     <div>
                         <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Audience</label>
@@ -127,7 +198,8 @@ export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
                                 <button
                                     key={opt.value}
                                     onClick={() => setAudience(opt.value)}
-                                    className={`text-sm font-medium px-3 py-2 rounded-lg border transition-colors ${
+                                    disabled={!!chosenTopic}
+                                    className={`text-sm font-medium px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                         audience === opt.value ? 'border-primary bg-primary/10 text-primary-strong' : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
                                     }`}
                                 >
@@ -135,7 +207,11 @@ export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
                                 </button>
                             ))}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">Targeted batches use only @men/@women-tagged topics.</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            {chosenTopic
+                                ? 'Disabled — the chosen topic sets its own audience via its @men/@women tag.'
+                                : 'Targeted batches use only @men/@women-tagged topics.'}
+                        </p>
                     </div>
 
                     {/* Schedule */}
@@ -175,21 +251,23 @@ export default function CharShowGenerateModal({ series, onClose, onGenerate }) {
                         )}
                     </div>
 
-                    <p className="text-xs text-muted-foreground">{estimateText}</p>
                 </div>
 
-                <div className="px-6 py-4 border-t border-border shrink-0 flex items-center gap-3">
-                    <button onClick={onClose} className="bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5 text-sm font-medium transition-colors">
-                        Cancel
-                    </button>
-                    <button
-                        onClick={submit}
-                        disabled={!canGenerate}
-                        className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        <Layers size={16} />
-                        Generate {count} deck{count === 1 ? '' : 's'}
-                    </button>
+                <div className="px-6 py-4 border-t border-border shrink-0 space-y-2">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onClose} className="bg-card border border-border text-foreground hover:bg-muted rounded-xl px-5 py-2.5 text-sm font-medium transition-colors">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={submit}
+                            disabled={!canGenerate}
+                            className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            <Layers size={16} />
+                            Generate {count} deck{count === 1 ? '' : 's'}
+                        </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">{costLabel}</p>
                 </div>
             </div>
         </div>

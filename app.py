@@ -1,6 +1,7 @@
 import os
 import uuid
 import subprocess
+import sys
 import threading
 import json
 import shutil
@@ -3473,7 +3474,7 @@ async def api_automations_rerender(req: RerenderRequest):
 # =====================================================================
 from db import SlideshowSeries
 from characters import generate_pose_pack, POSE_BANK, POSE_PROMPT_PREFIX
-from charshow import generate_deck, rerender_deck, rerender_deck_ai_full, export_batch
+from charshow import generate_deck, rerender_deck, rerender_deck_ai_full, regen_slide_art, export_batch, post_deck_photos
 
 
 def _seed_evex_mascot():
@@ -3557,6 +3558,8 @@ class SeriesRequest(BaseModel):
     slide_min: Optional[int] = 4
     slide_max: Optional[int] = 7
     render_mode: Optional[str] = "typeset"
+    copy_rules: Optional[str] = ""
+    save_badge: Optional[bool] = True
     plug: Optional[dict] = None
     caption_cfg: Optional[dict] = None
 
@@ -3595,6 +3598,8 @@ async def api_charshow_series_upsert(req: SeriesRequest):
         row.slide_min = req.slide_min or 4
         row.slide_max = req.slide_max or 7
         row.render_mode = req.render_mode if req.render_mode in ("typeset", "ai_full") else "typeset"
+        row.copy_rules = req.copy_rules or ""
+        row.save_badge = 1 if (req.save_badge is None or req.save_badge) else 0
         if req.plug is not None:
             row.plug_json = json.dumps(req.plug)
         if req.caption_cfg is not None:
@@ -3702,8 +3707,10 @@ def _save_charshow_creation(meta, pngs):
                "first_comment": meta.get("first_comment", ""), "series_id": meta.get("series_id"),
                "topic": meta.get("topic", ""), "category": meta.get("category", ""),
                "render_mode": meta.get("render_mode", "typeset"),
+               "deck_type": meta.get("deck_type", "info"),
                "character_id": meta.get("character_id", ""),
-               "audience": meta.get("audience")},
+               "audience": meta.get("audience"),
+               "gen_stats": meta.get("gen_stats")},
         image_paths=image_urls,
     )
 
@@ -3717,7 +3724,7 @@ def _charshow_schedule_date(schedule, deck_index):
     return (start + timedelta(days=deck_index // per_day)).isoformat()
 
 
-def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audience=None, schedule=None):
+def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audience=None, schedule=None, topic_override=None):
     """N decks for a series, carrying the topic round-robin state forward within the
     batch, then persisting the final state back onto the Series row once. Optionally
     filters topics to one audience and/or schedules each deck's publish date."""
@@ -3729,11 +3736,24 @@ def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audien
     if audience in ("men", "women"):
         series["_audience_filter"] = audience
         log(f"🎯 Batch audience filter: {audience}")
+    if topic_override:
+        series["_topic_override"] = topic_override
+    from charshow import reset_ai_tally, ai_tally
+    reset_ai_tally()
 
     creations = []
+    import time as _time
     for i in range(count):
         log(f"🎬 Deck {i + 1}/{count}…")
+        _snap, _t0 = ai_tally(), _time.time()
         pngs, meta = generate_deck(series, gemini_key, mock=mock, log=log)
+        _now = ai_tally()
+        meta["gen_stats"] = {
+            "seconds": round(_time.time() - _t0),
+            "image_calls": _now["image"] - _snap["image"],
+            "text_calls": _now["text"] - _snap["text"],
+            "est_usd": round(_now["est_usd"] - _snap["est_usd"], 2),
+        }
         series = {**series, "topic_bank": meta.pop("topic_bank"), "used_topics": meta.pop("used_topics"),
                   "_audience_filter": series.get("_audience_filter")}
         creation = _save_charshow_creation(meta, pngs)
@@ -3754,6 +3774,9 @@ def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audien
             row.topic_bank_json = json.dumps(series["topic_bank"])
             row.used_topics_json = json.dumps(series["used_topics"])
             s.commit()
+    if not mock:
+        t = ai_tally()
+        log(f"💰 Total AI usage: {t['image']} image + {t['text']} text calls ≈ ${t['est_usd']:.2f}")
     return creations
 
 
@@ -3763,6 +3786,7 @@ class CharshowGenerateRequest(BaseModel):
     mock: Optional[bool] = False
     audience: Optional[str] = None       # None/"any" = bank round-robin; "men"/"women" = only tagged topics
     schedule: Optional[dict] = None      # {start_date: "YYYY-MM-DD", per_day: 1-3} → decks saved as scheduled
+    topic: Optional[str] = None          # fixed topic for the batch (bank pick or custom text); None = round-robin
 
 
 @app.post("/api/charshow/generate")
@@ -3789,7 +3813,8 @@ async def api_charshow_generate(req: CharshowGenerateRequest,
             audience = req.audience if req.audience in ("men", "women") else None
             schedule = req.schedule if (req.schedule or {}).get("start_date") else None
             creations = await asyncio.to_thread(_run_charshow_generate, req.series_id, x_gemini_key,
-                                                count, bool(req.mock), log, audience, schedule)
+                                                count, bool(req.mock), log, audience, schedule,
+                                                (req.topic or "").strip() or None)
             if job_id in charshow_jobs:
                 charshow_jobs[job_id]["result"] = {
                     "creations": creations, "count": len(creations),
@@ -3842,7 +3867,10 @@ async def api_charshow_rerender(req: CharshowRerenderRequest,
 
     old_images = json.loads(creation.image_paths_json or "[]")
     try:
-        if slots.get("render_mode") == "ai_full":
+        slides_have_poses = any((sl.get("pose") or {}).get("path")
+                                or any((b.get("pose") or {}).get("path") for b in (sl.get("bullets") or []))
+                                for sl in (slots.get("slides") or []))
+        if slots.get("render_mode") == "ai_full" and not slides_have_poses:
             if req.slides is None:
                 raise HTTPException(status_code=400, detail="Full-AI decks require structured 'slides'")
             api_key = x_gemini_key or os.environ.get("GEMINI_API_KEY")
@@ -3883,18 +3911,65 @@ async def api_charshow_rerender(req: CharshowRerenderRequest,
     return {"creation": updated}
 
 
+class CharshowSlideRegenRequest(BaseModel):
+    creation_id: str
+    slide_index: int                     # 1-based
+    guidance: Optional[str] = ""         # e.g. "ensure header text is not covered by avatar"
+    mock: Optional[bool] = False
+
+
+@app.post("/api/charshow/slide/regen")
+async def api_charshow_slide_regen(req: CharshowSlideRegenRequest,
+                                   x_gemini_key: Optional[str] = Header(None, alias="X-Gemini-Key")):
+    """Regenerate ONE slide's character art (fresh draw, optional user guidance folded
+    into the art prompt) and recomposite just that slide."""
+    api_key = x_gemini_key or os.environ.get("GEMINI_API_KEY")
+    if not req.mock and not api_key:
+        raise HTTPException(status_code=400, detail="Gemini key required")
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        slots = json.loads(creation.slots_json or "{}")
+    try:
+        new_png, new_slides = await asyncio.to_thread(
+            regen_slide_art, slots, req.slide_index, req.guidance or "", api_key, bool(req.mock))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Slide regen failed: {e}")
+
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        slots = json.loads(creation.slots_json or "{}")
+        slots["slides"] = new_slides
+        creation.slots_json = json.dumps(slots)
+        images = json.loads(creation.image_paths_json or "[]")
+        old_web = images[req.slide_index - 1] if req.slide_index - 1 < len(images) else None
+        images[req.slide_index - 1] = f"/creations/{os.path.basename(new_png)}"
+        creation.image_paths_json = json.dumps(images)
+        s.commit()
+        updated = creation.to_dict()
+    if old_web:
+        fp = os.path.join(CREATIONS_DIR, os.path.basename(old_web))
+        if os.path.exists(fp):
+            os.remove(fp)
+    return {"creation": updated}
+
+
 # ---- Deck lifecycle: status/schedule + delete --------------------------
 
 class CharshowDeckPatchRequest(BaseModel):
     status: Optional[str] = None
-    scheduled_for: Optional[str] = None
+    scheduled_for: Optional[str] = None   # "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM"
+    published_at: Optional[str] = None    # "YYYY-MM-DDTHH:MM"; defaults to now on status='published'
 
 
 @app.patch("/api/charshow/deck/{creation_id}")
 async def api_charshow_deck_patch(creation_id: str, req: CharshowDeckPatchRequest):
-    """Update a deck's publish status and/or scheduled date. 'scheduled' requires
-    scheduled_for; setting status to draft/published clears scheduled_for unless a new
-    value is provided alongside it."""
+    """Update a deck's publish status / schedule datetime / published datetime.
+    'scheduled' requires scheduled_for. 'published' stamps published_at (defaults to
+    now, editable). 'draft' clears both."""
     if req.status is not None and req.status not in ("draft", "scheduled", "published"):
         raise HTTPException(status_code=400, detail="status must be one of: draft, scheduled, published")
     if req.status == "scheduled" and not req.scheduled_for:
@@ -3906,11 +3981,56 @@ async def api_charshow_deck_patch(creation_id: str, req: CharshowDeckPatchReques
             raise HTTPException(status_code=404, detail="Creation not found")
         if req.status is not None:
             creation.status = req.status
-            creation.scheduled_for = req.scheduled_for
-        elif req.scheduled_for is not None:
-            creation.scheduled_for = req.scheduled_for
+            creation.scheduled_for = req.scheduled_for if req.status == "scheduled" else None
+            if req.status == "published":
+                creation.published_at = (req.published_at
+                                         or datetime.now().strftime("%Y-%m-%dT%H:%M"))
+            else:
+                creation.published_at = None
+        else:
+            if req.scheduled_for is not None:
+                creation.scheduled_for = req.scheduled_for
+            if req.published_at is not None:
+                creation.published_at = req.published_at
         s.commit()
         return {"creation": creation.to_dict()}
+
+
+class CharshowPostRequest(BaseModel):
+    creation_id: str
+    user_id: str                          # Upload-Post profile name
+    auto_add_music: Optional[bool] = True
+    title: Optional[str] = None           # defaults to the deck's caption
+
+
+@app.post("/api/charshow/post")
+async def api_charshow_post(req: CharshowPostRequest,
+                            x_up_key: Optional[str] = Header(None, alias="X-Upload-Post-Key")):
+    """Publish a deck to TikTok as a photo carousel via Upload-Post (direct post,
+    auto-added music). On success the deck is marked published (published_at = now)."""
+    api_key = x_up_key or os.environ.get("UPLOAD_POST_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Upload-Post API key required")
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        if not creation:
+            raise HTTPException(status_code=404, detail="Creation not found")
+        deck = creation.to_dict()
+    try:
+        ref = await asyncio.to_thread(post_deck_photos, deck, req.user_id, api_key,
+                                      bool(req.auto_add_music), req.title)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload-Post failed: {e}")
+    with get_session() as s:
+        creation = s.get(Creation, req.creation_id)
+        creation.status = "published"
+        creation.published_at = datetime.now().strftime("%Y-%m-%dT%H:%M")
+        creation.scheduled_for = None
+        s.commit()
+        updated = creation.to_dict()
+    return {"creation": updated, "upload_post_response": ref}
 
 
 @app.delete("/api/charshow/deck/{creation_id}")
@@ -3940,16 +4060,23 @@ async def api_charshow_deck_delete(creation_id: str):
 
 class CharshowExportRequest(BaseModel):
     creation_ids: List[str]
+    images_only: Optional[bool] = False   # skip captions.md; single deck exports flat (select-all → AirDrop)
+    reveal: Optional[bool] = False        # open the export folder in Finder (local desktop use)
 
 
 @app.post("/api/charshow/export")
 async def api_charshow_export(req: CharshowExportRequest):
-    """Copies each deck's PNGs + writes captions.md. Publish status is managed
-    separately (PATCH /api/charshow/deck/{id}) — export no longer touches it."""
+    """Copies each deck's PNGs (+ captions.md unless images_only). Publish status is
+    managed separately (PATCH /api/charshow/deck/{id}) — export no longer touches it."""
     if not req.creation_ids:
         raise HTTPException(status_code=400, detail="creation_ids required")
     try:
-        path = await asyncio.to_thread(export_batch, req.creation_ids)
+        path = await asyncio.to_thread(export_batch, req.creation_ids, print, bool(req.images_only))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+    if req.reveal and sys.platform == "darwin":
+        try:
+            subprocess.Popen(["open", path])
+        except Exception:
+            pass
     return {"path": path}

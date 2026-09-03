@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Images, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Clapperboard, Library, Repeat, Sun, Moon } from 'lucide-react';
+import { BrowserRouter, useNavigate, useLocation } from 'react-router-dom';
+import { Upload, FileVideo, Sparkles, Youtube, Instagram, Share2, LogOut, ChevronDown, Check, Activity, LayoutDashboard, Settings, PlusCircle, History, Menu, X, Terminal, Shield, LayoutGrid, Image, Images, Globe, RotateCcw, Calendar, AlertTriangle, KeyRound, Bot, Users, Smartphone, ExternalLink, Copy, CheckCircle2, PanelLeft, HelpCircle, ChevronsUpDown, Library, Repeat, Sun, Moon } from 'lucide-react';
 import AccountModal from './components/AccountModal';
 import DebugMenu from './components/DebugMenu';
 import KeyInput from './components/KeyInput';
@@ -11,7 +12,6 @@ import ThumbnailStudio from './components/ThumbnailStudio';
 import SaaShortsTab from './components/SaaShortsTab';
 import UGCGallery from './components/UGCGallery';
 import ScheduleWeekModal from './components/ScheduleWeekModal';
-import CreateTab from './components/CreateTab';
 import AutomationsTab from './components/AutomationsTab';
 import CharShowTab from './components/CharShowTab';
 import CharactersTab from './components/CharactersTab';
@@ -19,6 +19,38 @@ import LibraryTab from './components/LibraryTab';
 import CalendarTab from './components/CalendarTab';
 import BrandProfileSettings from './components/BrandProfileSettings';
 import { getApiUrl } from './config';
+
+// Tab id <-> URL path mapping. "charshow" (Slideshows) has sub-routes for a deep-linked
+// series editor / deck modal; every other tab is a single flat path. Unknown paths (and
+// bare "/") resolve to the "charshow" tab / "/slideshows" path — see the redirect effect
+// in AppShell and the "Unknown route" requirement.
+const KNOWN_PATH_PREFIXES = ['/slideshows', '/automations', '/characters', '/library', '/calendar', '/ai-actor-ads', '/ugc', '/settings'];
+
+function tabForPath(pathname) {
+  if (pathname.startsWith('/slideshows')) return 'charshow';
+  if (pathname.startsWith('/automations')) return 'automations';
+  if (pathname.startsWith('/characters')) return 'characters';
+  if (pathname.startsWith('/library')) return 'library';
+  if (pathname.startsWith('/calendar')) return 'calendar';
+  if (pathname.startsWith('/ai-actor-ads')) return 'saasshorts';
+  if (pathname.startsWith('/ugc')) return 'ugc-gallery';
+  if (pathname.startsWith('/settings')) return 'settings';
+  return 'charshow';
+}
+
+function pathForTab(id) {
+  switch (id) {
+    case 'charshow': return '/slideshows';
+    case 'automations': return '/automations';
+    case 'characters': return '/characters';
+    case 'library': return '/library';
+    case 'calendar': return '/calendar';
+    case 'saasshorts': return '/ai-actor-ads';
+    case 'ugc-gallery': return '/ugc';
+    case 'settings': return '/settings';
+    default: return '/slideshows';
+  }
+}
 
 // Enhanced "Encryption" using XOR + Base64 with a Salt
 // This is better than plain Base64 but still client-side.
@@ -143,7 +175,17 @@ const pollJob = async (jobId) => {
   return res.json();
 };
 
-function App() {
+function AppShell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab = tabForPath(location.pathname);
+
+  // "/" and any unrecognized path fall back to the Slideshows tab.
+  useEffect(() => {
+    const isKnown = KNOWN_PATH_PREFIXES.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`));
+    if (!isKnown) navigate('/slideshows', { replace: true });
+  }, [location.pathname, navigate]);
+
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_key') || '');
   // Social API State - Load encrypted or plain
   const [uploadPostKey, setUploadPostKey] = useState(() => {
@@ -174,7 +216,6 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [logsVisible, setLogsVisible] = useState(true);
   const [processingMedia, setProcessingMedia] = useState(null);
-  const [activeTab, setActiveTab] = useState('create'); // create, library, calendar, saasshorts, ugc-gallery, settings (+ deferred tabs)
   const [brand, setBrand] = useState(null); // founder's app profile (pre-fills templates)
   // Keys served from the backend's .env.local — used only as fallbacks when the
   // Settings UI (localStorage) is empty, and never persisted to localStorage.
@@ -240,7 +281,7 @@ function App() {
         setJobId(session.jobId);
         setResults(session.results || null);
         if (session.processingMedia) setProcessingMedia(session.processingMedia);
-        if (session.activeTab) setActiveTab(session.activeTab);
+        if (session.activeTab) navigate(pathForTab(session.activeTab));
         // If was processing, resume polling; if complete/error, just show results
         setStatus(session.status === 'processing' ? 'processing' : session.status);
         setSessionRecovered(true);
@@ -249,6 +290,8 @@ function App() {
     } catch (e) {
       localStorage.removeItem(SESSION_KEY);
     }
+    // navigate is a stable reference from react-router — this effect should still only run on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Session Recovery: Save state changes
@@ -475,9 +518,8 @@ function App() {
     // Enabled = actually built out for the "generate your UGC marketing" flow.
     // Disabled = deferred / out of scope for now (kept visible so the roadmap reads).
     const navItems = [
-      { id: 'create', label: 'Create', icon: Clapperboard },
-      { id: 'automations', label: 'Automations', icon: Repeat },
       { id: 'charshow', label: 'Slideshows', icon: Images },
+      { id: 'automations', label: 'Automations', icon: Repeat },
       { id: 'characters', label: 'Characters', icon: Users },
       { id: 'library', label: 'Library', icon: Library },
       { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -557,7 +599,7 @@ function App() {
                 key={id}
                 onClick={() => {
                   if (navGuardRef.current && !navGuardRef.current()) return;
-                  setActiveTab(id);
+                  navigate(pathForTab(id));
                 }}
                 className={`group relative w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-colors ${active ? 'bg-primary/20 text-primary-strong' : 'text-foreground/70 hover:text-foreground hover:bg-muted'}`}
               >
@@ -699,7 +741,7 @@ function App() {
               </div>
             </div>
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => navigate('/settings')}
               className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black transition-colors"
             >
               Go to Settings
@@ -888,18 +930,6 @@ function App() {
             </div>
           )}
 
-          {/* View: Create — the "generate your UGC marketing" home */}
-          {activeTab === 'create' && (
-            <CreateTab
-              geminiApiKey={apiKey}
-              uploadPostKey={uploadPostKey}
-              uploadUserId={uploadUserId}
-              debug={debug}
-              brand={brand}
-              onOpenTab={setActiveTab}
-            />
-          )}
-
           {/* View: Automations */}
           {activeTab === 'automations' && (
             <AutomationsTab
@@ -914,7 +944,7 @@ function App() {
 
           {/* View: Slideshows (Character Slideshows) */}
           {activeTab === 'charshow' && (
-            <CharShowTab geminiApiKey={apiKey} debug={debug} />
+            <CharShowTab geminiApiKey={apiKey} debug={debug} uploadPostKey={uploadPostKey} />
           )}
 
           {/* View: Characters */}
@@ -1296,7 +1326,7 @@ function App() {
                 Cancel
               </button>
               <button
-                onClick={() => { setShowKeyModal(false); setActiveTab('settings'); }}
+                onClick={() => { setShowKeyModal(false); navigate('/settings'); }}
                 className="flex-1 text-sm text-foreground py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors font-medium"
               >
                 Go to Settings
@@ -1319,7 +1349,7 @@ function App() {
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
         user={{ name: 'Matt Kuda', email: 'mattkuda@gmail.com', initials: 'MK' }}
-        onOpenSettings={() => { setShowAccountModal(false); setActiveTab('settings'); }}
+        onOpenSettings={() => { setShowAccountModal(false); navigate('/settings'); }}
       />
 
       {debug.enabled && !debug.hidden && (
@@ -1329,4 +1359,12 @@ function App() {
   );
 }
 
-export default App;
+// AppShell needs router context (useNavigate/useLocation) — main.jsx just renders
+// <App/> unchanged, so BrowserRouter is wrapped here rather than at the mount site.
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
+    </BrowserRouter>
+  );
+}

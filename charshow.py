@@ -33,7 +33,7 @@ ANTON_FONT_PATH = os.path.join(FONT_DIR, "Anton-Regular.ttf")
 
 TEXT_MODEL = "gemini-2.5-flash"
 
-W, H = 1080, 1920
+W, H = 1080, 1440   # 3:4 — TikTok photo carousels render 3:4 on mobile (9:16 gets cropped)
 
 # Data-only style definitions — adding a preset later is a new dict, no renderer changes.
 STYLE_PRESETS = {
@@ -208,7 +208,7 @@ SIDE_MARGIN = 55           # left/right margin for text and mascot placement (40
 BOTTOM_MARGIN = 55         # bottom margin before the frame edge
 TOP_Y = 130                # headline top
 TEXT_MASCOT_GAP = 60       # gap between headline bottom and mascot top
-MASCOT_MIN_FRAC = 0.32     # floor so a very long headline still leaves a legible mascot
+MASCOT_MIN_FRAC = 0.40     # floor so a very long headline still leaves a legible mascot
 MASCOT_MAX_FRAC_CONTENT = 0.55
 MASCOT_MAX_FRAC_HOOK = 0.58
 
@@ -471,7 +471,8 @@ def _draw_bullet_pose_strip(img, bullets, y_top, strip_h):
     """Up to 3 small mascots along the bottom, one per bullet (bullet_poses=true)."""
     n = max(1, len(bullets))
     slot_w = W // n
-    max_w = int(W * BOTTOM_STRIP_MASCOT_W_FRAC)
+    max_w = int(W * (BOTTOM_STRIP_MASCOT_W_FRAC if n >= 3 else 0.40))
+    strip_h = min(strip_h, int(H * 0.42))
     for i, b in enumerate(bullets):
         pose_entry = (b or {}).get("pose") or {}
         disk = _pose_disk_path(pose_entry.get("path"))
@@ -522,7 +523,7 @@ def compose_list_slide(slide, out_path, preset, log=print):
     zone_bottom = H - bottom_reserved
     col_x1 = x0 + int((x1 - x0) * (RIGHT_MASCOT_COL_FRAC if side_pose_web else 1.0))
 
-    _draw_bullets(draw, bullets, (x0, zone_top, col_x1, zone_bottom), preset)
+    bullets_bottom = _draw_bullets(draw, bullets, (x0, zone_top, col_x1, zone_bottom), preset)
 
     if side_pose_web:
         disk = _pose_disk_path(side_pose_web)
@@ -532,8 +533,11 @@ def compose_list_slide(slide, out_path, preset, log=print):
             available_h = max(1, zone_bottom - zone_top)
             _paste_pose_at(img, disk, target_h_px=min(available_h, int(H * 0.5)), center_x=cx, center_y=cy)
     elif use_strip:
-        strip_y_top = H - BOTTOM_MARGIN - (tip_h + 30 if tip else 0) - strip_h
-        _draw_bullet_pose_strip(img, bullets, y_top=strip_y_top, strip_h=strip_h)
+        # fill the whole gap between the last bullet and the tip box — no dead band
+        strip_bottom = H - BOTTOM_MARGIN - (tip_h + 30 if tip else 0)
+        strip_y_top = min(bullets_bottom + 30, strip_bottom - strip_h)
+        _draw_bullet_pose_strip(img, bullets, y_top=strip_y_top,
+                                strip_h=max(strip_h, strip_bottom - strip_y_top))
 
     if tip:
         _draw_tip_box(draw, tip, x0, H - BOTTOM_MARGIN - tip_h, x1 - x0, tip_h, preset)
@@ -638,6 +642,7 @@ def _resolve_pose_hint(character_id, pose_hint, used_keys, api_key, mock, log=pr
                 slug = _slugify(pose_hint)[:40] or f"custom{random.getrandbits(20):06x}"
                 out_name = f"pose_{character_id[:8]}_{slug}.png"
                 log(f"🎨 On-the-fly pose (not in pack): '{pose_hint}' → generating…")
+                _tally("image")
                 web_path = generate_pose(api_key, char.portrait_path, pose_hint, out_name, mock=False)
                 with get_session() as s:
                     look = CharacterLook(character_id=character_id, prompt=f"{POSE_PROMPT_PREFIX}{slug}",
@@ -672,6 +677,7 @@ keys) to arrays of 5-8 short, specific topic phrases each, for a TikTok cartoon-
 slideshow series in this niche: {niche or 'fitness'}.
 Topics should be concrete enough to write one focused carousel about (not vague like
 "fitness tips" — instead like "squat depth" or "protein timing myths")."""
+    _tally("text")
     response = client.models.generate_content(
         model=TEXT_MODEL, contents=prompt, config={"response_mime_type": "application/json"})
     data = json.loads(response.text)
@@ -687,6 +693,7 @@ def _generate_topics_for_category(api_key, niche, category, existing=None, mock=
 slideshow series about {niche or 'fitness'}. Do not repeat or closely rephrase any of:
 {json.dumps((existing or [])[:30])}
 Return ONLY a JSON array of 5 short strings."""
+    _tally("text")
     response = client.models.generate_content(
         model=TEXT_MODEL, contents=prompt, config={"response_mime_type": "application/json"})
     data = json.loads(response.text)
@@ -700,6 +707,13 @@ def pick_topic(series, api_key, mock=False, log=print):
     topic_bank = dict(series.get("topic_bank") or {})
     used_topics = list(series.get("used_topics") or [])
     niche = series.get("niche") or "general fitness"
+
+    override = (series.get("_topic_override") or "").strip()
+    if override:
+        cat = next((c for c, ts in topic_bank.items() if override in ts), "custom")
+        used_topics = used_topics + [{"category": cat, "topic": override}]
+        log(f"🎯 Topic (chosen): [{cat}] {override}")
+        return override, cat, topic_bank, used_topics
 
     if not topic_bank:
         log("📚 Topic bank empty — seeding via Gemini…")
@@ -748,7 +762,9 @@ def pick_topic(series, api_key, mock=False, log=print):
 # ---- Deck text (one LLM call: hook + slides + plug + caption + comment) -
 
 MOCK_DECK_TEMPLATE = {
+    "deck_type": "info",
     "hook": "Your *lower belly fat* is not a mystery",
+    "hook_pose_hint": "pointing at abs",
     "slides": [
         {"layout": "statement", "text": "Stop doing *endless cardio* for fat loss", "pose_hint": "arms crossed confident"},
         {"layout": "list", "text": "3 fixes for a *fat loss* stall", "pose_hint": "arms crossed confident",
@@ -780,8 +796,19 @@ def _normalize_llm_slides(raw_slides, n_content):
             out.append({"layout": "statement", "text": item, "pose_hint": ""})
             continue
         item = item or {}
-        layout = item.get("layout") if item.get("layout") in ("statement", "list") else "statement"
+        layout = item.get("layout") if item.get("layout") in ("statement", "list", "exercise") else "statement"
         slide = {"layout": layout, "text": str(item.get("text") or ""), "pose_hint": str(item.get("pose_hint") or "")}
+        if layout == "exercise":
+            for k in ("targets", "reps", "sets", "form_cue"):
+                slide[k] = str(item.get(k) or "")
+        elif layout == "statement":
+            chips = []
+            for c in (item.get("chips") or [])[:3]:
+                c = c or {}
+                if c.get("label") or c.get("value"):
+                    chips.append({"label": str(c.get("label") or ""), "value": str(c.get("value") or "")})
+            if chips:
+                slide["chips"] = chips
         if layout == "list":
             bullets = []
             for b in (item.get("bullets") or [])[:4]:
@@ -806,13 +833,18 @@ def _deck_texts(series, topic, n_content, api_key, mock=False, audience=None):
         pool = MOCK_DECK_TEMPLATE["slides"]
         slides = _normalize_llm_slides([pool[i % len(pool)] for i in range(n_content)], n_content)
         return {
+            "deck_type": MOCK_DECK_TEMPLATE.get("deck_type", "info"),
             "hook": MOCK_DECK_TEMPLATE["hook"],
+            "hook_pose_hint": MOCK_DECK_TEMPLATE.get("hook_pose_hint", ""),
             "slides": slides,
             "plug_headline": MOCK_DECK_TEMPLATE["plug_headline"].replace("EVEX", app_name),
             "caption": MOCK_DECK_TEMPLATE["caption"],
             "first_comment": MOCK_DECK_TEMPLATE["first_comment"],
         }
 
+    rules_line = ""
+    if (series.get("copy_rules") or "").strip():
+        rules_line = "\nSERIES-SPECIFIC RULES (mandatory):\n" + series["copy_rules"].strip()
     audience_line = ""
     if audience:
         audience_line = (f"\nTarget audience: {audience} — write specifically for "
@@ -826,7 +858,7 @@ never like transcribed speech.
 
 Series niche: {niche}
 Topic for this deck: {topic}{audience_line}
-Voice & style: {tone_text}
+Voice & style: {tone_text}{rules_line}
 
 HARD RULES for hook and slides (violating any of these is a failure):
 - Poster copy, not conversation. NEVER use spoken filler: "like", "I think", "really", "just",
@@ -838,28 +870,51 @@ HARD RULES for hook and slides (violating any of these is a failure):
 - One idea per slide (or, for a "list" slide, one idea per bullet). A reader should get the full
   tip from that slide/bullet alone.
 - Fragments are good. Drop articles and glue words: "Weak glutes = weak lockout."
+- EVERY content slide after the hook must deliver IMMENSE standalone value: a concrete,
+  actionable, specific takeaway someone would screenshot. NEVER write transition, teaser,
+  or filler slides ("these 3 will change everything", "let's get into it", "ready?") —
+  if a slide teaches nothing by itself, replace it with one that does.
+- The hook must make the NICHE unmistakable BY ITSELF: a stranger seeing only slide 1
+  must instantly know what the post is about (e.g. gym training). Never write a hook
+  that could belong to any other niche.
+
+FIRST decide the deck's "deck_type":
+- "workout" — the topic is a set of exercises / a routine / how to train a body part. Content
+  slides are mostly "exercise" slides (one exercise each, follow-along style).
+- "info" — everything else (myths, recovery, nutrition, mindset). Content slides are
+  "statement"/"list".
 
 Each content slide is an OBJECT with a "layout":
 - "statement" — a single punchy claim or instruction. Fields: layout, text (max 12 words),
-  pose_hint.
-- "list" — 2-4 short bullets, for a tip roundup or an exercise breakdown. Fields: layout,
-  text (a short heading, max 8 words), bullets (2-4 objects: {{label (1-3 words), text (one
-  concrete line, max 10 words), pose_hint}}), tip (optional, one short actionable line), pose_hint
-  (the mascot shown beside the bullets, only used when bullet_poses is false), bullet_poses (true
-  ONLY for an exercise/action breakdown where a different mascot pose per bullet reads better —
-  set it true only when there are 2 or 3 bullets).
-Use AT MOST 2 "list" slides in the whole deck; the rest are "statement".
+  pose_hint, and optionally chips (1-3 objects {{label (1-2 words, uppercase, ends with ':'),
+  value (2-5 words)}}) when 2-3 hard facts deserve calling out (e.g. {{"label": "WHY:",
+  "value": "muscles grow at rest"}}).
+- "exercise" (workout decks) — ONE exercise, demonstration-style. Fields: layout, text (the
+  exercise NAME, 1-4 words, e.g. "Bulgarian Split Squat"), targets (muscles, 1-3 words), reps
+  (e.g. "8-12"), sets (e.g. "3-4"), form_cue (ONE short form tip, max 8 words), pose_hint (the
+  exercise being performed, e.g. "mid bulgarian split squat, rear foot on bench").
+- "list" — 2-4 short bullets, for a tip roundup. Fields: layout, text (a short heading, max 8
+  words), bullets (2-4 objects: {{label (1-3 words), text (one concrete line, max 10 words),
+  pose_hint}}), tip (optional, one short actionable line), pose_hint (the mascot shown beside
+  the bullets, only used when bullet_poses is false), bullet_poses (true ONLY for an
+  exercise/action breakdown with 2-3 bullets).
+Workout decks: 3-5 "exercise" slides, at most 1 "list". Info decks: at most 2 "list" slides,
+the rest "statement" (use chips on 1-2 of them).
 
-"pose_hint" (every slide and every bullet needs one, even statement slides): 2-4 words describing
-what the mascot is DOING in that beat — e.g. "dumbbell curl", "pointing at viewer", "arms crossed
-confident". Prefer an action that matches the text.
+"pose_hint" (every slide and every bullet needs one, even statement slides): 2-6 words describing
+what the mascot is DOING in that beat. Mini-SCENES with props are encouraged when they fit the
+text — e.g. "sweating mid-deadlift, heavy barbell", "sleeping in bed, zzz", "eating a big plate
+of food", "confused shrug with question mark". The art is drawn isolated on white, so describe
+the character + at most one or two props, never a full background.
 
 Write:
 - "hook": first slide, max 8 words. A bold claim, sharp question, or curiosity gap about the topic.
+- "hook_pose_hint": the mascot's action/scene for the hook slide (same rules as pose_hint).
 - "slides": exactly {n_content} content slide objects (as specified above), in a logical order
   (problem -> why -> fixes), each teaching ONE concrete point (or set of bullets), no repeats.
 - "plug_headline": max 10 words, positions the app "{app_name}" ({pitch}) as the payoff/solution
-  to THIS deck's topic.
+  to THIS deck's topic. For "workout" decks it must be a follow-along invitation, in the spirit
+  of: "Follow along and track your workouts free in the {app_name} app."
 - "caption": TikTok caption for the post (1-2 sentences + 3-5 lowercase hashtags).
 - "first_comment": short first-comment with a soft CTA.
 
@@ -881,14 +936,17 @@ slides: [
 ]
 plug_headline: "*{app_name}* programs the fix into your next push day."
 
-Return ONLY a JSON object with keys: hook, slides, plug_headline, caption, first_comment."""
+Return ONLY a JSON object with keys: deck_type, hook, hook_pose_hint, slides, plug_headline, caption, first_comment."""
+    _tally("text")
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=TEXT_MODEL, contents=prompt, config={"response_mime_type": "application/json"})
     data = json.loads(response.text)
     slides = _normalize_llm_slides(data.get("slides"), n_content)
     return {
+        "deck_type": data.get("deck_type") if data.get("deck_type") in ("workout", "info") else "info",
         "hook": str(data.get("hook") or topic),
+        "hook_pose_hint": str(data.get("hook_pose_hint") or ""),
         "slides": slides,
         "plug_headline": str(data.get("plug_headline") or f"{app_name} does this for you"),
         "caption": str(data.get("caption") or ""),
@@ -930,23 +988,27 @@ def _screenshot_disk_path(p):
 # model's native sense of layout (no dead whitespace, character reuse, richer motifs).
 
 AI_SLIDE_STYLE = (
-    "STYLE (identical on every slide of this carousel — consistent theme): vertical 9:16 "
-    "TikTok carousel slide, clean pure-white background. Headlines in an ULTRA-BOLD condensed "
-    "uppercase black sans-serif (Anton/impact style); the specific words called out as ACCENT "
-    "words are rendered in the accent color {accent}, all other text near-black. Body/secondary "
-    "text smaller, dark, highly legible. The cartoon character from the FIRST reference image: "
-    "copy its identity EXACTLY — teal skin, two plain white eyes, no other facial features, and the "
-    "same outfit as the reference — in the same flat cel-shaded comic style with thick clean outlines. "
-    "COMPOSITION: fill the frame with purposeful content — big type, large character art, tight "
-    "but breathable margins (~60px), NO large empty white regions and no cramped overlaps. The "
-    "character may appear MULTIPLE TIMES in different poses when it serves the layout. Allowed "
-    "motifs: numbered accent circles, bulleted lists, green-checkmark vs red-X comparison columns, "
-    "thin separator lines, softly tinted rounded callout boxes. "
+    "DESIGN SYSTEM (identical on every slide of this carousel — a premium fitness-infographic "
+    "brand look): vertical 3:4 portrait slide (1080x1440), clean white background. TYPOGRAPHY: ultra-bold "
+    "condensed uppercase sans-serif display text with MIXED SCALE — the most important word(s) "
+    "render 2-3x larger than the rest; the words called out as ACCENT words are in the accent "
+    "color {accent}, all other display text near-black. Secondary/body text much smaller, clean, "
+    "highly legible. BRAND CHIP: a small understated black wordmark chip reading \"EVEX\" in the "
+    "top-left corner of every slide. INFO CHIPS (only when specified): compact rounded-outline "
+    "boxes, each with a small solid accent-color icon square on the left and a bold uppercase "
+    "label plus short value. CHARACTER: the cartoon character from the FIRST reference image — "
+    "copy its identity EXACTLY (teal skin, two plain white eyes, no other facial features, same "
+    "outfit) in the same flat cel-shaded comic style with thick clean outlines; it may appear "
+    "multiple times when the layout calls for it. When the character performs an exercise, softly "
+    "GLOW the primary working muscles in the accent color. COMPOSITION: information-dense but "
+    "breathing — big type, large purposeful art, aligned margins, no large empty white regions "
+    "and no clutter. "
+    "Draw an info chip ONLY when its label and value are given — NEVER draw an empty chip, box, "
+    "or panel, and draw exactly as many chips as specified. "
     "TEXT ACCURACY IS CRITICAL: render every quoted string EXACTLY as written, spelled perfectly, "
     "and exactly ONCE — never duplicate a string or a word within it. Text must NEVER be covered "
-    "or overlapped by the character or any artwork: reserve clear space for every text block and "
-    "keep it fully legible. Add NO other words, labels, watermarks, or logos anywhere, and NO "
-    "empty placeholder boxes, badges, or panels — draw only the elements explicitly specified."
+    "or overlapped by artwork: keep every text block fully legible. Add NO other words, labels, "
+    "watermarks, or logos beyond those specified, and NO empty placeholder boxes or panels."
 )
 
 
@@ -976,12 +1038,39 @@ def _ai_slide_prompt(slide, accent_hex):
     lines = []
     if role == "hook":
         lines.append(
-            f'HOOK/COVER SLIDE with a strict two-zone layout. TOP ZONE (upper ~40% of the frame): '
-            f'ONLY the giant scroll-stopping headline, on clean white: {_quoted(text)}. BOTTOM ZONE '
-            f'(lower ~60%): the character, large and dynamic{f", {hint}" if hint else ""}. The '
-            'character\'s head may rise slightly into the headline zone BEHIND the text, but every '
-            'letter of every word must remain fully readable — no letter may be hidden, and the '
-            'character must never sit IN FRONT of any text.')
+            f'COVER SLIDE — the scroll-stopper, visually richer than the rest of the deck. '
+            f'TOP ~40%: the title {_quoted(text)} as a stacked, MIXED-SCALE composition — the key '
+            'word(s) huge (2-3x) and/or in the accent color, secondary words smaller, tight '
+            'leading, like a premium fitness poster. No artwork may cover any letter. '
+            f'BELOW: the character as the hero, large and dynamic{f" — {hint}" if hint else ""}, '
+            'with working muscles softly glowing accent if an exercise is implied. '
+            + ('BOTTOM: a black rounded badge with a small white bookmark icon and the exact '
+               'white text "SAVE THIS FOR LATER". ' if slide.get("save_badge", True) else '')
+            + 'The character may tuck slightly BEHIND text with every '
+              'letter readable, never in front of it.')
+    elif layout == "exercise":
+        targets = str(slide.get("targets") or "").strip()
+        reps = str(slide.get("reps") or "").strip()
+        sets_ = str(slide.get("sets") or "").strip()
+        cue = str(slide.get("form_cue") or "").strip()
+        lines.append(
+            f'EXERCISE DEMONSTRATION SLIDE. Top: the exercise name {_quoted(text)} as the bold '
+            'mixed-scale headline. MAIN ART: the character DEMONSTRATING this exercise — show TWO '
+            'positions of the movement (start and end) stacked or diagonal, connected by a thick '
+            'accent-color motion arrow, each position tagged with a small black rounded label '
+            'reading exactly "A" and "B". The working muscles glow softly in the accent color.')
+        chips = []
+        if targets:
+            chips.append(f'label "TARGETS:" value {_quoted(targets)}')
+        if reps:
+            chips.append(f'label "REPS:" value {_quoted(reps)}')
+        if sets_:
+            chips.append(f'label "SETS:" value {_quoted(sets_)}')
+        if chips:
+            lines.append('LEFT COLUMN: a vertical stack of info chips (per the design system): '
+                         + '; '.join(chips) + '.')
+        if cue:
+            lines.append(f'BOTTOM: a thin accent-outlined callout with bold "FORM:" then {_quoted(cue)}.')
     elif role == "plug":
         lines.append(
             f'FINAL APP-PROMO SLIDE. Headline at the top: {_quoted(text)}. Below it, ONE instance of the '
@@ -1004,29 +1093,125 @@ def _ai_slide_prompt(slide, accent_hex):
         lines.append('Illustrate with the character (one or several instances) integrated into the layout.')
     else:
         lines.append(
-            f'CONTENT SLIDE. Big headline: {_quoted(text)}. The character illustrates the point'
+            f'CONTENT SLIDE. Big mixed-scale headline: {_quoted(text)}. The character illustrates '
+            'the point as a substantial scene'
             + (f': {hint}.' if hint else '.'))
+        chips = [c for c in (slide.get("chips") or []) if (c.get("label") or c.get("value"))][:3]
+        if chips:
+            chip_bits = "; ".join(f'label {_quoted(c.get("label"))} value {_quoted(c.get("value"))}' for c in chips)
+            lines.append(f'Also a compact stack of info chips (per the design system): {chip_bits}.')
     lines.append(AI_SLIDE_STYLE.replace("{accent}", accent_hex or "#00C080"))
     return "\n".join(lines)
 
 
+# Per-batch AI-call tally (single-threaded per job). Rough public rates: Flash image
+# output ~$0.04/image, Flash text calls ~$0.001 — a "what did this batch cost" line,
+# not accounting.
+_AI_TALLY = {"image": 0, "text": 0, "usd": 0.0}
+COST_PER_IMAGE, COST_PER_TEXT = 0.04, 0.001
+
+
+def reset_ai_tally():
+    _AI_TALLY.update(image=0, text=0, usd=0.0)
+
+
+def _tally(kind, cost=None):
+    _AI_TALLY[kind] = _AI_TALLY.get(kind, 0) + 1
+    _AI_TALLY["usd"] += cost if cost is not None else (COST_PER_IMAGE if kind == "image" else COST_PER_TEXT)
+
+
+def ai_tally():
+    return {"image": _AI_TALLY["image"], "text": _AI_TALLY["text"],
+            "est_usd": round(_AI_TALLY["usd"], 2)}
+
+
 QC_PROMPT = (
     "You are checking a social-media slide image for text defects. Answer with EXACTLY one word: "
-    "OK or BAD. Answer BAD if any letters or words are partially covered by artwork, cut off at "
-    "an edge, overlapped so they are hard to read, visibly misspelled, or duplicated. Small "
+    "OK or BAD. Answer BAD if a significant portion of any word is covered by artwork, or if any "
+    "letters or words are partially covered, cut off at an edge, overlapped so they are hard to "
+    "read, visibly misspelled, or duplicated. Small "
     "stylistic overlap where every letter is still clearly readable is OK. Empty decorative "
     "shapes are OK. Otherwise answer OK."
 )
 
 
-def _qc_slide_text(image_path, api_key, log=print):
-    """One cheap vision check per AI-rendered slide: is the text clean? True = OK.
+def _expected_slide_text(slide):
+    """Every text string that must appear on the slide, accent markers stripped."""
+    bits = [slide.get("text") or ""]
+    for b in (slide.get("bullets") or []):
+        bits += [b.get("label") or "", b.get("text") or ""]
+    if (slide.get("layout") or "") == "exercise":
+        if slide.get("targets"):
+            bits.append("TARGETS: " + slide["targets"])
+        if slide.get("reps"):
+            bits.append("REPS: " + slide["reps"])
+        if slide.get("sets"):
+            bits.append("SETS: " + slide["sets"])
+        if slide.get("form_cue"):
+            bits.append("FORM: " + slide["form_cue"])
+    for c in (slide.get("chips") or []):
+        bits += [c.get("label") or "", c.get("value") or ""]
+    if (slide.get("role") or "") == "hook" and slide.get("save_badge", True):
+        bits.append("SAVE THIS FOR LATER")
+    bits.append("EVEX")  # brand chip on every slide
+    if slide.get("tip"):
+        bits.append("TIP: " + slide["tip"])
+    if slide.get("cta"):
+        bits.append(slide["cta"])
+    return " | ".join(s.replace("*", "").strip() for s in bits if s and str(s).strip())
+
+
+def _normalize_text(s):
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", str(s or "").lower()).split())
+
+
+def _qc_slide_text(image_path, api_key, log=print, expected=None):
+    """Vision QC for an AI-rendered slide. Instead of asking the model for a verdict
+    (which misses subtle defects like doubled words), it TRANSCRIBES the text and we
+    compare against the expected strings in code; it also reports coverage. True = OK.
     Any API failure counts as OK (QC must never block generation)."""
     try:
         client = genai.Client(api_key=api_key)
+        prompt = ('Look at this social-media slide. Transcribe the slide\'s own display text — '
+                  'headlines, list items, callout boxes, button pills — EXACTLY as printed, '
+                  'INCLUDING any misspellings, duplicated words, or garbled letters (do NOT '
+                  'auto-correct). IGNORE any text inside a phone-screen mockup. Return ONLY JSON: '
+                  '{"text": "<the transcription, reading order, single spaces>", '
+                  '"dup": <true ONLY if some word or phrase is accidentally printed twice in '
+                  'a row (e.g. "mean mean")>, '
+                  '"empty_boxes": <true if the design contains any empty outlined chips, boxes, or '
+                  'panels with no text inside them>, '
+                  '"covered": <true ONLY if part of a headline/list/callout text is blocked by '
+                  'artwork or cut off at an image edge so letters are missing or unreadable — '
+                  'a character standing near or slightly behind text with all letters readable '
+                  'is false>}')
+        _tally("text")
         resp = client.models.generate_content(
-            model=TEXT_MODEL, contents=[Image.open(image_path), QC_PROMPT])
-        return "BAD" not in (resp.text or "").strip().upper()
+            model=TEXT_MODEL, contents=[Image.open(image_path), prompt],
+            config={"response_mime_type": "application/json"})
+        data = json.loads(resp.text)
+        if data.get("covered"):
+            log("🔎 QC: text covered/clipped")
+            return False
+        if data.get("dup"):
+            log("🔎 QC: duplicated word detected")
+            return False
+        if data.get("empty_boxes"):
+            log("🔎 QC: empty chip/box detected")
+            return False
+        if expected:
+            got, want = _normalize_text(data.get("text")), _normalize_text(expected.replace("|", " "))
+            missing = [w for w in want.split() if w not in got.split()]
+            # duplicated-word check: any word appearing more often than expected
+            from collections import Counter
+            extra_dupes = Counter(got.split()) - Counter(want.split())
+            # big standalone numerals are a legitimate design motif (giant "3" next to
+            # "these 3 moves") — only alphabetic words count as duplication defects
+            dupes = [w for w, c in extra_dupes.items() if w in want.split() and w.isalpha() and len(w) > 2]
+            if missing or dupes:
+                log(f"🔎 QC: text mismatch (missing: {missing[:4]} dupes: {dupes[:4]})")
+                return False
+        return True
     except Exception as e:
         log(f"⚠️ QC check skipped ({e})")
         return True
@@ -1043,11 +1228,77 @@ def _character_portrait_disk(character_id):
     return fp if os.path.exists(fp) else None
 
 
+# Hybrid pipeline (research-backed, Sep 2026): PIL typesets ALL text pixel-perfectly
+# into a base slide with the character zone left empty; Gemini edit-mode then ONLY
+# composites the character in. Text is never AI-generated → zero typos; the layout
+# boundary is real pixels, not a soft prompt instruction. Nano Banana Pro
+# (gemini-3-pro-image) is the tier documented/benchmarked to preserve existing text
+# during edits; we fall back down the family if the account lacks access.
+SLIDE_MODEL_CANDIDATES = ["gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview"]
+SLIDE_MODEL_COST = {"gemini-3-pro-image": 0.134, "gemini-3.1-flash-image": 0.045,
+                    "gemini-3.1-flash-image-preview": 0.045}
+_slide_model = {"id": None}
+
+
+def _hybrid_base(slide, preset, screenshot_disk, base_path, log=print):
+    """Typeset the slide's text layer (no mascots) — the character zone stays empty."""
+    role, layout = slide.get("role") or "content", slide.get("layout") or "statement"
+    text = slide.get("text") or ""
+    if role == "hook":
+        compose_hook_slide(text, None, base_path, preset, log=log)
+        zone = "the large empty white area below the headline"
+    elif role == "plug":
+        compose_plug_slide(text, None, screenshot_disk, base_path, preset,
+                           cta_text=slide.get("cta") or "", log=log)
+        zone = "the empty white area beside the phone"
+    elif layout == "list":
+        stripped = dict(slide, bullet_poses=False, pose={"key": None, "path": None},
+                        bullets=[{**b, "pose": {}} for b in (slide.get("bullets") or [])])
+        compose_list_slide(stripped, base_path, preset, log=log)
+        zone = ("the empty right-side column and any empty white space between elements "
+                "(you may add up to 3 SMALL instances of the character, each demonstrating "
+                "a list item, if hints are given)")
+    else:
+        compose_content_slide(text, None, base_path, preset, log=log)
+        zone = "the large empty white area below the headline"
+    return base_path, zone
+
+
+def _hybrid_edit_prompt(slide, zone):
+    hint = (slide.get("pose_hint") or "").strip()
+    bullet_hints = [b.get("pose_hint") for b in (slide.get("bullets") or []) if b.get("pose_hint")]
+    lines = [
+        "The FIRST image is a FINISHED slide design — its text, typography, colors, layout, "
+        "and any phone mockup are FINAL and must remain pixel-identical.",
+        f"Your ONLY task: ADD the cartoon character from the SECOND image into {zone}.",
+        "Copy the character's identity EXACTLY: teal skin, two plain white eyes, no other facial "
+        "features, same outfit, same flat cel-shaded comic style with thick clean outlines.",
+        "Make the character large and dynamic so the empty space feels filled, but it must fit "
+        "entirely within the empty area" + (f" — pose: {hint}." if hint else "."),
+    ]
+    if bullet_hints:
+        lines.append("List-item character hints, in order: " + "; ".join(bullet_hints) + ".")
+    expected = _expected_slide_text(slide)
+    lines.append(
+        "STRICT RULES: do not modify, move, resize, redraw, restyle, or cover ANY existing text "
+        "or graphics. The finished slide must still contain EXACTLY this text, character for "
+        f"character, nothing dropped: \"{expected}\". Keep the background pure white (#FFFFFF). "
+        "Add NO new text, labels, badges, or objects — only the character art. Output the same "
+        "vertical 9:16 slide.")
+    return "\n".join(lines)
+
+
 def _ai_render_slide(slide, accent_hex, portrait_disk, out_path, api_key, mock=False,
-                     screenshot_disk=None, log=print):
+                     screenshot_disk=None, log=print, preset=None):
+    """PURE full-AI slide render (whole slide incl. text) on the Pro image tier —
+    reserved for SHORT-TEXT slides (hook/statement/plug), where Pro's text rendering
+    is reliable; list slides never come through here (dense text ⇒ typeset)."""
     if mock:
         from characters import _mock_image
         _mock_image(f"AI {slide.get('role')}", out_path, seed=str(slide)[:40])
+        with Image.open(out_path) as im:
+            if im.size != (W, H):
+                im.resize((W, H)).save(out_path)
         return out_path
     from characters import _generate_image
     parts = []
@@ -1056,7 +1307,27 @@ def _ai_render_slide(slide, accent_hex, portrait_disk, out_path, api_key, mock=F
     if slide.get("role") == "plug" and screenshot_disk and os.path.exists(screenshot_disk):
         parts.append(Image.open(screenshot_disk))
     parts.append(_ai_slide_prompt(slide, accent_hex))
-    _generate_image(api_key, parts, out_path)
+    models = [_slide_model["id"]] if _slide_model["id"] else SLIDE_MODEL_CANDIDATES
+    last_err = None
+    for model in models:
+        try:
+            _tally("image", SLIDE_MODEL_COST.get(model, 0.045))
+            _generate_image(api_key, parts, out_path, model=model, aspect_ratio="3:4")
+            if _slide_model["id"] != model:
+                _slide_model["id"] = model
+                log(f"🖌️ Slide image model: {model}")
+            break
+        except Exception as e:
+            last_err = e
+            if any(t in str(e).lower() for t in ("not found", "permission", "invalid", "404")):
+                log(f"⚠️ Model {model} unavailable — trying next tier…")
+                continue
+            raise
+    else:
+        raise last_err or RuntimeError("no slide image model available")
+    with Image.open(out_path) as im:
+        if im.size != (W, H):
+            im.resize((W, H)).save(out_path)
     return out_path
 
 
@@ -1188,6 +1459,23 @@ def generate_deck(series, api_key, mock=False, log=print):
     return pngs, meta
 
 
+def _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, slide_no, mock=False,
+                          screenshot_disk=None, log=print, max_attempts=3):
+    """Render an ai_full slide, QC-check it, regenerate up to max_attempts total —
+    re-checking EACH attempt (a bad retry must not ship silently). If every attempt
+    fails QC, keep the last and warn loudly so the user reviews it."""
+    for attempt in range(1, max_attempts + 1):
+        _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
+                         screenshot_disk=screenshot_disk, log=log)
+        if mock or _qc_slide_text(out, api_key, log=log, expected=_expected_slide_text(slide)):
+            return out, True
+        if attempt < max_attempts:
+            log(f"🔁 QC flagged slide {slide_no} (covered/garbled text) — regenerating "
+                f"(attempt {attempt + 1}/{max_attempts})…")
+    log(f"⚠️ Slide {slide_no} failed QC after {max_attempts} attempts")
+    return out, False
+
+
 def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, log=print,
                            topic=None, category=None, audience=None, topic_bank=None, used_topics=None):
     """Full-AI branch of generate_deck: every slide image is Gemini-rendered whole.
@@ -1200,34 +1488,58 @@ def _generate_deck_ai_full(series, texts, n_content, base, api_key, mock=False, 
 
     slides = [{"role": "hook", "layout": "statement", "text": texts["hook"], "bullets": [],
                "tip": "", "pose_hint": texts.get("hook_pose_hint", ""), "bullet_poses": False,
+               "save_badge": bool(series.get("save_badge", True)),
                "pose": {"key": None, "path": None}}]
     for spec in texts["slides"]:
-        slides.append({"role": "content", "layout": spec.get("layout") or "statement",
-                       "text": spec.get("text") or "",
-                       "bullets": [{"label": b.get("label") or "", "text": b.get("text") or "",
-                                    "pose_hint": b.get("pose_hint") or ""} for b in (spec.get("bullets") or [])],
-                       "tip": spec.get("tip") or "", "pose_hint": spec.get("pose_hint") or "",
-                       "bullet_poses": bool(spec.get("bullet_poses")),
-                       "pose": {"key": None, "path": None}})
+        slide_obj = {"role": "content", "layout": spec.get("layout") or "statement",
+                     "text": spec.get("text") or "",
+                     "bullets": [{"label": b.get("label") or "", "text": b.get("text") or "",
+                                  "pose_hint": b.get("pose_hint") or ""} for b in (spec.get("bullets") or [])],
+                     "tip": spec.get("tip") or "", "pose_hint": spec.get("pose_hint") or "",
+                     "bullet_poses": bool(spec.get("bullet_poses")),
+                     "pose": {"key": None, "path": None}}
+        for k in ("targets", "reps", "sets", "form_cue", "chips"):
+            if spec.get(k):
+                slide_obj[k] = spec[k]
+        slides.append(slide_obj)
     slides.append({"role": "plug", "layout": "statement", "text": texts["plug_headline"], "bullets": [],
                    "tip": "", "pose_hint": "", "bullet_poses": False,
                    "cta": (plug.get("cta_text") or "").strip(), "pose": {"key": None, "path": None}})
 
-    pngs = []
-    for i, slide in enumerate(slides, start=1):
-        out = os.path.join(CHARSHOW_DIR, f"{base}_slide{i:02d}.png")
-        log(f"🎨 Slide {i}/{len(slides)} — full-AI render ({slide['role']}/{slide['layout']})…")
-        _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                         screenshot_disk=screenshot_disk, log=log)
-        if not mock and not _qc_slide_text(out, api_key, log=log):
-            log(f"🔁 QC flagged slide {i} (covered/garbled text) — regenerating once…")
-            _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                             screenshot_disk=screenshot_disk, log=log)
-        pngs.append(out)
+    # FULL-AI pipeline (user-locked, Sep 2026): EVERY slide — lists included — is
+    # rendered whole by the Pro image tier. No typeset composition ever appears in an
+    # ai_full deck. QC (transcription-compare) retries up to 3x; if all attempts fail
+    # the BEST-EFFORT AI slide ships with a loud review warning (never a typeset swap).
+    total = len(slides)
+    log(f"🎨 Rendering {total} slides — full-AI on Pro (QC-guarded)…")
+
+    def _one(job):
+        i, slide, out = job
+        _out, ok = _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, i, mock=mock,
+                                         screenshot_disk=screenshot_disk, log=log)
+        if not ok:
+            log(f"⚠️ Slide {i} shipped from the best AI attempt — REVIEW IT (or hit Regenerate image)")
+        log(f"✓ Slide {i}/{total} rendered ({slide['role']}/{slide.get('layout') or 'statement'})")
+        return i, out
+
+    ai_jobs = [(i, slide, os.path.join(CHARSHOW_DIR, f"{base}_slide{i:02d}.png"))
+               for i, slide in enumerate(slides, start=1)]
+    outs = {}
+    if mock:
+        for job in ai_jobs:
+            i, out = _one(job)
+            outs[i] = out
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            for i, out in pool.map(_one, ai_jobs):
+                outs[i] = out
+    pngs = [outs[i] for i in sorted(outs)]
 
     meta = {
         "series_id": series.get("id"), "character_id": series.get("character_id"),
         "render_mode": "ai_full", "audience": audience,
+        "deck_type": texts.get("deck_type", "info"),
         "topic": topic, "category": category,
         "slides": slides,
         "plug_screenshot": screenshot_disk,
@@ -1270,14 +1582,72 @@ def rerender_deck_ai_full(meta, new_slides, api_key, mock=False, out_dir=CHARSHO
             continue
         out = os.path.join(out_dir, f"{base}_slide{i:02d}.png")
         log(f"🎨 Slide {i}/{len(new_slides)} — full-AI regenerate…")
-        _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                         screenshot_disk=screenshot_disk, log=log)
-        if not mock and not _qc_slide_text(out, api_key, log=log):
-            log(f"🔁 QC flagged slide {i} — regenerating once…")
-            _ai_render_slide(slide, accent, portrait_disk, out, api_key, mock=mock,
-                             screenshot_disk=screenshot_disk, log=log)
+        _render_slide_with_qc(slide, accent, portrait_disk, out, api_key, i, mock=mock,
+                              screenshot_disk=screenshot_disk, log=log)
         pngs.append(out)
     return pngs, new_slides
+
+
+def regen_slide_art(slots, slide_index, guidance, api_key, mock=False, out_dir=CHARSHOW_DIR, log=print):
+    """Regenerate ONE slide's character art (fresh, never cache-matched) with optional
+    user guidance appended to the pose hint, then recomposite that slide. Returns
+    (new_png_disk_path, updated_slides). slide_index is 1-based."""
+    slides = list(slots.get("slides") or [])
+    if not (1 <= slide_index <= len(slides)):
+        raise ValueError(f"Slide index {slide_index} out of range (1-{len(slides)})")
+    slide = dict(slides[slide_index - 1])
+    character_id = slots.get("character_id")
+    if not character_id:
+        raise ValueError("This deck predates character tracking — regenerate the whole deck instead")
+
+    from db import get_session, Character, CharacterLook
+    from characters import generate_pose, POSE_PROMPT_PREFIX
+    with get_session() as s:
+        char = s.get(Character, character_id)
+    if not char:
+        raise ValueError("Character not found")
+
+    def _fresh_pose(hint):
+        full = " — ".join(x for x in [hint or "standing confident", (guidance or "").strip()] if x)
+        slug = f"{_slugify(full)[:32]}_{random.getrandbits(16):04x}"
+        out_name = f"pose_{character_id[:8]}_{slug}.png"
+        log(f"🎨 Regenerating art: '{full}'…")
+        _tally("image")
+        if mock:
+            from characters import _mock_image
+            _mock_image(full[:24], os.path.join("creations", "avatars", out_name), seed=full)
+            web = f"/creations/avatars/{out_name}"
+        else:
+            web = generate_pose(api_key, char.portrait_path, full, out_name, mock=False)
+        with get_session() as s:
+            s.add(CharacterLook(character_id=character_id, prompt=f"{POSE_PROMPT_PREFIX}{slug}",
+                                image_path=web))
+            s.commit()
+        return {"key": slug, "path": web}
+
+    if slide.get("layout") == "list" and slide.get("bullet_poses") and slide.get("bullets"):
+        slide["bullets"] = [dict(b, pose=_fresh_pose(b.get("pose_hint") or "")) for b in slide["bullets"][:3]]
+    else:
+        slide["pose"] = _fresh_pose(slide.get("pose_hint") or "")
+
+    preset = dict(STYLE_PRESETS.get(slots.get("style_key") or "impact", STYLE_PRESETS["impact"]))
+    preset["accent"] = slots.get("accent_hex") or preset.get("accent")
+    out = os.path.join(out_dir, f"charshow_rg_{uuid.uuid4().hex[:12]}_slide{slide_index:02d}.png")
+    pose_disk = _pose_disk_path((slide.get("pose") or {}).get("path"))
+    role, layout = slide.get("role") or "content", slide.get("layout") or "statement"
+    if role == "hook":
+        compose_hook_slide(slide.get("text") or "", pose_disk, out, preset, log=log)
+    elif role == "plug":
+        compose_plug_slide(slide.get("text") or "", pose_disk,
+                           _screenshot_disk_path(slots.get("plug_screenshot")) or slots.get("plug_screenshot"),
+                           out, preset, cta_text=slide.get("cta") or "", log=log)
+    elif layout == "list":
+        compose_list_slide(slide, out, preset, log=log)
+    else:
+        compose_content_slide(slide.get("text") or "", pose_disk, out, preset, log=log)
+
+    slides[slide_index - 1] = slide
+    return out, slides
 
 
 def rerender_deck(meta, new_slides=None, new_texts=None, out_dir=CHARSHOW_DIR, log=print):
@@ -1332,6 +1702,34 @@ def rerender_deck(meta, new_slides=None, new_texts=None, out_dir=CHARSHOW_DIR, l
     return pngs, slides
 
 
+def post_deck_photos(creation, user_id, api_key, auto_add_music=True, title=None, log=print):
+    """Publish a deck's PNG slides to TikTok as a photo carousel via Upload-Post
+    (official Content Posting API under the hood; direct post + auto-added music).
+    Returns the raw response text."""
+    import httpx
+    slots = creation.get("slots") or {}
+    paths = []
+    for web_path in creation.get("image_paths") or []:
+        fp = os.path.join(CHARSHOW_DIR, os.path.basename(web_path))
+        if os.path.exists(fp):
+            paths.append(fp)
+    if not paths:
+        raise ValueError("Deck has no slide images on disk")
+    post_title = (title or slots.get("caption") or creation.get("title") or "").strip()[:2200]
+    data = [("user", user_id), ("title", post_title), ("platform[]", "tiktok"),
+            ("auto_add_music", "true" if auto_add_music else "false"),
+            ("photo_cover_index", "0"), ("async_upload", "true")]
+    files = [("photos[]", (os.path.basename(p), open(p, "rb").read(), "image/png")) for p in paths]
+    log(f"📤 Posting {len(paths)} slides to TikTok via Upload-Post (user: {user_id})…")
+    with httpx.Client(timeout=180.0) as client:
+        r = client.post("https://api.upload-post.com/api/upload_photos",
+                        headers={"Authorization": f"Apikey {api_key}"}, data=data, files=files)
+    if r.status_code not in (200, 201, 202):
+        raise RuntimeError(f"Upload-Post error {r.status_code}: {r.text[:300]}")
+    log("✅ Upload-Post accepted the carousel")
+    return r.text[:2000]
+
+
 # ---- Batch export ---------------------------------------------------------
 
 def _slugify(text):
@@ -1341,7 +1739,7 @@ def _slugify(text):
     return out.strip("-")
 
 
-def export_batch(creation_ids, log=print):
+def export_batch(creation_ids, log=print, images_only=False):
     """Copies each deck's PNGs into creations/exports/batch_<YYYYMMDD_HHMM>/deck_NN_<slug>/
     and writes one captions.md at the batch root (title, caption, first comment per deck).
     Returns the absolute batch directory path."""
@@ -1355,11 +1753,12 @@ def export_batch(creation_ids, log=print):
         rows = [s.get(Creation, cid) for cid in creation_ids]
         decks = [r.to_dict() for r in rows if r]
 
+    flatten = images_only and len(decks) == 1  # single deck → PNGs at top level (easy select-all → AirDrop)
     lines = [f"# Batch export — {ts}", ""]
     for n, creation in enumerate(decks, start=1):
         slots = creation.get("slots") or {}
         title = creation.get("title") or slots.get("topic") or f"deck {n}"
-        deck_dir = os.path.join(batch_dir, f"deck_{n:02d}_{_slugify(title)[:40] or 'deck'}")
+        deck_dir = batch_dir if flatten else os.path.join(batch_dir, f"deck_{n:02d}_{_slugify(title)[:40] or 'deck'}")
         os.makedirs(deck_dir, exist_ok=True)
         for i, web_path in enumerate(creation.get("image_paths") or [], start=1):
             fp = os.path.join(CHARSHOW_DIR, os.path.basename(web_path))
@@ -1374,7 +1773,8 @@ def export_batch(creation_ids, log=print):
             "",
         ]
 
-    with open(os.path.join(batch_dir, "captions.md"), "w") as f:
-        f.write("\n".join(lines))
+    if not images_only:
+        with open(os.path.join(batch_dir, "captions.md"), "w") as f:
+            f.write("\n".join(lines))
     log(f"✅ Exported batch → {batch_dir}")
     return os.path.abspath(batch_dir)

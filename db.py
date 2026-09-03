@@ -71,7 +71,8 @@ class Creation(Base):
     video_path = Column(String(500), default="")       # web path under /videos or /mocks
     image_paths_json = Column(Text, default="[]")      # slideshow PNG set (web paths)
     status = Column(String(20), default="draft")       # draft | scheduled | published
-    scheduled_for = Column(String(20), nullable=True, default=None)  # "YYYY-MM-DD" or None
+    scheduled_for = Column(String(20), nullable=True, default=None)  # "YYYY-MM-DD[THH:MM]" or None
+    published_at = Column(String(20), nullable=True, default=None)   # "YYYY-MM-DDTHH:MM" when published
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -84,6 +85,7 @@ class Creation(Base):
             "image_paths": json.loads(self.image_paths_json or "[]"),
             "status": self.status,
             "scheduled_for": self.scheduled_for,
+            "published_at": self.published_at,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -250,6 +252,8 @@ class SlideshowSeries(Base):
     slide_min = Column(Integer, default=4)
     slide_max = Column(Integer, default=7)
     render_mode = Column(String(20), default="typeset")  # "typeset" (PIL) | "ai_full" (Gemini renders whole slide)
+    copy_rules = Column(Text, default="")           # free-text series-specific rules appended to the copy prompt
+    save_badge = Column(Integer, default=1)         # 1 = "SAVE THIS FOR LATER" badge on the cover slide
     plug_json = Column(Text, default="{}")          # {app_name, pitch, screenshots: [paths], position}
     caption_cfg_json = Column(Text, default="{}")
     created_at = Column(DateTime(timezone=True), default=_now)
@@ -265,6 +269,8 @@ class SlideshowSeries(Base):
             "used_topics": json.loads(self.used_topics_json or "[]"),
             "slide_min": self.slide_min or 4, "slide_max": self.slide_max or 7,
             "render_mode": self.render_mode or "typeset",
+            "copy_rules": self.copy_rules or "",
+            "save_badge": bool(1 if self.save_badge is None else self.save_badge),
             "plug": json.loads(self.plug_json or "{}"),
             "caption_cfg": json.loads(self.caption_cfg_json or "{}"),
             "created_at": self.created_at.isoformat() if self.created_at else None,
