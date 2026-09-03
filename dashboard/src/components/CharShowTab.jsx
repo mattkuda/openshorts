@@ -14,20 +14,17 @@ const POSE_PACK_TARGET = 20;
 
 const STATUS_LABELS = { draft: 'Unpublished', scheduled: 'Scheduled', published: 'Published' };
 
-// Parses either a full ISO timestamp (created_at) or a plain "YYYY-MM-DD" date
-// (scheduled_for) into a local "M/D" string, avoiding UTC-midnight shift for
-// date-only values.
-function formatShortDate(value) {
+// Formats an ISO created_at/updated_at timestamp (always a full UTC-offset instant
+// from the backend, per db.py's `_now()`) into local "M/D h:MM AM/PM" — goes through
+// the Date constructor (unlike formatDateTime below) so the UTC offset is correctly
+// converted to the viewer's local time, rather than read off as if already local.
+function formatTimestamp(value) {
     if (!value) return '';
-    let d;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        const [y, m, day] = value.split('-').map(Number);
-        d = new Date(y, m - 1, day);
-    } else {
-        d = new Date(value);
-    }
+    const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    const dateStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
 }
 
 // Formats a "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" value into "M/D" or "M/D h:MM AM/PM".
@@ -61,6 +58,19 @@ function statusMeta(status, scheduledFor, publishedAt) {
 }
 
 const AUDIENCE_LABELS = { men: '♂ men', women: '♀ women' };
+const DECK_TYPE_LABELS = { workout: 'Workout', info: 'Info' };
+
+function deckTypeLabel(deckType) {
+    if (!deckType) return '';
+    return DECK_TYPE_LABELS[deckType] || (deckType.charAt(0).toUpperCase() + deckType.slice(1));
+}
+
+// 3-way model badge: "Typeset" for the classic render path, else the image provider
+// used for the ai_full render — "Gemini Pro" (default) or "GPT Image 2" (openai).
+function modelBadgeLabel(slots) {
+    if (!slots || slots.render_mode !== 'ai_full') return 'Typeset';
+    return slots.image_model === 'openai' ? 'GPT Image 2' : 'Gemini Pro';
+}
 
 function AudiencePill({ audience }) {
     if (!audience || !AUDIENCE_LABELS[audience]) return null;
@@ -539,7 +549,7 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                                     >
                                         <div className="flex items-center justify-between gap-2">
                                             <label
-                                                className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                                className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <input
@@ -550,10 +560,20 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                                                 />
                                                 Select
                                             </label>
-                                            <span className={`inline-flex items-center gap-1.5 shrink-0 text-xs font-medium px-2 py-0.5 rounded-full border ${meta.classes}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
-                                                {meta.label}
-                                            </span>
+                                            <div className="flex items-center gap-1 flex-wrap justify-end">
+                                                <span className={`inline-flex items-center gap-1.5 shrink-0 text-xs font-medium px-2 py-0.5 rounded-full border ${meta.classes}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+                                                    {meta.label}
+                                                </span>
+                                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                                    {modelBadgeLabel(c.slots)}
+                                                </span>
+                                                {c.slots?.deck_type && (
+                                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                                        {deckTypeLabel(c.slots.deck_type)}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-0.5">
                                             {(c.image_paths || []).map((img, i) => (
@@ -567,7 +587,7 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                                                 <p className="text-sm font-medium text-foreground truncate">{c.title || 'Untitled deck'}</p>
                                                 <AudiencePill audience={c.slots?.audience} />
                                             </div>
-                                            <p className="text-xs text-muted-foreground mt-0.5">Created {formatShortDate(c.created_at)}</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">Created {formatTimestamp(c.created_at)}</p>
                                         </div>
                                     </div>
                                 );

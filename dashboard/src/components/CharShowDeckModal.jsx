@@ -4,34 +4,56 @@ import { getApiUrl } from '../config';
 
 const ROLE_LABELS = { hook: 'HOOK', content: 'CONTENT', plug: 'PLUG', cta: 'PLUG' };
 
-// Mirrors the "M/D" short-date formatting used on the deck cards (CharShowTab) —
-// duplicated locally since this codebase doesn't share a date-format utility across
-// components (see ScheduleWeekModal.formatDate for the same convention).
-function formatShortDate(value) {
+// Formats an ISO created_at/updated_at timestamp (always a full UTC-offset instant
+// from the backend, per db.py's `_now()`) into local "M/D h:MM AM/PM" — duplicated
+// locally since this codebase doesn't share a date-format utility across components
+// (see ScheduleWeekModal.formatDate for the same convention). Goes through the Date
+// constructor (unlike formatDateTime below) so the UTC offset is correctly converted
+// to the viewer's local time, rather than read off as if it were already local.
+function formatTimestamp(value) {
     if (!value) return '';
-    let d;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        const [y, m, day] = value.split('-').map(Number);
-        d = new Date(y, m - 1, day);
-    } else {
-        d = new Date(value);
-    }
+    const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    const dateStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${dateStr} ${timeStr}`;
 }
 
 const AUDIENCE_LABELS = { men: '♂ men', women: '♀ women' };
+const DECK_TYPE_LABELS = { workout: 'Workout', info: 'Info' };
+
+function deckTypeLabel(deckType) {
+    if (!deckType) return '';
+    return DECK_TYPE_LABELS[deckType] || (deckType.charAt(0).toUpperCase() + deckType.slice(1));
+}
+
+// 3-way model badge: "Typeset" for the classic render path, else the image provider
+// used for the ai_full render — "Gemini Pro" (default) or "GPT Image 2" (openai).
+function modelBadgeLabel(slots) {
+    if (!slots || slots.render_mode !== 'ai_full') return 'Typeset';
+    return slots.image_model === 'openai' ? 'GPT Image 2' : 'Gemini Pro';
+}
 
 // "Generated in 1m 12s · 14 img + 9 txt calls · ≈$0.58" — only new decks carry
-// slots.gen_stats, so callers should skip rendering this when it's absent.
-function formatGenStats(stats) {
+// slots.gen_stats, so callers should skip rendering this when it's absent. Appends
+// "· updated M/D h:MM AM/PM" when updatedAt is more than a minute after createdAt
+// (i.e. the deck was edited/re-rendered after its initial generation).
+function formatGenStats(stats, createdAt, updatedAt) {
     if (!stats) return '';
     const seconds = stats.seconds || 0;
     const m = Math.floor(seconds / 60);
     const s = Math.round(seconds % 60);
     const time = m > 0 ? `${m}m ${s}s` : `${s}s`;
     const estUsd = (stats.est_usd || 0).toFixed(2);
-    return `Generated in ${time} · ${stats.image_calls || 0} img + ${stats.text_calls || 0} txt calls · ≈$${estUsd}`;
+    let line = `Generated in ${time} · ${stats.image_calls || 0} img + ${stats.text_calls || 0} txt calls · ≈$${estUsd}`;
+    if (createdAt && updatedAt) {
+        const createdMs = new Date(createdAt).getTime();
+        const updatedMs = new Date(updatedAt).getTime();
+        if (!Number.isNaN(createdMs) && !Number.isNaN(updatedMs) && Math.abs(updatedMs - createdMs) > 60000) {
+            line += ` · updated ${formatTimestamp(updatedAt)}`;
+        }
+    }
+    return line;
 }
 
 // Formats a "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" value into "M/D" or "M/D h:MM AM/PM".
@@ -549,7 +571,6 @@ export default function CharShowDeckModal({ creation, onClose, onSaved, onDelete
     const slots = creation.slots || {};
     const roles = slots.roles || [];
     const isStructured = Array.isArray(slots.slides);
-    const isAiFull = slots.render_mode === 'ai_full';
     const sourceSeries = slots.series_id ? (seriesList || []).find((s) => s.id === slots.series_id) || null : null;
 
     const [slidesBase, setSlidesBase] = useState(() => (isStructured ? slots.slides : null));
@@ -708,20 +729,23 @@ export default function CharShowDeckModal({ creation, onClose, onSaved, onDelete
                 <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border shrink-0">
                     <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{creation.title || 'Deck'}</p>
+                        {(slots.topic || slots.category) && (
+                            <p className="text-xs text-muted-foreground truncate">
+                                Topic: {[slots.topic, slots.category].filter(Boolean).join(' · ')}
+                            </p>
+                        )}
                         <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground mt-1">
                             <span>{rows.length} slides</span>
                             <span className="text-border">·</span>
-                            <span>Created {formatShortDate(creation.created_at)}</span>
+                            <span>Created {formatTimestamp(creation.created_at)}</span>
                             <span className="text-border">·</span>
                             <DeckStatusControl creation={creation} onSaved={onSaved} />
-                            {isAiFull && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                                {modelBadgeLabel(slots)}
+                            </span>
+                            {slots.deck_type && (
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                                    FULL AI
-                                </span>
-                            )}
-                            {slots.image_model === 'openai' && (
-                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                                    GPT-IMG-2
+                                    {deckTypeLabel(slots.deck_type)}
                                 </span>
                             )}
                             {slots.audience && AUDIENCE_LABELS[slots.audience] && (
@@ -746,7 +770,9 @@ export default function CharShowDeckModal({ creation, onClose, onSaved, onDelete
                             )}
                         </div>
                         {slots.gen_stats && (
-                            <p className="text-xs text-muted-foreground mt-1">{formatGenStats(slots.gen_stats)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {formatGenStats(slots.gen_stats, creation.created_at, creation.updated_at)}
+                            </p>
                         )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">

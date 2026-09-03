@@ -1236,6 +1236,11 @@ def _character_portrait_disk(character_id):
 # during edits; we fall back down the family if the account lacks access.
 OPENAI_IMAGE_MODEL = "gpt-image-2"
 OPENAI_IMAGE_COST = 0.165   # high quality @ 1024x1536 (per-token derived; ~3rd-party estimate)
+# gpt-image-2 is gated behind OpenAI org verification — fall back down the family if
+# the project lacks access (403 model_not_found), memoizing what worked.
+OPENAI_MODEL_CANDIDATES = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"]
+OPENAI_MODEL_COST = {"gpt-image-2": 0.165, "gpt-image-1.5": 0.17, "gpt-image-1": 0.25}
+_openai_model = {"id": None}
 
 
 def _openai_render(prompt, ref_paths, out_path, log=print):
@@ -1248,13 +1253,27 @@ def _openai_render(prompt, ref_paths, out_path, log=print):
         raise RuntimeError("OPENAI_API_KEY not set — add it to .env.local to use the OpenAI image model")
     files = [("image", (os.path.basename(p), open(p, "rb").read(), "image/png"))
              for p in ref_paths if p and os.path.exists(p)]
-    data = {"model": OPENAI_IMAGE_MODEL, "prompt": prompt[:32000], "size": "1024x1536",
-            "quality": "high", "input_fidelity": "high", "n": "1"}
-    with httpx.Client(timeout=300.0) as client:
-        r = client.post("https://api.openai.com/v1/images/edits",
-                        headers={"Authorization": f"Bearer {key}"}, data=data, files=files)
-    if r.status_code != 200:
+    models = [_openai_model["id"]] if _openai_model["id"] else OPENAI_MODEL_CANDIDATES
+    r = None
+    for model in models:
+        data = {"model": model, "prompt": prompt[:32000], "size": "1024x1536",
+                "quality": "high", "n": "1"}
+        with httpx.Client(timeout=300.0) as client:
+            r = client.post("https://api.openai.com/v1/images/edits",
+                            headers={"Authorization": f"Bearer {key}"}, data=data, files=files)
+        if r.status_code == 200:
+            if _openai_model["id"] != model:
+                _openai_model["id"] = model
+                log(f"🖌️ OpenAI image model: {model}")
+            break
+        if r.status_code in (403, 404) and "model" in r.text.lower():
+            log(f"⚠️ {model} not available to this OpenAI project — trying next tier…")
+            continue
         raise RuntimeError(f"OpenAI image error {r.status_code}: {r.text[:300]}")
+    else:
+        raise RuntimeError("No OpenAI image model available to this project — enable Organization "
+                           "Verification in the OpenAI console for gpt-image-2 "
+                           f"(last error {r.status_code}: {r.text[:200]})")
     b64 = r.json()["data"][0]["b64_json"]
     with open(out_path, "wb") as f:
         f.write(base64.b64decode(b64))
@@ -1346,7 +1365,7 @@ def _ai_render_slide(slide, accent_hex, portrait_disk, out_path, api_key, mock=F
         refs = [portrait_disk]
         if slide.get("role") == "plug" and screenshot_disk:
             refs.append(screenshot_disk)
-        _tally("image", OPENAI_IMAGE_COST)
+        _tally("image", OPENAI_MODEL_COST.get(_openai_model["id"] or OPENAI_IMAGE_MODEL, OPENAI_IMAGE_COST))
         _openai_render(prompt, refs, out_path, log=log)
         return out_path
     parts.append(prompt)
