@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useMatch } from 'react-router-dom';
 import {
     Plus, Loader2, Sparkles, Layers,
-    Copy, Check, X, Download,
+    Copy, Check, X, Download, Trash2,
 } from 'lucide-react';
 import { getApiUrl } from '../config';
 import CharShowSeriesEditor from './CharShowSeriesEditor';
@@ -70,6 +70,33 @@ function deckTypeLabel(deckType) {
 function modelBadgeLabel(slots) {
     if (!slots || slots.render_mode !== 'ai_full') return 'Typeset';
     return slots.image_model === 'openai' ? 'GPT Image 2' : 'Gemini Pro';
+}
+
+const DECK_FILTERS_STORAGE_KEY = 'charshow_deck_filters';
+const DEFAULT_DECK_FILTERS = { status: 'all', model: 'all', type: 'all', audience: 'all', seriesId: 'all' };
+
+// A labeled row of small pill toggles — one active value per group. Mirrors the
+// "Segmented / toggle groups" pattern from STYLE_GUIDE.md, sized down (rounded-lg,
+// tight padding) for a compact filter bar rather than full-width equal columns.
+function FilterPillGroup({ label, options, value, onChange }) {
+    return (
+        <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+            {options.map((opt) => (
+                <button
+                    key={opt.value}
+                    onClick={() => onChange(opt.value)}
+                    className={`text-xs font-medium px-2 py-1 rounded-lg border transition-colors ${
+                        value === opt.value
+                            ? 'border-primary bg-primary/10 text-primary-strong'
+                            : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                >
+                    {opt.label}
+                </button>
+            ))}
+        </div>
+    );
 }
 
 function AudiencePill({ audience }) {
@@ -161,6 +188,16 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
     const [exporting, setExporting] = useState(false);
     const [exportResult, setExportResult] = useState(null);
     const [exportCopied, setExportCopied] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteNote, setDeleteNote] = useState('');
+    const [deleteError, setDeleteError] = useState('');
+    const [deckFilters, setDeckFilters] = useState(() => {
+        try {
+            const raw = localStorage.getItem(DECK_FILTERS_STORAGE_KEY);
+            if (raw) return { ...DEFAULT_DECK_FILTERS, ...JSON.parse(raw) };
+        } catch { /* ignore malformed/blocked storage */ }
+        return DEFAULT_DECK_FILTERS;
+    });
 
     // Multiple concurrent jobs (one per series, generate or pose-pack) — each entry:
     // { clientId, jobId, kind, seriesId, seriesName, characterId, status, logs, result,
@@ -217,6 +254,31 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
             setLoading(false);
         })();
     }, [fetchSeries, fetchCharacters, fetchCreations]);
+
+    useEffect(() => {
+        try { localStorage.setItem(DECK_FILTERS_STORAGE_KEY, JSON.stringify(deckFilters)); } catch { /* ignore */ }
+    }, [deckFilters]);
+
+    const filteredCreations = useMemo(() => creations.filter((c) => {
+        if (deckFilters.status !== 'all' && c.status !== deckFilters.status) return false;
+        if (deckFilters.model !== 'all' && modelBadgeLabel(c.slots) !== deckFilters.model) return false;
+        if (deckFilters.type !== 'all' && c.slots?.deck_type !== deckFilters.type) return false;
+        if (deckFilters.audience !== 'all' && c.slots?.audience !== deckFilters.audience) return false;
+        if (deckFilters.seriesId !== 'all' && c.slots?.series_id !== deckFilters.seriesId) return false;
+        return true;
+    }), [creations, deckFilters]);
+    const deckFiltersActive = JSON.stringify(deckFilters) !== JSON.stringify(DEFAULT_DECK_FILTERS);
+
+    // Selection is always drawn from currently-visible decks — if a filter hides a
+    // selected deck, drop it from the selection rather than letting Export/Delete act
+    // on decks the user can no longer see.
+    useEffect(() => {
+        setSelectedDeckIds((prev) => {
+            const visibleIds = new Set(filteredCreations.map((c) => c.id));
+            const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+            return next.size === prev.size ? prev : next;
+        });
+    }, [filteredCreations]);
 
     // Fetch pose counts for every distinct character used by a series.
     useEffect(() => {
@@ -373,6 +435,39 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
         }
     };
 
+    const deleteSelected = async () => {
+        const ids = [...selectedDeckIds];
+        if (ids.length === 0) return;
+        if (!window.confirm(`Delete ${ids.length} deck(s)? This permanently removes their slide images. This cannot be undone.`)) return;
+        setDeleting(true);
+        setDeleteNote('');
+        setDeleteError('');
+        const results = await Promise.all(ids.map(async (id) => {
+            try {
+                const res = await fetch(getApiUrl(`/api/charshow/deck/${id}`), { method: 'DELETE' });
+                if (!res.ok) throw new Error();
+                return { id, ok: true };
+            } catch {
+                return { id, ok: false };
+            }
+        }));
+        const succeededIds = new Set(results.filter((r) => r.ok).map((r) => r.id));
+        const failedCount = results.length - succeededIds.size;
+        if (succeededIds.size > 0) {
+            setCreations((prev) => prev.filter((c) => !succeededIds.has(c.id)));
+        }
+        // Failed deletes stay selected so the user can see what to retry; successes clear.
+        setSelectedDeckIds(new Set(ids.filter((id) => !succeededIds.has(id))));
+        if (succeededIds.size > 0) {
+            setDeleteNote(`Deleted ${succeededIds.size} deck${succeededIds.size === 1 ? '' : 's'}`);
+            setTimeout(() => setDeleteNote(''), 2500);
+        }
+        if (failedCount > 0) {
+            setDeleteError(`${failedCount} deck${failedCount === 1 ? '' : 's'} failed to delete.`);
+        }
+        setDeleting(false);
+    };
+
     const editingSeriesId = seriesRouteMatch?.params?.id || null;
     const editingSeries = newSeriesDraft || (editingSeriesId ? (series.find((s) => s.id === editingSeriesId) || null) : null);
     const viewingDeckId = deckRouteMatch?.params?.id || null;
@@ -498,15 +593,108 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
                         <h2 className="text-lg font-semibold text-foreground">Decks</h2>
-                        <button
-                            onClick={exportSelected}
-                            disabled={selectedDeckIds.size === 0 || exporting}
-                            className="flex items-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                            Export selected {selectedDeckIds.size > 0 ? `(${selectedDeckIds.size})` : ''}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={exportSelected}
+                                disabled={selectedDeckIds.size === 0 || exporting}
+                                className="flex items-center gap-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                                {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                Export selected {selectedDeckIds.size > 0 ? `(${selectedDeckIds.size})` : ''}
+                            </button>
+                            {selectedDeckIds.size > 0 && (
+                                <button
+                                    onClick={deleteSelected}
+                                    disabled={deleting}
+                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                    Delete selected ({selectedDeckIds.size})
+                                </button>
+                            )}
+                        </div>
                     </div>
+
+                    {creations.length > 0 && (
+                        <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
+                            <FilterPillGroup
+                                label="Status"
+                                value={deckFilters.status}
+                                onChange={(v) => setDeckFilters((f) => ({ ...f, status: v }))}
+                                options={[
+                                    { value: 'all', label: 'All' },
+                                    { value: 'draft', label: 'Unpublished' },
+                                    { value: 'scheduled', label: 'Scheduled' },
+                                    { value: 'published', label: 'Published' },
+                                ]}
+                            />
+                            <FilterPillGroup
+                                label="Model"
+                                value={deckFilters.model}
+                                onChange={(v) => setDeckFilters((f) => ({ ...f, model: v }))}
+                                options={[
+                                    { value: 'all', label: 'All' },
+                                    { value: 'Gemini Pro', label: 'Gemini Pro' },
+                                    { value: 'GPT Image 2', label: 'GPT Image 2' },
+                                    { value: 'Typeset', label: 'Typeset' },
+                                ]}
+                            />
+                            <FilterPillGroup
+                                label="Type"
+                                value={deckFilters.type}
+                                onChange={(v) => setDeckFilters((f) => ({ ...f, type: v }))}
+                                options={[
+                                    { value: 'all', label: 'All' },
+                                    { value: 'workout', label: 'Workout' },
+                                    { value: 'info', label: 'Info' },
+                                ]}
+                            />
+                            <FilterPillGroup
+                                label="Audience"
+                                value={deckFilters.audience}
+                                onChange={(v) => setDeckFilters((f) => ({ ...f, audience: v }))}
+                                options={[
+                                    { value: 'all', label: 'All' },
+                                    { value: 'men', label: AUDIENCE_LABELS.men },
+                                    { value: 'women', label: AUDIENCE_LABELS.women },
+                                ]}
+                            />
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Series</span>
+                                <select
+                                    value={deckFilters.seriesId}
+                                    onChange={(e) => setDeckFilters((f) => ({ ...f, seriesId: e.target.value }))}
+                                    className="input-field w-auto text-xs py-1"
+                                >
+                                    <option value="all">All</option>
+                                    {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1" />
+                            {deckFiltersActive && (
+                                <button
+                                    onClick={() => setDeckFilters(DEFAULT_DECK_FILTERS)}
+                                    className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2 py-1 transition-colors"
+                                >
+                                    Clear filters
+                                </button>
+                            )}
+                            <span className="text-xs text-muted-foreground shrink-0">
+                                {filteredCreations.length} of {creations.length} decks
+                            </span>
+                        </div>
+                    )}
+
+                    {deleteNote && (
+                        <p className="text-sm font-medium text-green-700 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
+                            {deleteNote}
+                        </p>
+                    )}
+                    {deleteError && (
+                        <p className="text-sm font-medium text-red-700 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                            {deleteError}
+                        </p>
+                    )}
 
                     {exportResult && (
                         <div className="flex items-center justify-between gap-3 text-sm text-green-700 bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3">
@@ -534,9 +722,13 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                         <p className="text-sm text-muted-foreground bg-muted border border-border rounded-xl p-6 text-center">
                             No decks yet — generate one from a series above.
                         </p>
+                    ) : filteredCreations.length === 0 ? (
+                        <p className="text-sm text-muted-foreground bg-muted border border-border rounded-xl p-6 text-center">
+                            No decks match the current filters.
+                        </p>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {creations.map((c) => {
+                            {filteredCreations.map((c) => {
                                 const selected = selectedDeckIds.has(c.id);
                                 const meta = statusMeta(c.status, c.scheduled_for, c.published_at);
                                 return (
