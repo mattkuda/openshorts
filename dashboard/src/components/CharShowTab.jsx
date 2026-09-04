@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useMatch } from 'react-router-dom';
 import {
     Plus, Loader2, Sparkles, Layers,
-    Copy, Check, X, Download, Trash2,
+    Copy, Check, X, Download, Trash2, Coins,
 } from 'lucide-react';
 import { getApiUrl } from '../config';
 import CharShowSeriesEditor from './CharShowSeriesEditor';
 import CharShowDeckModal from './CharShowDeckModal';
 import CharShowGenerateModal from './CharShowGenerateModal';
 import CharShowJobLogBar from './CharShowJobLogBar';
+import CharShowSpendingView from './CharShowSpendingView';
 
 const POSE_PACK_TARGET = 20;
 
@@ -175,6 +176,7 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
     // "New series" has no id yet, so it stays local, ephemeral client state instead.
     const seriesRouteMatch = useMatch('/slideshows/series/:id');
     const deckRouteMatch = useMatch('/slideshows/decks/:id');
+    const spendingRouteMatch = useMatch('/slideshows/spending');
     const [newSeriesDraft, setNewSeriesDraft] = useState(null); // {} sentinel while creating, else null
 
     const [series, setSeries] = useState([]);
@@ -528,6 +530,10 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
         );
     }
 
+    if (spendingRouteMatch) {
+        return <CharShowSpendingView onBack={() => navigate('/slideshows')} onOpenDeck={goToDeck} />;
+    }
+
     return (
         <>
         <div className="h-full overflow-y-auto custom-scrollbar p-6 md:p-10 animate-[fadeIn_0.3s_ease-out]">
@@ -545,9 +551,17 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
 
                     <div className="flex items-center justify-between gap-4">
                         <h2 className="text-lg font-semibold text-foreground">Series</h2>
-                        <button onClick={() => setNewSeriesDraft({})} className="btn-primary flex items-center gap-2 text-sm">
-                            <Plus size={16} /> New series
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => navigate('/slideshows/spending')}
+                                className="flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                            >
+                                <Coins size={16} /> Spending
+                            </button>
+                            <button onClick={() => setNewSeriesDraft({})} className="btn-primary flex items-center gap-2 text-sm">
+                                <Plus size={16} /> New series
+                            </button>
+                        </div>
                     </div>
 
                     {loading ? (

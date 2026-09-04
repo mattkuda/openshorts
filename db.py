@@ -158,6 +158,32 @@ class CharacterLook(Base):
         }
 
 
+class SpendEvent(Base):
+    """One AI-spend event (deck generation, slide regen, pose pack…) — the ledger
+    behind the Spending view. Costs are estimates from per-call price tables, not
+    the provider's bill."""
+    __tablename__ = "spend_events"
+    id = Column(String(32), primary_key=True, default=_uuid)
+    kind = Column(String(20), default="deck")        # deck | regen | poses | rerender
+    series_id = Column(String(32), default="")
+    creation_id = Column(String(32), default="")
+    image_model = Column(String(20), default="gemini")
+    image_calls = Column(Integer, default=0)
+    text_calls = Column(Integer, default=0)
+    est_usd = Column(String(20), default="0")        # stored as string to keep sqlite/pg portable
+    seconds = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "kind": self.kind, "series_id": self.series_id,
+            "creation_id": self.creation_id, "image_model": self.image_model or "gemini",
+            "image_calls": self.image_calls or 0, "text_calls": self.text_calls or 0,
+            "est_usd": float(self.est_usd or 0), "seconds": self.seconds or 0,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class ImageCollection(Base):
     """A named pack of preset photos used by slideshow automations."""
     __tablename__ = "image_collections"

@@ -2796,7 +2796,7 @@ async def api_schedule_cancel(post_id: str):
 # ClipZoo Characters — reusable AI personas (ReelFarm-style):
 # identity → Gemini portrait → consistent "looks" via reference image.
 # =====================================================================
-from db import Character, CharacterLook
+from db import Character, CharacterLook, SpendEvent
 from characters import (generate_portrait, generate_look, random_scene,
                         ATTRIBUTE_SCHEMA, build_portrait_prompt)
 
@@ -3668,7 +3668,13 @@ async def api_charshow_poses_generate(req: CharshowPosesRequest,
 
     async def run():
         try:
+            from charshow import ai_tally as _tally_fn
+            _ps, _pt = _tally_fn(), time.time()
             created = await asyncio.to_thread(generate_pose_pack, x_gemini_key, req.character_id, bool(req.mock), log)
+            _pn = _tally_fn()
+            if not req.mock:
+                _log_spend("poses", "", "", "gemini", _pn["image"] - _ps["image"], _pn["text"] - _ps["text"],
+                           _pn["est_usd"] - _ps["est_usd"], round(time.time() - _pt))
             if job_id in charshow_jobs:
                 charshow_jobs[job_id]["result"] = {"created": created, "count": len(created)}
                 charshow_jobs[job_id]["status"] = "completed"
@@ -3718,6 +3724,21 @@ def _save_charshow_creation(meta, pngs):
     )
 
 
+def _log_spend(kind, series_id="", creation_id="", image_model="gemini",
+               image_calls=0, text_calls=0, est_usd=0.0, seconds=0):
+    """Append one row to the spend ledger (never raises — spend logging must not
+    break generation)."""
+    try:
+        with get_session() as s:
+            s.add(SpendEvent(kind=kind, series_id=series_id or "", creation_id=creation_id or "",
+                             image_model=image_model or "gemini", image_calls=int(image_calls or 0),
+                             text_calls=int(text_calls or 0), est_usd=f"{float(est_usd or 0):.4f}",
+                             seconds=int(seconds or 0)))
+            s.commit()
+    except Exception as e:
+        print(f"⚠️ spend log failed: {e}")
+
+
 def _charshow_schedule_date(schedule, deck_index):
     """Deck i of a batch → its publish date under {start_date, per_day} (per_day decks
     share a date, consecutive days)."""
@@ -3760,6 +3781,10 @@ def _run_charshow_generate(series_id, gemini_key, count, mock, log=print, audien
         series = {**series, "topic_bank": meta.pop("topic_bank"), "used_topics": meta.pop("used_topics"),
                   "_audience_filter": series.get("_audience_filter")}
         creation = _save_charshow_creation(meta, pngs)
+        gs = meta.get("gen_stats") or {}
+        if not mock:
+            _log_spend("deck", series_id, creation["id"], meta.get("image_model", "gemini"),
+                       gs.get("image_calls", 0), gs.get("text_calls", 0), gs.get("est_usd", 0), gs.get("seconds", 0))
         if schedule and schedule.get("start_date"):
             when = _charshow_schedule_date(schedule, i)
             with get_session() as s:
@@ -3934,6 +3959,9 @@ async def api_charshow_slide_regen(req: CharshowSlideRegenRequest,
         if not creation:
             raise HTTPException(status_code=404, detail="Creation not found")
         slots = json.loads(creation.slots_json or "{}")
+    from charshow import ai_tally as _ai_tally
+    _snap = _ai_tally()
+    _t0 = time.time()
     try:
         new_png, new_slides = await asyncio.to_thread(
             regen_slide_art, slots, req.slide_index, req.guidance or "", api_key, bool(req.mock))
@@ -3942,10 +3970,22 @@ async def api_charshow_slide_regen(req: CharshowSlideRegenRequest,
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Slide regen failed: {e}")
 
+    _now_t = _ai_tally()
+    if not req.mock:
+        _log_spend("regen", slots.get("series_id", ""), req.creation_id, slots.get("image_model", "gemini"),
+                   _now_t["image"] - _snap["image"], _now_t["text"] - _snap["text"],
+                   _now_t["est_usd"] - _snap["est_usd"], round(time.time() - _t0))
     with get_session() as s:
         creation = s.get(Creation, req.creation_id)
         slots = json.loads(creation.slots_json or "{}")
         slots["slides"] = new_slides
+        # fold regen cost into the deck's own stats so the modal stays truthful
+        if not req.mock:
+            gs = slots.get("gen_stats") or {}
+            gs["image_calls"] = int(gs.get("image_calls", 0)) + (_now_t["image"] - _snap["image"])
+            gs["text_calls"] = int(gs.get("text_calls", 0)) + (_now_t["text"] - _snap["text"])
+            gs["est_usd"] = round(float(gs.get("est_usd", 0)) + (_now_t["est_usd"] - _snap["est_usd"]), 2)
+            slots["gen_stats"] = gs
         creation.slots_json = json.dumps(slots)
         images = json.loads(creation.image_paths_json or "[]")
         old_web = images[req.slide_index - 1] if req.slide_index - 1 < len(images) else None
@@ -3958,6 +3998,98 @@ async def api_charshow_slide_regen(req: CharshowSlideRegenRequest,
         if os.path.exists(fp):
             os.remove(fp)
     return {"creation": updated}
+
+
+# ---- Spending ledger -----------------------------------------------------
+
+def _backfill_spend_from_decks():
+    """One-time: decks generated before the ledger existed get a synthetic 'deck'
+    event from their stored gen_stats, dated at their creation time."""
+    with get_session() as s:
+        known = {e.creation_id for e in s.query(SpendEvent).filter(SpendEvent.kind == "deck").all()}
+        rows = s.query(Creation).filter(Creation.kind == "char_slideshow").all()
+        n = 0
+        for c in rows:
+            if c.id in known:
+                continue
+            slots = json.loads(c.slots_json or "{}")
+            gs = slots.get("gen_stats") or {}
+            if not gs or float(gs.get("est_usd", 0) or 0) <= 0:
+                continue
+            s.add(SpendEvent(kind="deck", series_id=slots.get("series_id") or "", creation_id=c.id,
+                             image_model=slots.get("image_model") or "gemini",
+                             image_calls=int(gs.get("image_calls", 0)), text_calls=int(gs.get("text_calls", 0)),
+                             est_usd=f"{float(gs.get('est_usd', 0)):.4f}", seconds=int(gs.get("seconds", 0)),
+                             created_at=c.created_at))
+            n += 1
+        s.commit()
+        return n
+
+
+@app.get("/api/charshow/spend")
+async def api_charshow_spend(days: int = 30):
+    """Aggregated AI spend (estimates) for the Spending view: totals, per-day series,
+    breakdowns by series / model / kind, and the recent event list."""
+    from collections import defaultdict
+    from datetime import timedelta
+    _backfill_spend_from_decks()
+    since = datetime.now(dt_timezone.utc) - timedelta(days=max(1, min(int(days), 365)))
+    with get_session() as s:
+        events = [e.to_dict() for e in s.query(SpendEvent).order_by(SpendEvent.created_at.desc()).all()]
+        series_names = {r.id: r.name for r in s.query(SlideshowSeries).all()}
+        deck_titles = {c.id: c.title for c in s.query(Creation).filter(Creation.kind == "char_slideshow").all()}
+
+    def _in_window(e):
+        try:
+            return datetime.fromisoformat(e["created_at"]) >= since
+        except Exception:
+            return True
+
+    window = [e for e in events if _in_window(e)]
+    by_day, by_series, by_model, by_kind = defaultdict(float), defaultdict(float), defaultdict(float), defaultdict(float)
+    calls_by_day = defaultdict(lambda: {"image": 0, "text": 0})
+    for e in window:
+        day = (e["created_at"] or "")[:10]
+        by_day[day] += e["est_usd"]
+        calls_by_day[day]["image"] += e["image_calls"]
+        calls_by_day[day]["text"] += e["text_calls"]
+        by_series[series_names.get(e["series_id"], "(other)")] += e["est_usd"]
+        by_model[e["image_model"]] += e["est_usd"]
+        by_kind[e["kind"]] += e["est_usd"]
+
+    deck_events = [e for e in window if e["kind"] == "deck"]
+    total = sum(e["est_usd"] for e in window)
+    all_time = sum(e["est_usd"] for e in events)
+    # fill missing days so charts have a continuous axis
+    day_series = []
+    d = since.date()
+    end = datetime.now(dt_timezone.utc).date()
+    while d <= end:
+        k = d.isoformat()
+        day_series.append({"day": k, "usd": round(by_day.get(k, 0.0), 2),
+                           "image_calls": calls_by_day[k]["image"], "text_calls": calls_by_day[k]["text"]})
+        d += timedelta(days=1)
+
+    for e in window[:50]:
+        e["series_name"] = series_names.get(e["series_id"], "")
+        e["deck_title"] = deck_titles.get(e["creation_id"], "")
+
+    return {
+        "days": days,
+        "total_usd": round(total, 2),
+        "all_time_usd": round(all_time, 2),
+        "deck_count": len(deck_events),
+        "avg_per_deck_usd": round(total / len(deck_events), 2) if deck_events else 0.0,
+        "image_calls": sum(e["image_calls"] for e in window),
+        "text_calls": sum(e["text_calls"] for e in window),
+        "by_day": day_series,
+        "by_series": sorted([{"name": k, "usd": round(v, 2)} for k, v in by_series.items()], key=lambda x: -x["usd"]),
+        "by_model": sorted([{"name": k, "usd": round(v, 2)} for k, v in by_model.items()], key=lambda x: -x["usd"]),
+        "by_kind": sorted([{"name": k, "usd": round(v, 2)} for k, v in by_kind.items()], key=lambda x: -x["usd"]),
+        "recent": window[:50],
+        "note": "Estimates from per-call price tables (Gemini Pro image ≈$0.134, GPT Image 2 ≈$0.165, "
+                "text/QC ≈$0.001). Your provider's billing console is the source of truth.",
+    }
 
 
 # ---- Deck lifecycle: status/schedule + delete --------------------------
