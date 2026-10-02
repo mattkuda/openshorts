@@ -783,8 +783,8 @@ export default function CharShowTab({ geminiApiKey, debug, uploadPostKey }) {
                                         </div>
                                         <div className="flex gap-1.5 overflow-x-auto custom-scrollbar pb-0.5">
                                             {(c.image_paths || []).map((img, i) => (
-                                                <div key={i} className="w-16 aspect-[9/16] bg-black rounded-lg overflow-hidden shrink-0">
-                                                    <img src={getApiUrl(img)} alt={`Slide ${i + 1}`} className="w-full h-full object-cover" />
+                                                <div key={i} className="w-16 aspect-[3/4] bg-black rounded-lg overflow-hidden shrink-0">
+                                                    <img src={getApiUrl(img)} alt={`Slide ${i + 1}`} className="w-full h-full object-contain" />
                                                 </div>
                                             ))}
                                         </div>

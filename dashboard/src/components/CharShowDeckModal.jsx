@@ -457,9 +457,9 @@ function SlidePreview({ src, onOpen }) {
     return (
         <div
             onClick={() => src && onOpen()}
-            className={`w-72 aspect-[9/16] bg-black rounded-lg overflow-hidden shrink-0 ${src ? 'cursor-zoom-in' : ''}`}
+            className={`w-72 aspect-[3/4] bg-black rounded-lg overflow-hidden shrink-0 ${src ? 'cursor-zoom-in' : ''}`}
         >
-            {src && <img src={src} alt="Slide" className="w-full h-full object-cover" />}
+            {src && <img src={src} alt="Slide" className="w-full h-full object-contain" />}
         </div>
     );
 }
@@ -554,11 +554,11 @@ function Lightbox({ slides, index, onClose, onNavigate }) {
                             key={i}
                             ref={(el) => { thumbRefs.current[i] = el; }}
                             onClick={() => goTo(i)}
-                            className={`h-20 aspect-[9/16] rounded-lg overflow-hidden shrink-0 bg-black transition-opacity ${
+                            className={`h-20 aspect-[3/4] rounded-lg overflow-hidden shrink-0 bg-black transition-opacity ${
                                 i === index ? 'ring-2 ring-primary' : 'opacity-60 hover:opacity-100'
                             }`}
                         >
-                            {s.src && <img src={s.src} alt={`Slide ${i + 1} thumbnail`} className="w-full h-full object-cover" />}
+                            {s.src && <img src={s.src} alt={`Slide ${i + 1} thumbnail`} className="w-full h-full object-contain" />}
                         </button>
                     ))}
                 </div>
